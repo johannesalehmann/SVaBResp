@@ -1,0 +1,10 @@
+[package]
+name = "tiny-pmc-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prism-model = { path = "../prism-model" }
+prism-parser = { path = "../prism-parser" }
+ariadne = { version = "0.5.1", features = ["auto-color"] }
+chumsky = "1.0.0-alpha.8"

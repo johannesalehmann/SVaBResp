@@ -1,0 +1,8 @@
+[package]
+name = "tiny-pmc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prism-model = { path = "../prism-model" }
+prism-parser = { path = "../prism-parser" }

@@ -1,0 +1,3 @@
+[workspace]
+resolver = "3"
+members = ["prism-model", "prism-parser", "tiny-pmc", "tiny-pmc-cli"]
