@@ -16,18 +16,27 @@ impl<A, V, S: Clone> ModuleManager<A, V, S> {
         self.modules.get(index)
     }
 
+    pub fn get_index_by_name(&self, name: &Identifier<S>) -> Option<usize> {
+        self.modules
+            .iter()
+            .enumerate()
+            .find(|(_, m)| &m.name == name)
+            .map(|(i, _)| i)
+    }
+
     pub fn get_by_name(&self, name: &Identifier<S>) -> Option<&Module<A, V, S>> {
         self.modules.iter().find(|m| &m.name == name)
     }
 
-    pub fn add(&mut self, module: Module<A, V, S>) -> Result<(), AddModuleError> {
+    pub fn add(&mut self, module: Module<A, V, S>) -> Result<usize, AddModuleError> {
         for (index, other_module) in self.modules.iter().enumerate() {
             if other_module.name == module.name {
                 return Err(AddModuleError::ModuleExists { index });
             }
         }
+        let index = self.modules.len();
         self.modules.push(module);
-        Ok(())
+        Ok(index)
     }
 
     pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> ModuleManager<A, V, S2> {
@@ -49,7 +58,6 @@ pub enum AddModuleError {
 
 pub struct Module<A, V, S: Clone> {
     pub name: Identifier<S>,
-    pub variables: VariableManager<V, S>,
     pub commands: Vec<Command<A, V, S>>,
     pub span: S,
 }
@@ -58,7 +66,6 @@ impl<A, V, S: Clone> Module<A, V, S> {
     pub fn new(name: Identifier<S>, span: S) -> Self {
         Self {
             name,
-            variables: VariableManager::new(),
             commands: Vec::new(),
             span,
         }
@@ -67,18 +74,41 @@ impl<A, V, S: Clone> Module<A, V, S> {
     pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Module<A, V, S2> {
         Module {
             name: self.name.map_span(map),
-            variables: self.variables.map_span(map),
             commands: self.commands.into_iter().map(|c| c.map_span(map)).collect(),
             span: map(self.span),
         }
     }
 }
 
-impl<A: Display, V: Display, S: Clone> Display for Module<A, V, S> {
+impl<A: Display, V: Display, S: Clone> Module<A, V, S> {
+    pub fn format<'a, 'b>(
+        &'a self,
+        variable_manager: &'b VariableManager<V, S>,
+        own_index: usize,
+    ) -> PrintableModule<'a, 'b, A, V, S> {
+        PrintableModule {
+            module: self,
+            variable_manager,
+            own_index,
+        }
+    }
+}
+
+pub struct PrintableModule<'a, 'b, A: Display, V: Display, S: Clone> {
+    module: &'a Module<A, V, S>,
+    variable_manager: &'b VariableManager<V, S>,
+    own_index: usize,
+}
+
+impl<'a, 'b, A: Display, V: Display, S: Clone> Display for PrintableModule<'a, 'b, A, V, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "module {}", self.name)?;
-        write!(f, "{}", self.variables.format_as_local_vars())?;
-        for command in &self.commands {
+        writeln!(f, "module {}", self.module.name)?;
+        write!(
+            f,
+            "{}",
+            self.variable_manager.format_as_local_vars(self.own_index)
+        )?;
+        for command in &self.module.commands {
             writeln!(f, "    {}", command)?;
         }
         writeln!(f, "endmodule")

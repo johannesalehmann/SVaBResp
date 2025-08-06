@@ -12,8 +12,7 @@ use std::fmt::{Display, Formatter};
 pub struct Model<AM, A, V, S: Clone> {
     pub model_type: ModelType<S>,
 
-    pub global_variables: VariableManager<V, S>,
-    pub global_constants: VariableManager<V, S>,
+    pub variable_manager: VariableManager<V, S>,
     pub formulas: FormulaManager<V, S>,
 
     pub action_manager: AM,
@@ -24,7 +23,7 @@ pub struct Model<AM, A, V, S: Clone> {
     pub init_constraint: Option<Expression<V, S>>,
 
     pub labels: LabelManager<V, S>,
-    pub rewards: RewardsManager<A, V, S>, // todo: turn into rewards manager
+    pub rewards: RewardsManager<A, V, S>,
 
     pub span: S,
 }
@@ -33,8 +32,7 @@ impl<AM: Default, A, V, S: Clone> Model<AM, A, V, S> {
     pub fn new(model_type: ModelType<S>, span: S) -> Self {
         Self {
             model_type,
-            global_variables: VariableManager::new(),
-            global_constants: VariableManager::new(),
+            variable_manager: VariableManager::new(),
             formulas: FormulaManager::new(),
             action_manager: AM::default(),
             modules: ModuleManager::new(),
@@ -48,8 +46,7 @@ impl<AM: Default, A, V, S: Clone> Model<AM, A, V, S> {
 
     pub fn from_components(
         model_type: ModelType<S>,
-        global_variables: VariableManager<V, S>,
-        global_constants: VariableManager<V, S>,
+        variable_manager: VariableManager<V, S>,
         formulas: FormulaManager<V, S>,
         action_manager: AM,
         modules: ModuleManager<A, V, S>,
@@ -61,8 +58,7 @@ impl<AM: Default, A, V, S: Clone> Model<AM, A, V, S> {
     ) -> Self {
         Self {
             model_type,
-            global_variables,
-            global_constants,
+            variable_manager,
             formulas,
             action_manager,
             modules,
@@ -77,8 +73,7 @@ impl<AM: Default, A, V, S: Clone> Model<AM, A, V, S> {
     pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Model<AM, A, V, S2> {
         Model {
             model_type: self.model_type.map_span(map),
-            global_variables: self.global_variables.map_span(map),
-            global_constants: self.global_constants.map_span(map),
+            variable_manager: self.variable_manager.map_span(map),
             formulas: self.formulas.map_span(map),
             action_manager: self.action_manager,
             modules: self.modules.map_span(map),
@@ -139,8 +134,8 @@ impl<AM, A: Display, V: Display, S: Clone> Display for Model<AM, A, V, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.model_type)?;
         writeln!(f, "")?;
-        write!(f, "{}", self.global_constants.format_as_consts())?;
-        write!(f, "{}", self.global_variables.format_as_global_vars())?;
+        write!(f, "{}", self.variable_manager.format_as_consts())?;
+        write!(f, "{}", self.variable_manager.format_as_global_vars())?;
         write!(f, "{}", self.formulas)?;
         write!(f, "{}", self.labels)?;
         if let Some(init) = &self.init_constraint {
@@ -148,8 +143,8 @@ impl<AM, A: Display, V: Display, S: Clone> Display for Model<AM, A, V, S> {
             writeln!(f, "    {}", init)?;
             writeln!(f, "endinit")?;
         }
-        for module in &self.modules.modules {
-            writeln!(f, "{}", module)?;
+        for (i, module) in self.modules.modules.iter().enumerate() {
+            writeln!(f, "{}", module.format(&self.variable_manager, i))?;
         }
         for renamed_module in &self.renamed_modules {
             writeln!(f, "{}", renamed_module)?;

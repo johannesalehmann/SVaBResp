@@ -1,4 +1,5 @@
 use crate::module::RenameRules;
+use crate::variable_index::VariableIndex;
 use crate::{Expression, Identifier};
 use std::fmt::{Display, Formatter};
 
@@ -55,28 +56,37 @@ impl<V, S: Clone> VariableManager<V, S> {
         PrintableVariableManager {
             vm: &self,
             display_kind: VariablePrintingStyle::Const,
+            filter: VariableFilter::Constant,
         }
     }
     pub fn format_as_global_vars(&self) -> PrintableVariableManager<V, S> {
         PrintableVariableManager {
             vm: &self,
             display_kind: VariablePrintingStyle::GlobalVar,
+            filter: VariableFilter::GlobalVar,
         }
     }
-    pub fn format_as_local_vars(&self) -> PrintableVariableManager<V, S> {
+    pub fn format_as_local_vars(&self, module: usize) -> PrintableVariableManager<V, S> {
         PrintableVariableManager {
             vm: &self,
             display_kind: VariablePrintingStyle::LocalVar,
+            filter: VariableFilter::LocalVar(module),
         }
     }
 }
 impl<S: Clone> VariableManager<Identifier<S>, S> {
-    pub fn renamed(
-        &self,
+    pub fn add_renamed(
+        &mut self,
+        old_module_index: usize,
+        new_module_index: usize,
         rename_rules: &RenameRules<S>,
     ) -> Result<VariableManager<Identifier<S>, S>, MissingVariableRenaming<S>> {
         let mut variables = Vec::with_capacity(self.variables.len());
-        for variable in &self.variables {
+        for i in 0..self.variables.len() {
+            let variable = &self.variables[i];
+            if variable.is_constant || variable.scope != Some(old_module_index) {
+                continue;
+            }
             match rename_rules.get_renaming(&variable.name) {
                 None => {
                     return Err(MissingVariableRenaming {
@@ -84,15 +94,20 @@ impl<S: Clone> VariableManager<Identifier<S>, S> {
                         original_definition: variable.span.clone(),
                     })
                 }
-                Some(renaming) => variables.push(VariableInfo {
-                    range: variable.range.renamed(rename_rules),
-                    name: renaming,
-                    initial_value: variable
-                        .initial_value
-                        .as_ref()
-                        .map(|i| i.renamed(rename_rules)),
-                    span: variable.span.clone(),
-                }),
+                Some(renaming) => {
+                    let new_var = VariableInfo {
+                        range: variable.range.renamed(rename_rules),
+                        name: renaming,
+                        initial_value: variable
+                            .initial_value
+                            .as_ref()
+                            .map(|i| i.renamed(rename_rules)),
+                        span: variable.span.clone(),
+                        is_constant: false,
+                        scope: Some(new_module_index),
+                    };
+                    self.variables.push(new_var)
+                }
             }
         }
 
@@ -124,6 +139,8 @@ impl std::fmt::Debug for VariableAddError {
 }
 
 pub struct VariableInfo<V, S: Clone> {
+    pub is_constant: bool,
+    pub scope: Option<usize>,
     pub range: VariableRange<V, S>,
     pub name: Identifier<S>,
     pub initial_value: Option<Expression<V, S>>,
@@ -131,18 +148,28 @@ pub struct VariableInfo<V, S: Clone> {
 }
 
 impl<V, S: Clone> VariableInfo<V, S> {
-    pub fn new(name: Identifier<S>, range: VariableRange<V, S>, span: S) -> Self {
+    pub fn new(
+        name: Identifier<S>,
+        range: VariableRange<V, S>,
+        span: S,
+        is_constant: bool,
+        scope: Option<usize>,
+    ) -> Self {
         Self {
             name,
             range,
             initial_value: None,
             span,
+            is_constant,
+            scope,
         }
     }
 
     pub fn with_initial_value(
         name: Identifier<S>,
         range: VariableRange<V, S>,
+        is_constant: bool,
+        scope: Option<usize>,
         initial_value: Expression<V, S>,
         span: S,
     ) -> Self {
@@ -151,12 +178,16 @@ impl<V, S: Clone> VariableInfo<V, S> {
             range,
             initial_value: Some(initial_value),
             span,
+            is_constant,
+            scope,
         }
     }
 
     pub fn with_optional_initial_value(
         name: Identifier<S>,
         range: VariableRange<V, S>,
+        is_constant: bool,
+        scope: Option<usize>,
         initial_value: Option<Expression<V, S>>,
         span: S,
     ) -> Self {
@@ -165,11 +196,15 @@ impl<V, S: Clone> VariableInfo<V, S> {
             range,
             initial_value,
             span,
+            is_constant,
+            scope,
         }
     }
 
     pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> VariableInfo<V, S2> {
         VariableInfo {
+            is_constant: self.is_constant,
+            scope: self.scope,
             range: self.range.map_span(map),
             name: self.name.map_span(map),
             initial_value: self.initial_value.map(|i| i.map_span(map)),
@@ -292,11 +327,6 @@ impl VariableReference {
     }
 }
 
-pub struct PrintableVariableManager<'a, V, S: Clone> {
-    vm: &'a VariableManager<V, S>,
-    display_kind: VariablePrintingStyle,
-}
-
 #[derive(PartialEq)]
 enum VariablePrintingStyle {
     Const,
@@ -304,9 +334,36 @@ enum VariablePrintingStyle {
     LocalVar,
 }
 
+enum VariableFilter {
+    Constant,
+    GlobalVar,
+    LocalVar(usize),
+}
+
+impl VariableFilter {
+    fn accepts<V, S: Clone>(&self, variable: &VariableInfo<V, S>) -> bool {
+        match self {
+            VariableFilter::Constant => variable.is_constant,
+            VariableFilter::GlobalVar => !variable.is_constant && variable.scope.is_none(),
+            VariableFilter::LocalVar(index) => {
+                !variable.is_constant && variable.scope == Some(*index)
+            }
+        }
+    }
+}
+
+pub struct PrintableVariableManager<'a, V, S: Clone> {
+    vm: &'a VariableManager<V, S>,
+    display_kind: VariablePrintingStyle,
+    filter: VariableFilter,
+}
+
 impl<'a, V: Display, S: Clone> Display for PrintableVariableManager<'a, V, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for variable in &self.vm.variables {
+            if !self.filter.accepts(variable) {
+                continue;
+            }
             if self.display_kind == VariablePrintingStyle::Const {
                 write!(f, "const {} {}", variable.range, variable.name)?;
                 if let Some(initial) = &variable.initial_value {

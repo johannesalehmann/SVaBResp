@@ -5,8 +5,9 @@ use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use prism_model::{
     Identifier, ModelType, ModuleManager, RewardsTarget, VariableAddError, VariableInfo,
-    VariableManager,
+    VariableManager, VariableReference,
 };
+use std::env::var;
 
 pub type E<'a> = extra::Err<crate::PrismParserError<'a, Span, Token>>; // Rich<'a, Token, Span>
 
@@ -51,8 +52,7 @@ fn build_program_from_type_and_elements<'a>(
     let mut model_type = Option::None;
     let mut modules = ModuleManager::new();
     let mut renamed_modules = Vec::new();
-    let mut consts = prism_model::VariableManager::new();
-    let mut global_vars = prism_model::VariableManager::new();
+    let mut variables = VariableManager::new();
     let mut labels = prism_model::LabelManager::new();
     let mut formulas = prism_model::FormulaManager::new();
     let mut init_constraint = None;
@@ -60,11 +60,21 @@ fn build_program_from_type_and_elements<'a>(
 
     for element in elements {
         match element {
-            ProgramElement::Module(m) => {
+            ProgramElement::Module(m, m_vars) => {
                 let span = m.span.clone();
 
                 match modules.add(m) {
-                    Ok(()) => {}
+                    Ok(module_index) => {
+                        for mut variable in m_vars {
+                            variable.scope = Some(module_index);
+                            add_or_emit_variable(
+                                &mut variables,
+                                variable,
+                                ElementKind::LocalVar,
+                                emitter,
+                            );
+                        }
+                    }
                     Err(prism_model::AddModuleError::ModuleExists { index }) => emitter.emit(
                         PrismParserValidationError::DuplicateElement {
                             previous_occurrence: modules.get(index).unwrap().span,
@@ -77,15 +87,10 @@ fn build_program_from_type_and_elements<'a>(
             }
             ProgramElement::RenamedModule(m) => renamed_modules.push(m),
             ProgramElement::Const(c) => {
-                add_or_emit_variable(&mut consts, c, crate::error::ElementKind::Const, emitter);
+                add_or_emit_variable(&mut variables, c, ElementKind::Const, emitter);
             }
             ProgramElement::GlobalVariable(v) => {
-                add_or_emit_variable(
-                    &mut global_vars,
-                    v,
-                    crate::error::ElementKind::GlobalVar,
-                    emitter,
-                );
+                add_or_emit_variable(&mut variables, v, ElementKind::GlobalVar, emitter);
             }
             ProgramElement::Label(l) => {
                 let span = l.span;
@@ -177,8 +182,7 @@ fn build_program_from_type_and_elements<'a>(
 
     prism_model::Model::from_components(
         model_type,
-        global_vars,
-        consts,
+        variables,
         formulas,
         (),
         modules,
@@ -194,7 +198,10 @@ enum ProgramElement {
     ModelType(ModelType<Span>),
     Const(prism_model::VariableInfo<Identifier<Span>, Span>),
     Label(prism_model::Label<Identifier<Span>, Span>),
-    Module(prism_model::Module<Identifier<Span>, Identifier<Span>, Span>),
+    Module(
+        prism_model::Module<Identifier<Span>, Identifier<Span>, Span>,
+        Vec<VariableInfo<Identifier<Span>, Span>>,
+    ),
     RenamedModule(prism_model::RenamedModule<Span>),
     GlobalVariable(prism_model::VariableInfo<Identifier<Span>, Span>),
     Formula(prism_model::Formula<Identifier<Span>, Span>),
@@ -208,7 +215,7 @@ where
 {
     model_type_parser()
         .map(ProgramElement::ModelType)
-        .or(module_parser().map(ProgramElement::Module))
+        .or(module_parser().map(|(m, v)| ProgramElement::Module(m, v)))
         .or(renamed_module_parser().map(ProgramElement::RenamedModule))
         .or(const_parser().map(ProgramElement::Const))
         .or(label_parser().map(ProgramElement::Label))
@@ -273,6 +280,8 @@ where
                 Ok(prism_model::VariableInfo::with_optional_initial_value(
                     name,
                     const_type,
+                    true,
+                    None,
                     value,
                     e.span(),
                 ))
@@ -339,8 +348,15 @@ where
         .as_context()
 }
 
-fn module_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Module<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+fn module_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    (
+        prism_model::Module<Identifier<Span>, Identifier<Span>, Span>,
+        Vec<VariableInfo<Identifier<Span>, Span>>,
+    ),
+    E<'a>,
+>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -360,13 +376,17 @@ fn create_module_from_name_and_elements(
     module_elements: Vec<ModuleElement>,
     span: Span,
     emitter: &mut chumsky::input::Emitter<PrismParserError<Span, Token>>,
-) -> prism_model::Module<Identifier<Span>, Identifier<Span>, Span> {
+) -> (
+    prism_model::Module<Identifier<Span>, Identifier<Span>, Span>,
+    Vec<VariableInfo<Identifier<Span>, Span>>,
+) {
     let mut module = prism_model::Module::new(name, span);
+    let mut variables = Vec::new();
 
     for element in module_elements {
         match element {
             ModuleElement::Variable(v) => {
-                add_or_emit_variable(&mut module.variables, v, ElementKind::LocalVar, emitter);
+                variables.push(v);
             }
             ModuleElement::Command(c) => {
                 module.commands.push(c);
@@ -374,7 +394,7 @@ fn create_module_from_name_and_elements(
         }
     }
 
-    module
+    (module, variables)
 }
 
 fn renamed_module_parser<'a, 'b, I>() -> impl Parser<'a, I, prism_model::RenamedModule<Span>, E<'a>>
@@ -482,7 +502,14 @@ where
         .then(init_parser.or_not())
         .then_ignore(just(Token::Semicolon))
         .map_with(|((name, domain), init), e| {
-            prism_model::VariableInfo::with_optional_initial_value(name, domain, init, e.span())
+            prism_model::VariableInfo::with_optional_initial_value(
+                name,
+                domain,
+                false,
+                None,
+                init,
+                e.span(),
+            )
         })
         .labelled("global variable declaration")
         .as_context()
@@ -500,7 +527,8 @@ where
         .then(init_parser.or_not())
         .then_ignore(just(Token::Semicolon))
         .map_with(|((name, domain), init), e| {
-            prism_model::VariableInfo::with_optional_initial_value(name, domain, init, e.span())
+            VariableInfo::with_optional_initial_value(name, domain, false, None, init, e.span())
+            // Module must be changed from None to Some(...) later on
         })
         .labelled("variable declaration")
         .as_context()

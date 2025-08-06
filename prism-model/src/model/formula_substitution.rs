@@ -50,11 +50,7 @@ impl<AM, A, S: Clone> super::Model<AM, A, crate::Identifier<S>, S> {
                     }
                 }
             };
-            replace_in_var_defs(&mut self.global_constants);
-            replace_in_var_defs(&mut self.global_variables);
-            for module in &mut self.modules.modules {
-                replace_in_var_defs(&mut module.variables);
-            }
+            replace_in_var_defs(&mut self.variable_manager);
         }
 
         self.formulas.formulas.clear();

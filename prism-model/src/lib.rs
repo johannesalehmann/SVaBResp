@@ -33,5 +33,6 @@ pub use variables::{
 };
 
 mod identifier;
+mod variable_index;
 
 pub use identifier::{Identifier, InvalidName};

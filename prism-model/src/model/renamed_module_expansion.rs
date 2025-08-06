@@ -6,23 +6,17 @@ impl<S: Clone> super::Model<(), Identifier<S>, Identifier<S>, S> {
     pub fn expand_renamed_models(&mut self) -> Result<(), ModuleExpansionError<S>> {
         let renamed_modules = std::mem::replace(&mut self.renamed_modules, Vec::new());
         for renamed_module in renamed_modules {
-            let source_module = &self.modules.get_by_name(&renamed_module.old_name).ok_or(
-                ModuleExpansionError::RenamingSourceDoesNotExist {
+            let source_index = self
+                .modules
+                .get_index_by_name(&renamed_module.old_name)
+                .ok_or(ModuleExpansionError::RenamingSourceDoesNotExist {
                     old_name: renamed_module.old_name.clone(),
                     new_name: renamed_module.new_name.clone(),
                     renaming_rule: renamed_module.span.clone(),
-                },
-            )?;
+                })?;
+            let source_module = &self.modules.get(source_index).unwrap();
             let module = Module {
                 name: renamed_module.new_name.clone(),
-                variables: source_module
-                    .variables
-                    .renamed(&renamed_module.rename_rules)
-                    .map_err(|e| ModuleExpansionError::MissingVariableRenaming {
-                        variable_name: e.variable_name,
-                        original_definition: e.original_definition,
-                        renaming_rule: renamed_module.span.clone(),
-                    })?,
                 commands: source_module
                     .commands
                     .iter()
@@ -30,9 +24,20 @@ impl<S: Clone> super::Model<(), Identifier<S>, Identifier<S>, S> {
                     .collect(),
                 span: renamed_module.span.clone(),
             };
+            self.variable_manager
+                .add_renamed(
+                    source_index,
+                    self.modules.modules.len(),
+                    &renamed_module.rename_rules,
+                )
+                .map_err(|e| ModuleExpansionError::MissingVariableRenaming {
+                    variable_name: e.variable_name,
+                    original_definition: e.original_definition,
+                    renaming_rule: renamed_module.span.clone(),
+                })?;
 
             match self.modules.add(module) {
-                Ok(()) => Ok(()),
+                Ok(_) => Ok(()),
                 Err(AddModuleError::ModuleExists { index }) => {
                     Err(ModuleExpansionError::DuplicateModule {
                         name: renamed_module.new_name.clone(),
