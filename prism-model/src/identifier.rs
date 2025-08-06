@@ -1,18 +1,25 @@
-use std::fmt::Formatter;
+use crate::module::RenameRules;
+use std::fmt::{Display, Formatter};
 
 #[derive(Clone)]
-pub struct Identifier<S> {
+pub struct Identifier<S: Clone> {
     pub name: String,
     pub span: S,
 }
 
-impl<S> std::fmt::Debug for Identifier<S> {
+impl<S: Clone> std::fmt::Debug for Identifier<S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-impl<S> Identifier<S> {
+impl<S: Clone> Display for Identifier<S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl<S: Clone> Identifier<S> {
     const RESERVED_NAMES: &'static [&'static str] = &[
         "A",
         "bool",
@@ -119,9 +126,19 @@ impl<S> Identifier<S> {
 
         Ok(Self { name, span })
     }
+
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Identifier<S2> {
+        Identifier {
+            name: self.name,
+            span: map(self.span),
+        }
+    }
+    pub fn renamed(&self, rename_rules: &RenameRules<S>) -> Self {
+        rename_rules.get_renaming(self).unwrap_or(self.clone())
+    }
 }
 
-impl<S> PartialEq for Identifier<S> {
+impl<S: Clone> PartialEq for Identifier<S> {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
     }

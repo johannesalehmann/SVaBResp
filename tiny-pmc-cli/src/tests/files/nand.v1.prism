@@ -5,6 +5,11 @@
 
 dtmc
 
+formula fa = x + 3 + fb + fc;
+formula fb = x + 2 + fd;
+formula fc = x + 1 + fd + fb;
+formula fd = x + 10 + fa;
+
 const int N; // number of inputs in each bundle
 const int K; // number of restorative stages
 
@@ -26,6 +31,7 @@ module multiplex
 	c : [0..N]; // counter (number of copies of the nand done)
 
 	s : [0..4]; // local state
+
 	// 0 - initial state
 	// 1 - set x inputs
 	// 2 - set y inputs

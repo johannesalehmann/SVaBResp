@@ -1,0 +1,25 @@
+mdp
+
+formula fa = 5;
+formula fb = fc+fc+fc;
+formula fc = fd*fd*fd;
+formula fd = fe+fe*fe;
+formula fe = ff+ff+ff;
+formula ff = fg+fg+fg;
+formula fg = fh+fh+fh;
+formula fh = fi+fi+fi;
+formula fi = fj+fj+fj;
+formula fj = fk+fk+fk;
+formula fk = fl+fl+fl;
+formula fl = 3;
+
+module x
+    a: int init 7;
+    b: [0..5] init a + c;
+    c: bool init true;
+    d: bool init a=b;
+    [] a -> b/10:(a'=c+d) + (1-b/10):(a'=c);
+endmodule
+
+module y = x [a=ya,b=yb,c=yc, d=yd] endmodule
+module z = qwerqwe123412 [a=za,b=zb,c=zc, d=zd] endmodule

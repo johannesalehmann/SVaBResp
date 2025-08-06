@@ -3,7 +3,7 @@ use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::error::RichPattern;
 use chumsky::prelude::SimpleSpan;
 use chumsky::util::MaybeRef;
-use prism_model::{Identifier, InvalidName, Model};
+use prism_model::{Identifier, InvalidName, Model, ModuleExpansionError};
 use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
 
@@ -13,11 +13,15 @@ pub fn parse_prism(
 ) -> Option<Model<(), Identifier<SimpleSpan>, Identifier<SimpleSpan>, SimpleSpan>> {
     let parse_result = prism_parser::parse_prism(source);
 
+    let has_errors = !parse_result.errors.is_empty();
     for error in parse_result.errors {
         print_error(file_name, source, error);
     }
-
-    parse_result.output
+    if has_errors {
+        None
+    } else {
+        parse_result.output
+    }
 }
 
 fn print_error(file_name: Option<&str>, source: &str, error: PrismParserError<Span, String>) {
@@ -32,7 +36,8 @@ fn print_error(file_name: Option<&str>, source: &str, error: PrismParserError<Sp
             expected,
             found,
             contexts,
-        } => build_expected_found(file_name, span, &expected, found, &contexts),
+            help,
+        } => build_expected_found(file_name, span, &expected, found, &contexts, &help),
 
         PrismParserError::Validation(validation) => build_validation(file_name, validation),
     };
@@ -48,6 +53,7 @@ fn build_expected_found<'a>(
     expected: &Vec<RichPattern<String>>,
     found: Option<MaybeRef<String>>,
     contexts: &Vec<(RichPattern<String>, Span)>,
+    help: &Option<String>,
 ) -> ReportBuilder<'a, (&'a str, Range<usize>)> {
     let mut builder = Report::build(ReportKind::Error, (file_name, span.into_range()));
     builder.set_message(format!(
@@ -64,6 +70,11 @@ fn build_expected_found<'a>(
     if let Some((_, location)) = contexts.first() {
         builder.add_label(Label::new((file_name, location.into_range())));
     }
+
+    if let Some(help) = help {
+        builder.add_help(help);
+    }
+
     builder
 }
 
@@ -238,6 +249,101 @@ fn build_validation(
             if let Some(help) = help {
                 builder.add_help(help);
             }
+            builder
+        }
+
+        PrismParserValidationError::CyclicFormulaDependency { cycle } => {
+            let primary = cycle.entries[0].formula_span.into_range();
+            let mut builder = Report::build(ReportKind::Error, (file_name, primary));
+            builder.set_message("Cyclic dependency between formulas");
+
+            for i in 0..cycle.entries.len() {
+                let depends_on_index = match i {
+                    0 => cycle.entries.len() - 1,
+                    i => i - 1,
+                };
+                let depends_on = cycle.entries[depends_on_index].formula_name.name.clone();
+                let entry = &cycle.entries[i];
+                builder.add_label(
+                    Label::new((file_name, entry.dependency_span.into_range())).with_message(
+                        format!("{} depends on {} here", entry.formula_name.name, depends_on),
+                    ),
+                );
+                builder.add_label(Label::new((file_name, entry.formula_span.into_range())));
+            }
+
+            builder
+        }
+
+        PrismParserValidationError::ModuleExpansionError {
+            error:
+                ModuleExpansionError::DuplicateModule {
+                    name,
+                    original_module,
+                    renaming_rule,
+                },
+        } => {
+            let mut builder =
+                Report::build(ReportKind::Error, (file_name, renaming_rule.into_range()));
+            builder.set_message("Duplicate module during renaming");
+            builder.add_label(
+                Label::new((file_name, renaming_rule.into_range())).with_message(format!(
+                    "This renaming rule creates a module with name {}",
+                    name
+                )),
+            );
+            builder.add_label(
+                Label::new((file_name, original_module.into_range()))
+                    .with_message(format!("A module with name {} is first defined here", name)),
+            );
+
+            builder
+        }
+        PrismParserValidationError::ModuleExpansionError {
+            error:
+                ModuleExpansionError::MissingVariableRenaming {
+                    variable_name,
+                    original_definition,
+                    renaming_rule,
+                },
+        } => {
+            let mut builder =
+                Report::build(ReportKind::Error, (file_name, renaming_rule.into_range()));
+            builder.set_message("Missing variable renaming during module renaming");
+
+            builder.add_label(
+                Label::new((file_name, renaming_rule.into_range())).with_message(format!(
+                    "This renaming rule does not rename variable {}",
+                    variable_name
+                )),
+            );
+            builder.add_label(
+                Label::new((file_name, original_definition.into_range()))
+                    .with_message(format!("{} is defined here", variable_name)),
+            );
+
+            builder.add_note(
+                "When renaming a module, a new name must be given for every variable of the module.",
+            );
+            builder
+        }
+        PrismParserValidationError::ModuleExpansionError {
+            error:
+                ModuleExpansionError::RenamingSourceDoesNotExist {
+                    old_name,
+                    new_name,
+                    renaming_rule,
+                },
+        } => {
+            let mut builder =
+                Report::build(ReportKind::Error, (file_name, renaming_rule.into_range()));
+            builder.set_message("Renamed module does not exist");
+
+            builder.add_label(
+                Label::new((file_name, old_name.span.into_range()))
+                    .with_message(format!("Cannot find module with name {}", old_name.name)),
+            );
+
             builder
         }
     }

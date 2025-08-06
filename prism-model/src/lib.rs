@@ -2,22 +2,27 @@ mod command;
 pub use command::{Assignment, Command, Update};
 
 mod expressions;
-pub use expressions::{Expression, GlobalVariableReference, VariableScope};
+pub use expressions::{
+    DefaultMapExpression, Expression, GlobalVariableReference, IdentityMapExpression,
+    MapExpression, VariableScope,
+};
 
 mod module;
-pub use module::{Module, RenameRule, RenamedModule};
+pub use module::{AddModuleError, Module, ModuleManager, RenameRule, RenameRules, RenamedModule};
 
 mod actions;
 pub use actions::{Action, ActionManager, ActionReference, AddActionError};
 
 mod formulas;
-pub use formulas::{AddFormulaError, Formula, FormulaManager};
+pub use formulas::{
+    AddFormulaError, CyclicDependency, CyclicDependencyEntry, Formula, FormulaManager,
+};
 
 mod labels;
 pub use labels::{AddLabelError, Label, LabelManager};
 
 mod model;
-pub use model::{Model, ModelType};
+pub use model::{Model, ModelType, ModuleExpansionError};
 
 mod rewards;
 pub use rewards::{AddRewardsError, Rewards, RewardsElement, RewardsManager, RewardsTarget};
@@ -28,6 +33,5 @@ pub use variables::{
 };
 
 mod identifier;
-mod operations;
 
 pub use identifier::{Identifier, InvalidName};

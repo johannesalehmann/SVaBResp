@@ -4,18 +4,19 @@ use chumsky::util::MaybeRef;
 use prism_model::Identifier;
 
 #[derive(Debug, PartialEq)]
-pub enum PrismParserError<'a, S, T> {
+pub enum PrismParserError<'a, S: Clone, T> {
     ExpectedFound {
         span: S,
         expected: Vec<RichPattern<'a, T>>,
         found: Option<MaybeRef<'a, T>>,
         contexts: Vec<(RichPattern<'a, T>, S)>,
+        help: Option<String>,
     },
     Validation(PrismParserValidationError<S>),
 }
 
 #[derive(Debug, PartialEq)]
-pub enum PrismParserValidationError<S> {
+pub enum PrismParserValidationError<S: Clone> {
     UnsupportedModelType {
         model_type: &'static str,
         span: S,
@@ -44,6 +45,19 @@ pub enum PrismParserValidationError<S> {
         span: S,
         reason: prism_model::InvalidName,
     },
+    CyclicFormulaDependency {
+        cycle: prism_model::CyclicDependency<S>,
+    },
+    ModuleExpansionError {
+        error: prism_model::ModuleExpansionError<S>,
+    },
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CyclicDependencyEntry<S: Clone> {
+    formula_name: Identifier<S>,
+    formula_span: S,
+    dependency_span: S,
 }
 
 #[derive(Debug, PartialEq)]
@@ -54,15 +68,16 @@ pub enum ElementKind {
     Label,
     Formula,
     Reward,
+    Module,
 }
 
-impl<'a, S, T> Into<PrismParserError<'a, S, T>> for PrismParserValidationError<S> {
+impl<'a, S: Clone, T> Into<PrismParserError<'a, S, T>> for PrismParserValidationError<S> {
     fn into(self) -> PrismParserError<'a, S, T> {
         PrismParserError::Validation(self)
     }
 }
 
-impl<'a, S, T> PrismParserError<'a, S, T> {
+impl<'a, S: Clone, T> PrismParserError<'a, S, T> {
     pub fn into_owned<'b>(self) -> PrismParserError<'b, S, T>
     where
         T: Clone,
@@ -73,6 +88,7 @@ impl<'a, S, T> PrismParserError<'a, S, T> {
                 expected,
                 span,
                 contexts,
+                help,
             } => PrismParserError::ExpectedFound {
                 expected: expected.into_iter().map(RichPattern::into_owned).collect(),
                 found: found.map(MaybeRef::into_owned),
@@ -81,6 +97,7 @@ impl<'a, S, T> PrismParserError<'a, S, T> {
                     .into_iter()
                     .map(|(p, s)| (p.into_owned(), s))
                     .collect(),
+                help,
             },
             Self::Validation(validation) => PrismParserError::Validation(validation),
         }
@@ -96,6 +113,7 @@ impl<'a, S, T> PrismParserError<'a, S, T> {
                 found,
                 span,
                 contexts,
+                help,
             } => PrismParserError::ExpectedFound {
                 expected: expected
                     .into_iter()
@@ -107,6 +125,7 @@ impl<'a, S, T> PrismParserError<'a, S, T> {
                     .into_iter()
                     .map(|(pat, s)| (pat.map_token(&mut f), s))
                     .collect(),
+                help,
             },
             Self::Validation(validation) => PrismParserError::Validation(validation),
         }
@@ -116,6 +135,7 @@ impl<'a, S, T> PrismParserError<'a, S, T> {
 impl<'a, I: Input<'a>> Error<'a, I> for PrismParserError<'a, I::Span, I::Token>
 where
     I::Token: PartialEq + Clone,
+    I::Span: Clone,
 {
     fn merge(mut self, mut other: Self) -> Self {
         if let (
@@ -135,6 +155,7 @@ where
 impl<'a, I: Input<'a>, L> LabelError<'a, I, L> for PrismParserError<'a, I::Span, I::Token>
 where
     I::Token: PartialEq + Clone,
+    I::Span: Clone,
     L: Into<RichPattern<'a, I::Token>>,
 {
     fn expected_found<Iter: IntoIterator<Item = L>>(
@@ -147,6 +168,7 @@ where
             expected: expected.into_iter().map(|e| e.into()).collect(),
             found,
             contexts: Vec::new(),
+            help: None,
         }
     }
 

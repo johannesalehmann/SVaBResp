@@ -4,7 +4,8 @@ use crate::{PrismParserError, PrismParserValidationError};
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use prism_model::{
-    Identifier, ModelType, RewardsTarget, VariableAddError, VariableInfo, VariableManager,
+    Identifier, ModelType, ModuleManager, RewardsTarget, VariableAddError, VariableInfo,
+    VariableManager,
 };
 
 pub type E<'a> = extra::Err<crate::PrismParserError<'a, Span, Token>>; // Rich<'a, Token, Span>
@@ -48,7 +49,7 @@ fn build_program_from_type_and_elements<'a>(
     emitter: &mut chumsky::input::Emitter<PrismParserError<Span, Token>>,
 ) -> prism_model::Model<(), Identifier<Span>, Identifier<Span>, Span> {
     let mut model_type = Option::None;
-    let mut modules = Vec::new();
+    let mut modules = ModuleManager::new();
     let mut renamed_modules = Vec::new();
     let mut consts = prism_model::VariableManager::new();
     let mut global_vars = prism_model::VariableManager::new();
@@ -59,7 +60,21 @@ fn build_program_from_type_and_elements<'a>(
 
     for element in elements {
         match element {
-            ProgramElement::Module(m) => modules.push(m),
+            ProgramElement::Module(m) => {
+                let span = m.span.clone();
+
+                match modules.add(m) {
+                    Ok(()) => {}
+                    Err(prism_model::AddModuleError::ModuleExists { index }) => emitter.emit(
+                        PrismParserValidationError::DuplicateElement {
+                            previous_occurrence: modules.get(index).unwrap().span,
+                            new_definition: span,
+                            kind: ElementKind::Module,
+                        }
+                        .into(),
+                    ),
+                }
+            }
             ProgramElement::RenamedModule(m) => renamed_modules.push(m),
             ProgramElement::Const(c) => {
                 add_or_emit_variable(&mut consts, c, crate::error::ElementKind::Const, emitter);
@@ -134,7 +149,7 @@ fn build_program_from_type_and_elements<'a>(
             },
             ProgramElement::Rewards(r) => {
                 let span = r.span;
-                match rewards.add_rewards(r) {
+                match rewards.add(r) {
                     Ok(_) => {}
                     Err(prism_model::AddRewardsError::RewardsExist { index }) => {
                         let previous = rewards.get(index).unwrap();
@@ -388,7 +403,14 @@ where
         .then_ignore(just(Token::RightSqBracket))
         .then_ignore(just(Token::EndModule))
         .map_with(|((new_name, old_name), rename_rules), e| {
-            prism_model::RenamedModule::new(old_name, new_name, rename_rules, e.span())
+            prism_model::RenamedModule::new(
+                old_name,
+                new_name,
+                prism_model::RenameRules {
+                    rules: rename_rules,
+                },
+                e.span(),
+            )
         })
         .labelled("renamed module")
         .as_context()

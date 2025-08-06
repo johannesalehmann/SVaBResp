@@ -1,10 +1,10 @@
 use crate::Identifier;
 
-pub struct ActionManager<S> {
+pub struct ActionManager<S: Clone> {
     actions: Vec<Action<S>>,
 }
 
-impl<S> ActionManager<S> {
+impl<S: Clone> ActionManager<S> {
     pub fn new() -> Self {
         Self {
             actions: Vec::new(),
@@ -42,13 +42,17 @@ pub enum AddActionError {
     ActionExists { reference: ActionReference },
 }
 
-pub struct Action<S> {
+pub struct Action<S: Clone> {
     pub name: Identifier<S>,
 }
 
-impl<S> Action<S> {
+impl<S: Clone> Action<S> {
     fn new(name: Identifier<S>) -> Self {
         Self { name }
+    }
+
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Action<S2> {
+        Action::new(self.name.map_span(map))
     }
 }
 
