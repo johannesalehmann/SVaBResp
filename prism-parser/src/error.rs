@@ -51,6 +51,9 @@ pub enum PrismParserValidationError<S: Clone> {
     ModuleExpansionError {
         error: prism_model::ModuleExpansionError<S>,
     },
+    UnknownVariable {
+        identifier: Identifier<S>,
+    },
 }
 
 #[derive(Debug, PartialEq)]

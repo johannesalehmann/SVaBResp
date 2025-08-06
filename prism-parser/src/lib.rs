@@ -3,13 +3,14 @@ mod lexer;
 mod parser;
 
 use chumsky::prelude::*;
+use chumsky::util::IntoMaybe;
 pub use error::{PrismParserError, PrismParserValidationError};
 pub use lexer::{Span, Token};
 use std::borrow::Cow;
 
 pub struct ParseResult<'a> {
     pub output: Option<
-        prism_model::Model<(), prism_model::Identifier<Span>, prism_model::Identifier<Span>, Span>,
+        prism_model::Model<(), prism_model::Identifier<Span>, prism_model::VariableReference, Span>,
     >,
     pub errors: Vec<PrismParserError<'a, Span, String>>,
 }
@@ -70,16 +71,31 @@ pub fn parse_prism<'a, 'b>(source: &'a str) -> ParseResult<'b> {
             }
             let mut output = output.map(|(o, _)| o);
 
-            if let Some(output) = &mut output {
-                if let Err(err) = output.substitute_formulas(SimpleSpan::new(0, 1)) {
-                    errors.push(
-                        PrismParserValidationError::CyclicFormulaDependency { cycle: err }.into(),
-                    )
+            let output = match output {
+                Some(mut output) => {
+                    if let Err(err) = output.substitute_formulas(SimpleSpan::new(0, 1)) {
+                        errors.push(
+                            PrismParserValidationError::CyclicFormulaDependency { cycle: err }
+                                .into(),
+                        )
+                    }
+                    match output.replace_identifiers_by_variable_indices() {
+                        Ok(output) => Some(output),
+                        Err(errs) => {
+                            for err in errs {
+                                errors.push(
+                                    PrismParserValidationError::UnknownVariable {
+                                        identifier: err.identifier,
+                                    }
+                                    .into(),
+                                )
+                            }
+                            None
+                        }
+                    }
                 }
-                if let Err(error) = output.expand_renamed_models() {
-                    errors.push(PrismParserValidationError::ModuleExpansionError { error }.into())
-                }
-            }
+                None => None,
+            };
 
             ParseResult { output, errors }
         } else {

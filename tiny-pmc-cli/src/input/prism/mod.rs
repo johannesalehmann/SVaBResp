@@ -3,14 +3,14 @@ use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::error::RichPattern;
 use chumsky::prelude::SimpleSpan;
 use chumsky::util::MaybeRef;
-use prism_model::{Identifier, InvalidName, Model, ModuleExpansionError};
+use prism_model::{Identifier, InvalidName, Model, ModuleExpansionError, VariableReference};
 use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
 
 pub fn parse_prism(
     file_name: Option<&str>,
     source: &str,
-) -> Option<Model<(), Identifier<SimpleSpan>, Identifier<SimpleSpan>, SimpleSpan>> {
+) -> Option<Model<(), Identifier<SimpleSpan>, VariableReference, SimpleSpan>> {
     let parse_result = prism_parser::parse_prism(source);
 
     let has_errors = !parse_result.errors.is_empty();
@@ -342,6 +342,21 @@ fn build_validation(
             builder.add_label(
                 Label::new((file_name, old_name.span.into_range()))
                     .with_message(format!("Cannot find module with name {}", old_name.name)),
+            );
+
+            builder
+        }
+
+        PrismParserValidationError::UnknownVariable { identifier } => {
+            let mut builder =
+                Report::build(ReportKind::Error, (file_name, identifier.span.into_range()));
+            builder.set_message("Unknown variable or constant");
+
+            builder.add_label(
+                Label::new((file_name, identifier.span.into_range())).with_message(format!(
+                    "Cannot find variable or constant {}",
+                    identifier.name
+                )),
             );
 
             builder

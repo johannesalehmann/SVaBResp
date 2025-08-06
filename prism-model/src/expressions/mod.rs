@@ -3,8 +3,9 @@ mod maps;
 pub use maps::*;
 use std::fmt::{Display, Formatter};
 
+use crate::expressions::map_variable::MapVariable;
 use crate::module::RenameRules;
-use crate::{Identifier, VariableReference};
+use crate::{Identifier, ModuleExpansionError, VariableManager, VariableReference};
 
 #[derive(PartialEq, Clone)]
 pub struct GlobalVariableReference {
@@ -122,7 +123,6 @@ impl<S: Clone> Expression<Identifier<S>, S> {
         self.clone().visit(&mut visitor) // This clone is not required in principle, but cannot be avoided as long as visitors consume their expression
     }
 }
-
 struct RenamingVisitor<'a, S: Clone> {
     rename_rules: &'a RenameRules<S>,
 }
@@ -135,6 +135,38 @@ impl<'a, S: Clone> IdentityMapExpression<Identifier<S>, S> for RenamingVisitor<'
             Some(renaming) => Expression::VarOrConst(renaming, span),
         }
     }
+}
+impl<S: Clone> Expression<Identifier<S>, S> {
+    pub fn replace_identifiers_by_variable_indices(
+        self,
+        variable_manager: &VariableManager<Identifier<S>, S>,
+    ) -> Result<Expression<VariableReference, S>, Vec<UnknownVariableError<S>>> {
+        let errors = Vec::new();
+        let mut replace_visitor: MapVariable<Identifier<S>, VariableReference, _, _> =
+            MapVariable::new(
+                |f, e| match variable_manager.get_reference(&f) {
+                    Some(index) => index,
+                    None => {
+                        e.push(UnknownVariableError {
+                            identifier: f.clone(),
+                        });
+                        VariableReference::new(0)
+                    }
+                },
+                errors,
+            );
+        let new_expression = self.visit(&mut replace_visitor);
+        if !replace_visitor.context.is_empty() {
+            Err(replace_visitor.context)
+        } else {
+            Ok(new_expression)
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct UnknownVariableError<S: Clone> {
+    pub identifier: Identifier<S>,
 }
 
 impl<V: Display, S: Clone> Expression<V, S> {

@@ -4,6 +4,8 @@ global a: int init 7+2;
 
 module x
     b: int init 7+2;
+
+    [] b=c -> 0.5:(a'=b*(c+c));
 endmodule
 
 module y

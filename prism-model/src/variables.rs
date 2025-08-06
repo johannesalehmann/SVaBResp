@@ -1,5 +1,5 @@
+use crate::expressions::UnknownVariableError;
 use crate::module::RenameRules;
-use crate::variable_index::VariableIndex;
 use crate::{Expression, Identifier};
 use std::fmt::{Display, Formatter};
 
@@ -295,6 +295,43 @@ impl<S: Clone> VariableRange<Identifier<S>, S> {
             VariableRange::Double { span } => VariableRange::Double { span: span.clone() },
         }
     }
+
+    pub fn replace_identifiers_by_variable_indices(
+        &self,
+        variable_manager: &VariableManager<Identifier<S>, S>,
+    ) -> Result<VariableRange<VariableReference, S>, Vec<UnknownVariableError<S>>> {
+        match self {
+            VariableRange::BoundedInt { min, max, span } => {
+                let mut errors = Vec::new();
+                let mut min = min
+                    .clone()
+                    .replace_identifiers_by_variable_indices(variable_manager);
+                let mut max = max
+                    .clone()
+                    .replace_identifiers_by_variable_indices(variable_manager);
+                if let Err(err) = &min {
+                    errors.extend_from_slice(&err[..]);
+                }
+                if let Err(err) = &max {
+                    errors.extend_from_slice(&err[..]);
+                }
+                if let (Ok(min), Ok(max)) = (min, max) {
+                    Ok(VariableRange::BoundedInt {
+                        min,
+                        max,
+                        span: span.clone(),
+                    })
+                } else {
+                    Err(errors)
+                }
+            }
+            VariableRange::UnboundedInt { span } => {
+                Ok(VariableRange::UnboundedInt { span: span.clone() })
+            }
+            VariableRange::Boolean { span } => Ok(VariableRange::Boolean { span: span.clone() }),
+            VariableRange::Double { span } => Ok(VariableRange::Double { span: span.clone() }),
+        }
+    }
 }
 
 impl<V: Display, S: Clone> Display for VariableRange<V, S> {
@@ -324,6 +361,12 @@ pub struct VariableReference {
 impl VariableReference {
     pub fn new(index: usize) -> Self {
         Self { index }
+    }
+}
+
+impl Display for VariableReference {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "var_{}", self.index)
     }
 }
 

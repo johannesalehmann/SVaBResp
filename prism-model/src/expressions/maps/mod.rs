@@ -6,6 +6,8 @@ pub use identity_map::IdentityMapExpression;
 
 pub mod map_span;
 
+pub mod map_variable;
+
 use super::{Expression, Identifier};
 
 pub trait MapExpression<V, S: Clone, T> {
