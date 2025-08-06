@@ -5,11 +5,6 @@
 
 dtmc
 
-formula fa = x + 3 + fb + fc;
-formula fb = x + 2 + fd;
-formula fc = x + 1 + fd + fb;
-formula fd = x + 10 + fa;
-
 const int N; // number of inputs in each bundle
 const int K; // number of restorative stages
 

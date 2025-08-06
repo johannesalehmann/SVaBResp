@@ -79,18 +79,25 @@ pub fn parse_prism<'a, 'b>(source: &'a str) -> ParseResult<'b> {
                                 .into(),
                         )
                     }
-                    match output.replace_identifiers_by_variable_indices() {
-                        Ok(output) => Some(output),
-                        Err(errs) => {
-                            for err in errs {
-                                errors.push(
-                                    PrismParserValidationError::UnknownVariable {
-                                        identifier: err.identifier,
-                                    }
-                                    .into(),
-                                )
+                    if let Err(error) = output.expand_renamed_models() {
+                        errors.push(
+                            PrismParserValidationError::ModuleExpansionError { error }.into(),
+                        );
+                        None
+                    } else {
+                        match output.replace_identifiers_by_variable_indices() {
+                            Ok(output) => Some(output),
+                            Err(errs) => {
+                                for err in errs {
+                                    errors.push(
+                                        PrismParserValidationError::UnknownVariable {
+                                            identifier: err.identifier,
+                                        }
+                                        .into(),
+                                    )
+                                }
+                                None
                             }
-                            None
                         }
                     }
                 }
