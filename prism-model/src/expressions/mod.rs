@@ -137,9 +137,9 @@ impl<'a, S: Clone> IdentityMapExpression<Identifier<S>, S> for RenamingVisitor<'
     }
 }
 impl<S: Clone> Expression<Identifier<S>, S> {
-    pub fn replace_identifiers_by_variable_indices(
+    pub fn replace_identifiers_by_variable_indices<R>(
         self,
-        variable_manager: &VariableManager<Identifier<S>, S>,
+        variable_manager: &VariableManager<R, S>,
     ) -> Result<Expression<VariableReference, S>, Vec<UnknownVariableError<S>>> {
         let errors = Vec::new();
         let mut replace_visitor: MapVariable<Identifier<S>, VariableReference, _, _> =

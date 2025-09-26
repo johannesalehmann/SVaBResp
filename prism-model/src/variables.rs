@@ -226,7 +226,7 @@ pub enum VariableRange<V, S: Clone> {
     Boolean {
         span: S,
     },
-    Double {
+    Float {
         span: S,
     },
 }
@@ -237,7 +237,7 @@ impl<V, S: Clone> VariableRange<V, S> {
             VariableRange::BoundedInt { .. } => false,
             VariableRange::UnboundedInt { .. } => true,
             VariableRange::Boolean { .. } => true,
-            VariableRange::Double { .. } => true,
+            VariableRange::Float { .. } => true,
         }
     }
     pub fn is_legal_for_variable(&self) -> bool {
@@ -245,7 +245,7 @@ impl<V, S: Clone> VariableRange<V, S> {
             VariableRange::BoundedInt { .. } => true,
             VariableRange::UnboundedInt { .. } => true,
             VariableRange::Boolean { .. } => true,
-            VariableRange::Double { .. } => false,
+            VariableRange::Float { .. } => false,
         }
     }
 
@@ -254,7 +254,7 @@ impl<V, S: Clone> VariableRange<V, S> {
             VariableRange::BoundedInt { .. } => "bounded int",
             VariableRange::UnboundedInt { .. } => "int",
             VariableRange::Boolean { .. } => "bool",
-            VariableRange::Double { .. } => "double",
+            VariableRange::Float { .. } => "double",
         }
     }
 
@@ -263,7 +263,7 @@ impl<V, S: Clone> VariableRange<V, S> {
             VariableRange::BoundedInt { span, .. } => span,
             VariableRange::UnboundedInt { span } => span,
             VariableRange::Boolean { span } => span,
-            VariableRange::Double { span } => span,
+            VariableRange::Float { span } => span,
         }
     }
 
@@ -276,7 +276,7 @@ impl<V, S: Clone> VariableRange<V, S> {
             },
             VariableRange::UnboundedInt { span } => VariableRange::UnboundedInt { span: map(span) },
             VariableRange::Boolean { span } => VariableRange::Boolean { span: map(span) },
-            VariableRange::Double { span } => VariableRange::Double { span: map(span) },
+            VariableRange::Float { span } => VariableRange::Float { span: map(span) },
         }
     }
 }
@@ -292,7 +292,7 @@ impl<S: Clone> VariableRange<Identifier<S>, S> {
                 VariableRange::UnboundedInt { span: span.clone() }
             }
             VariableRange::Boolean { span } => VariableRange::Boolean { span: span.clone() },
-            VariableRange::Double { span } => VariableRange::Double { span: span.clone() },
+            VariableRange::Float { span } => VariableRange::Float { span: span.clone() },
         }
     }
 
@@ -329,7 +329,7 @@ impl<S: Clone> VariableRange<Identifier<S>, S> {
                 Ok(VariableRange::UnboundedInt { span: span.clone() })
             }
             VariableRange::Boolean { span } => Ok(VariableRange::Boolean { span: span.clone() }),
-            VariableRange::Double { span } => Ok(VariableRange::Double { span: span.clone() }),
+            VariableRange::Float { span } => Ok(VariableRange::Float { span: span.clone() }),
         }
     }
 }
@@ -346,16 +346,16 @@ impl<V: Display, S: Clone> Display for VariableRange<V, S> {
             VariableRange::Boolean { .. } => {
                 write!(f, "bool")
             }
-            VariableRange::Double { .. } => {
+            VariableRange::Float { .. } => {
                 write!(f, "double")
             }
         }
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct VariableReference {
-    index: usize,
+    pub index: usize,
 }
 
 impl VariableReference {

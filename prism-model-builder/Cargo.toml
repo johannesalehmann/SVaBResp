@@ -1,10 +1,8 @@
 [package]
-name = "tiny-pmc"
+name = "prism-model-builder"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 prism-model = { path = "../prism-model" }
-prism-parser = { path = "../prism-parser" }
 probabilistic-models = { path = "../probabilistic-models" }
-prism-model-builder = { path = "../prism-model-builder" }

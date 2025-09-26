@@ -3,7 +3,10 @@ use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::error::RichPattern;
 use chumsky::prelude::SimpleSpan;
 use chumsky::util::MaybeRef;
-use prism_model::{Identifier, InvalidName, Model, ModuleExpansionError, VariableReference};
+use prism_model::{
+    Expression, Identifier, InvalidName, Model, ModuleExpansionError, VariableManager,
+    VariableReference,
+};
 use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
 
@@ -15,7 +18,7 @@ pub fn parse_prism(
 
     let has_errors = !parse_result.errors.is_empty();
     for error in parse_result.errors {
-        print_error(file_name, source, error);
+        print_error(&file_name, source, error);
     }
     if has_errors {
         None
@@ -24,8 +27,28 @@ pub fn parse_prism(
     }
 }
 
-fn print_error(file_name: Option<&str>, source: &str, error: PrismParserError<Span, String>) {
-    let file_name = file_name.unwrap_or("input");
+pub fn parse_expression<R>(
+    expression: &str,
+    variable_manager: &VariableManager<R, Span>,
+) -> Option<Expression<VariableReference, SimpleSpan>> {
+    let parse_result = prism_parser::parse_expression(expression, variable_manager);
+
+    let has_errors = !parse_result.errors.is_empty();
+    for error in parse_result.errors {
+        print_error(&Some("Objective specification"), expression, error);
+    }
+    if has_errors {
+        None
+    } else {
+        parse_result.output
+    }
+}
+
+fn print_error(file_name: &Option<&str>, source: &str, error: PrismParserError<Span, String>) {
+    let file_name = match file_name {
+        Some(name) => name,
+        None => "input",
+    };
 
     // let mut cg = ColorGenerator::new();
     // let context_color = cg.next();
@@ -331,8 +354,8 @@ fn build_validation(
             error:
                 ModuleExpansionError::RenamingSourceDoesNotExist {
                     old_name,
-                    new_name,
                     renaming_rule,
+                    ..
                 },
         } => {
             let mut builder =

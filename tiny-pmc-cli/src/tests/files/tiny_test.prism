@@ -1,13 +1,7 @@
 mdp
 
-global a: int init 7+2;
-
 module x
-    b: int init 7+2;
+    n: [0..3] init 0;
 
-    [] b=c -> 0.5:(a'=b*(c+c));
-endmodule
-
-module y
-    c: int init 7+1;
+    [] n=0 -> 0.5: (n'=1) + 0.25: (n'=2) + 0.25: true;
 endmodule

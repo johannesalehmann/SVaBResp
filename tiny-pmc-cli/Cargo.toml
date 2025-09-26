@@ -6,5 +6,8 @@ edition = "2021"
 [dependencies]
 prism-model = { path = "../prism-model" }
 prism-parser = { path = "../prism-parser" }
+prism-model-builder = { path = "../prism-model-builder" }
+probabilistic-model-algorithms = { path = "../probabilistic-model-algorithms" }
+tiny-pmc = { path = "../tiny-pmc" }
 ariadne = { version = "0.5.1", features = ["auto-color"] }
 chumsky = "1.0.0-alpha.8"

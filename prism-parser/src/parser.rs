@@ -314,7 +314,7 @@ where
         .or(just(Token::Bool)
             .map_with(|_, e| prism_model::VariableRange::Boolean { span: e.span() }))
         .or(just(Token::Double)
-            .map_with(|_, e| prism_model::VariableRange::Double { span: e.span() }))
+            .map_with(|_, e| prism_model::VariableRange::Float { span: e.span() }))
         .labelled("variable domain ([n..m], int, bool or double)")
         .as_context()
 }
@@ -675,7 +675,7 @@ where
         .as_context()
 }
 
-fn expression_parser<'a, 'b, I>(
+pub fn expression_parser<'a, 'b, I>(
 ) -> impl Parser<'a, I, prism_model::Expression<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
