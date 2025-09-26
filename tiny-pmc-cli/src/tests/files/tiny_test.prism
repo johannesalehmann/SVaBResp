@@ -1,7 +1,25 @@
 mdp
 
+module filler
+    t: [0..1];
+endmodule
+
 module x
     n: [0..3] init 0;
 
     [] n=0 -> 0.5: (n'=1) + 0.25: (n'=2) + 0.25: true;
+
+    [joined] n>0 -> 0.7: (n'=3) + 0.3: true;
+endmodule
+
+module filler2
+    t2: [0..1];
+endmodule
+
+module y
+    m: [0..6] init 0;
+
+    [] m<4 -> (m'=m+1);
+
+    [joined] m=4 -> 0.25: (m'=6) + 0.4: (m'=5) + 0.35: (m'=6);
 endmodule

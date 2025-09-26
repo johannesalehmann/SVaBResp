@@ -15,7 +15,11 @@ pub fn value_iteration<M: probabilistic_models::ModelTypes>(
         }
     }
 
-    for _ in 0..1000 {
+    for i in 0..30_000 {
+        if i % 5000 == 0 {
+            println!("Iteration {}", i);
+        }
+
         let mut largest_change: f64 = 0.0;
         for state_index in 0..n {
             let state = &model.states[state_index];
@@ -43,10 +47,11 @@ pub fn value_iteration<M: probabilistic_models::ModelTypes>(
             data[state_index].action = best_action;
         }
     }
-    println!("Result of value iteration:");
-    for state in 0..n {
-        println!("  {}: {}", state, data[state].value);
-    }
+    // println!("Result of value iteration:");
+    // for state in 0..n {
+    //     println!("  {}: {}", state, data[state].value);
+    // }
+    println!("Result of value iteration: {}", data[0].value);
 }
 
 #[derive(Copy, Clone)]

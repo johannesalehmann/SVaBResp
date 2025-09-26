@@ -8,6 +8,7 @@ use probabilistic_models::{
     Action, ActionCollection, AtomicPropositions, Builder, ContextBuilder, Distribution, MdpType,
     ModelTypes, ProbabilisticModel, State, Successor, Valuation, ValuationBuilder,
 };
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use probabilistic_models::DistributionBuilder;
@@ -53,6 +54,8 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             Self::prepare_variable_bounds(&model.variable_manager, &consts, &valuation_map)?;
         let context = Self::prepare_valuation_context(model, &valuation_map, &variable_bounds);
 
+        let synchronised_actions = SynchronisedActions::from_prism(model);
+
         let mut builder = Self {
             phantom_data: Default::default(),
             states: Vec::new(),
@@ -66,7 +69,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         builder.create_initial_states(model, atomic_propositions.len())?;
 
         while let Some(state) = builder.open_states.pop() {
-            builder.process_state(state, &model, atomic_propositions)?;
+            builder.process_state(state, &model, atomic_propositions, &synchronised_actions)?;
         }
 
         println!();
@@ -218,6 +221,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         state: usize,
         model: &Model<(), Identifier<S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
+        synchronised_actions: &SynchronisedActions,
     ) -> Result<(), ModelBuildingError> {
         print!("Processing state ");
         Self::print_valuation(&self.states[state].valuation, &self.valuation_map, model);
@@ -230,7 +234,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             for command_index in 0..module.commands.len() {
                 let command = &module.commands[command_index];
                 if command.action.is_some() {
-                    panic!("Commands with synchronising actions are not yet supported");
+                    continue; // Synchronising actions are handled separately
                 }
                 let valuation = &self.states[state].valuation;
                 let val_source = ConstsAndVars::new(&self.valuation_map, &self.consts, valuation);
@@ -251,7 +255,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                             &model.variable_manager,
                             valuation,
                             &val_source,
-                            &update,
+                            &[&update],
                         );
 
                         let index = self.get_or_add_state(new_valuation, atomic_propositions.len());
@@ -261,6 +265,146 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     self.states[state].actions.add_action(Action {
                         successors: distribution.finish(),
                     });
+                }
+            }
+        }
+
+        println!("Handling synchronised actions");
+        for synchronised_action in &synchronised_actions.actions {
+            println!("  Handling synchronised action");
+            let valuation = &self.states[state].valuation;
+            let val_source = ConstsAndVars::new(&self.valuation_map, &self.consts, valuation);
+
+            let mut satisfied_guards_indicies = Vec::new();
+            let mut all_satisfied = true;
+            for action_module in &synchronised_action.participating_modules {
+                println!(
+                    "    Checking guards in module {}",
+                    action_module.module_index
+                );
+                let module = &model.modules.modules[action_module.module_index];
+                let mut module_info = Vec::new();
+                for &command_index in &action_module.command_indices {
+                    let command = &module.commands[command_index];
+                    let guard = B::ExpressionEvaluator::create()
+                        .evaluate_as_bool(&command.guard, &val_source);
+                    if guard {
+                        module_info.push(command_index);
+                        println!("      Command {}: satisfied", command_index);
+                    } else {
+                        println!("      Command {}: unsatisfied", command_index);
+                    }
+                }
+                if module_info.is_empty() {
+                    all_satisfied = false;
+                }
+                satisfied_guards_indicies.push(module_info);
+            }
+
+            let n = satisfied_guards_indicies.len();
+
+            if n == 0 {
+                panic!("Synchronised actions with zero associated modules are not yet supported (but they should be impossible to create anyways");
+            }
+
+            if all_satisfied {
+                println!("    Constructing transitions");
+                let modules = &synchronised_action.participating_modules;
+                let mut indices = vec![0; n];
+                while indices[0] < satisfied_guards_indicies[0].len() {
+                    println!("      Indices: {:?}", indices);
+                    let mut command_indices = Vec::with_capacity(n);
+                    for i in 0..n {
+                        command_indices.push(satisfied_guards_indicies[i][indices[i]]);
+                    }
+                    println!("      Command indices: {:?}", command_indices);
+                    println!("      Enumerating update combinations");
+
+                    let mut update_indices = vec![0; n];
+
+                    let mut distribution = <M::Distribution as Distribution>::get_builder();
+
+                    while update_indices[0]
+                        < model.modules.modules[modules[0].module_index].commands
+                            [command_indices[0]]
+                            .updates
+                            .len()
+                            .max(1)
+                    // max(1) is required because a synchronising action may have an empty update ("true")
+                    {
+                        println!("        Update indices: {:?}", update_indices);
+                        let valuation = &self.states[state].valuation;
+                        let val_source =
+                            ConstsAndVars::new(&self.valuation_map, &self.consts, valuation);
+                        let mut updates = Vec::new();
+                        for i in 0..n {
+                            let command = &model.modules.modules[modules[i].module_index].commands
+                                [command_indices[i]];
+                            if command.updates.len() > 0 {
+                                updates.push(&command.updates[update_indices[i]]);
+                            }
+                        }
+                        let new_valuation = self.apply_assignments(
+                            &model.variable_manager,
+                            valuation,
+                            &val_source,
+                            &updates[..],
+                        );
+
+                        let mut probability = 1.0;
+
+                        for i in 0..n {
+                            let command = &model.modules.modules[modules[i].module_index].commands
+                                [command_indices[i]];
+                            if command.updates.len() > 0 {
+                                let ith_expression =
+                                    &command.updates[update_indices[i]].probability;
+                                let ith_probability = B::ExpressionEvaluator::create()
+                                    .evaluate_as_float(ith_expression, &val_source);
+                                probability *= ith_probability;
+                            }
+                        }
+
+                        let index = self.get_or_add_state(new_valuation, atomic_propositions.len());
+                        distribution.add_successor(Successor { probability, index });
+
+                        println!("        State {} with probability {}", index, probability);
+                        for i in (0..n).rev() {
+                            if update_indices[i] + 1
+                                < model.modules.modules[modules[i].module_index].commands
+                                    [command_indices[i]]
+                                    .updates
+                                    .len()
+                            {
+                                update_indices[i] += 1;
+                                for j in i + 1..n {
+                                    update_indices[j] = 0;
+                                }
+                                break;
+                            } else {
+                                if i == 0 {
+                                    update_indices[0] += 1;
+                                }
+                            }
+                        }
+                    }
+
+                    self.states[state].actions.add_action(Action {
+                        successors: distribution.finish(),
+                    });
+
+                    for i in (0..n).rev() {
+                        if indices[i] < satisfied_guards_indicies[i].len() {
+                            indices[i] += 1;
+                            for j in i + 1..n {
+                                indices[j] = 0;
+                            }
+                        } else {
+                            if i == 0 {
+                                indices[0] += 1;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -287,43 +431,45 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         variable_manager: &VariableManager<VariableReference, S>,
         valuation: &<M as ModelTypes>::Valuation,
         val_source: &ConstsAndVars<<M as ModelTypes>::Valuation>,
-        update: &Update<VariableReference, S>,
+        updates: &[&Update<VariableReference, S>],
     ) -> <M as ModelTypes>::Valuation {
         let mut new_valuation = valuation.clone();
-        for assignment in &update.assignments {
-            let target = variable_manager.get(&assignment.target).unwrap();
-            let target_index = match self.valuation_map.entries[assignment.target.index] {
-                ValuationMapEntry::Const(_) => panic!("Cannot assign to constant"),
-                ValuationMapEntry::Var(index) => index,
-            };
-            match target.range {
-                VariableRange::BoundedInt { .. } => {
-                    let value = B::ExpressionEvaluator::create()
-                        .evaluate_as_int(&assignment.value, &val_source);
-                    let (min, max) = self.variable_bounds.bounds[target_index].unwrap();
-                    if value < min || value > max {
-                        panic!(
-                            "Value exceeds variable bounds, bounds are ({}, {}), value is {}",
-                            min, max, value
-                        );
-                    } else {
-                        new_valuation.set_bounded_int(target_index, value);
+        for update in updates {
+            for assignment in &update.assignments {
+                let target = variable_manager.get(&assignment.target).unwrap();
+                let target_index = match self.valuation_map.entries[assignment.target.index] {
+                    ValuationMapEntry::Const(_) => panic!("Cannot assign to constant"),
+                    ValuationMapEntry::Var(index) => index,
+                };
+                match target.range {
+                    VariableRange::BoundedInt { .. } => {
+                        let value = B::ExpressionEvaluator::create()
+                            .evaluate_as_int(&assignment.value, &val_source);
+                        let (min, max) = self.variable_bounds.bounds[target_index].unwrap();
+                        if value < min || value > max {
+                            panic!(
+                                "Value exceeds variable bounds, bounds are ({}, {}), value is {}",
+                                min, max, value
+                            );
+                        } else {
+                            new_valuation.set_bounded_int(target_index, value);
+                        }
                     }
-                }
-                VariableRange::UnboundedInt { .. } => {
-                    let value = B::ExpressionEvaluator::create()
-                        .evaluate_as_int(&assignment.value, &val_source);
-                    new_valuation.set_unbounded_int(target_index, value);
-                }
-                VariableRange::Boolean { .. } => {
-                    let value = B::ExpressionEvaluator::create()
-                        .evaluate_as_bool(&assignment.value, &val_source);
-                    new_valuation.set_bool(target_index, value);
-                }
-                VariableRange::Float { .. } => {
-                    let value = B::ExpressionEvaluator::create()
-                        .evaluate_as_float(&assignment.value, &val_source);
-                    new_valuation.set_float(target_index, value);
+                    VariableRange::UnboundedInt { .. } => {
+                        let value = B::ExpressionEvaluator::create()
+                            .evaluate_as_int(&assignment.value, &val_source);
+                        new_valuation.set_unbounded_int(target_index, value);
+                    }
+                    VariableRange::Boolean { .. } => {
+                        let value = B::ExpressionEvaluator::create()
+                            .evaluate_as_bool(&assignment.value, &val_source);
+                        new_valuation.set_bool(target_index, value);
+                    }
+                    VariableRange::Float { .. } => {
+                        let value = B::ExpressionEvaluator::create()
+                            .evaluate_as_float(&assignment.value, &val_source);
+                        new_valuation.set_float(target_index, value);
+                    }
                 }
             }
         }
@@ -595,5 +741,59 @@ impl<'a, 'b, E: Evaluator> ValuationSource for ConstOnlyEvaluator<'a, 'b, E> {
 
     fn get_float(&self, index: VariableReference) -> f64 {
         self.get(index).as_float()
+    }
+}
+
+pub struct SynchronisedActions {
+    actions: Vec<SynchronisedAction>,
+}
+
+pub struct SynchronisedAction {
+    participating_modules: Vec<SynchronisedActionModule>,
+}
+
+pub struct SynchronisedActionModule {
+    module_index: usize,
+    command_indices: Vec<usize>,
+}
+
+impl SynchronisedActions {
+    pub fn from_prism<S: Clone>(model: &Model<(), Identifier<S>, VariableReference, S>) -> Self {
+        let mut actions: HashMap<String, SynchronisedAction> = HashMap::new();
+
+        for (module_index, module) in model.modules.modules.iter().enumerate() {
+            let mut module_actions: HashMap<String, SynchronisedActionModule> = HashMap::new();
+            for (command_index, command) in module.commands.iter().enumerate() {
+                if let Some(action) = &command.action {
+                    if let Some(module_action) = module_actions.get_mut(&action.name) {
+                        module_action.command_indices.push(command_index);
+                    } else {
+                        module_actions.insert(
+                            action.name.clone(),
+                            SynchronisedActionModule {
+                                module_index,
+                                command_indices: vec![command_index],
+                            },
+                        );
+                    }
+                }
+            }
+            for (action_name, module_action) in module_actions {
+                if let Some(action) = actions.get_mut(&action_name) {
+                    action.participating_modules.push(module_action);
+                } else {
+                    actions.insert(
+                        action_name,
+                        SynchronisedAction {
+                            participating_modules: vec![module_action],
+                        },
+                    );
+                }
+            }
+        }
+
+        SynchronisedActions {
+            actions: actions.into_iter().map(|(n, a)| a).collect(),
+        }
     }
 }

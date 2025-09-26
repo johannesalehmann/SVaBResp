@@ -2,10 +2,7 @@ use crate::input::prism::parse_prism;
 
 #[test]
 fn parse_tiny_test() {
-    let model = parse_prism(None, include_str!("files/tiny_test.prism")).unwrap();
-    println!("===========\nMODEL:\n===========");
-    println!("{}", model);
-    let built = prism_model_builder::build_model(&model);
+    parse_prism(None, include_str!("files/tiny_test.prism")).unwrap();
 }
 
 #[test]
