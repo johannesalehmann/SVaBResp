@@ -13,7 +13,7 @@ mod atomic_propositions;
 pub use atomic_propositions::*;
 
 pub trait ModelTypes: Sized {
-    type Valuation: Valuation;
+    type Valuation: Valuation + std::hash::Hash + Eq;
     type Distribution: Distribution;
     type Owners: Owners;
     type ActionCollection: ActionCollection<Self>;

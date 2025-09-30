@@ -12,7 +12,10 @@ fn main() {
 }
 
 fn checker() -> i32 {
-    let source = include_str!("tests/files/consensus.2.v1-fixed.prism");
+    let start_time = std::time::Instant::now();
+    let source = include_str!("tests/files/consensus.6.v1.prism");
+    // let source = include_str!("tests/files/consensus.4.prism");
+    // let source = include_str!("tests/files/consensus.2.v1-fixed.prism");
     // let source = include_str!("tests/files/tiny_test.prism");
     let parse = input::prism::parse_prism(Some("tiny_test.prism"), source);
     let prism = match parse {
@@ -23,6 +26,8 @@ fn checker() -> i32 {
     };
 
     let objective = "pc1=3 & pc2=3&!(coin1=coin2)";
+    // let objective = "pc1=3 & pc2=3 & pc3=3 & pc4=3 & !(coin1=coin2 & coin2=coin3 & coin3=coin4)";
+    // let objective = "pc1=3 & pc2=3 & pc3=3 & pc4=3 & pc5=3 & pc6=3 &!(coin1=coin2 & coin2=coin3 & coin3=coin4 & coin4=coin5 & coin5=coin6)";
     let objective = input::prism::parse_expression(objective, &prism.variable_manager);
     let objective = match objective {
         None => {
@@ -41,5 +46,6 @@ fn checker() -> i32 {
 
     let values = probabilistic_model_algorithms::mdp::value_iteration(&model, 0);
 
+    println!("Finished in {:?}", start_time.elapsed());
     0
 }

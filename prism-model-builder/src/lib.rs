@@ -36,6 +36,7 @@ pub struct StateInProgress<M: ModelTypes> {
 pub struct ExplicitModelBuilder<M: ModelTypes, B: ModelBuilderTypes> {
     phantom_data: PhantomData<B>,
     states: Vec<StateInProgress<M>>,
+    valuation_to_state: HashMap<M::Valuation, usize>,
     open_states: Vec<usize>,
     valuation_map: ValuationMap,
     consts: ConstValuations,
@@ -59,6 +60,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         let mut builder = Self {
             phantom_data: Default::default(),
             states: Vec::new(),
+            valuation_to_state: HashMap::new(),
             open_states: Vec::new(),
             valuation_map,
             consts,
@@ -72,8 +74,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             builder.process_state(state, &model, atomic_propositions, &synchronised_actions)?;
         }
 
-        println!();
-        println!("RESULT:");
         let mut result = ProbabilisticModel::new();
         for (i, state_in_progress) in builder.states.into_iter().enumerate() {
             let state = State {
@@ -81,10 +81,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                 actions: state_in_progress.actions.finish(),
                 atomic_propositions: state_in_progress.atomic_propositions,
             };
-
-            print!("  {}: ", i);
-            Self::print_valuation(&state.valuation, &builder.valuation_map, model);
-            println!();
             result.states.push(state);
         }
 
@@ -190,21 +186,23 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         valuation: M::Valuation,
         atomic_proposition_len: usize,
     ) -> usize {
-        let index = self
-            .states
-            .iter()
-            .enumerate()
-            .filter(|(_, v)| v.valuation == valuation)
-            .map(|(i, _)| i)
-            .next();
+        let index = self.valuation_to_state.get(&valuation);
+        // let index = self
+        //     .states
+        //     .iter()
+        //     .enumerate()
+        //     .filter(|(_, v)| v.valuation == valuation)
+        //     .map(|(i, _)| i)
+        //     .next();
         match index {
-            Some(index) => index,
+            Some(&index) => index,
             None => {
                 let index = self.states.len();
                 let action_builder: <M::ActionCollection as ActionCollection<M>>::Builder =
                     M::ActionCollection::get_builder();
                 let atomic_propositions =
                     <(M::AtomicPropositions)>::get_empty(atomic_proposition_len);
+                self.valuation_to_state.insert(valuation.clone(), index);
                 self.states.push(StateInProgress {
                     valuation,
                     actions: action_builder,
@@ -223,10 +221,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         atomic_propositions: &[Expression<VariableReference, S>],
         synchronised_actions: &SynchronisedActions,
     ) -> Result<(), ModelBuildingError> {
-        print!("Processing state ");
-        Self::print_valuation(&self.states[state].valuation, &self.valuation_map, model);
-        println!();
-
         self.evaluate_atomic_propositions(state, atomic_propositions);
 
         for module_index in 0..model.modules.modules.len() {
@@ -241,7 +235,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                 let guard =
                     B::ExpressionEvaluator::create().evaluate_as_bool(&command.guard, &val_source);
                 if guard {
-                    println!("Command {}'s guard is satisfied!", command_index);
                     let mut distribution = <M::Distribution as Distribution>::get_builder();
 
                     for update_index in 0..command.updates.len() {
@@ -269,19 +262,13 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             }
         }
 
-        println!("Handling synchronised actions");
         for synchronised_action in &synchronised_actions.actions {
-            println!("  Handling synchronised action");
             let valuation = &self.states[state].valuation;
             let val_source = ConstsAndVars::new(&self.valuation_map, &self.consts, valuation);
 
             let mut satisfied_guards_indicies = Vec::new();
             let mut all_satisfied = true;
             for action_module in &synchronised_action.participating_modules {
-                println!(
-                    "    Checking guards in module {}",
-                    action_module.module_index
-                );
                 let module = &model.modules.modules[action_module.module_index];
                 let mut module_info = Vec::new();
                 for &command_index in &action_module.command_indices {
@@ -290,9 +277,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                         .evaluate_as_bool(&command.guard, &val_source);
                     if guard {
                         module_info.push(command_index);
-                        println!("      Command {}: satisfied", command_index);
-                    } else {
-                        println!("      Command {}: unsatisfied", command_index);
                     }
                 }
                 if module_info.is_empty() {
@@ -308,17 +292,13 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             }
 
             if all_satisfied {
-                println!("    Constructing transitions");
                 let modules = &synchronised_action.participating_modules;
                 let mut indices = vec![0; n];
                 while indices[0] < satisfied_guards_indicies[0].len() {
-                    println!("      Indices: {:?}", indices);
                     let mut command_indices = Vec::with_capacity(n);
                     for i in 0..n {
                         command_indices.push(satisfied_guards_indicies[i][indices[i]]);
                     }
-                    println!("      Command indices: {:?}", command_indices);
-                    println!("      Enumerating update combinations");
 
                     let mut update_indices = vec![0; n];
 
@@ -332,7 +312,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                             .max(1)
                     // max(1) is required because a synchronising action may have an empty update ("true")
                     {
-                        println!("        Update indices: {:?}", update_indices);
                         let valuation = &self.states[state].valuation;
                         let val_source =
                             ConstsAndVars::new(&self.valuation_map, &self.consts, valuation);
@@ -368,7 +347,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                         let index = self.get_or_add_state(new_valuation, atomic_propositions.len());
                         distribution.add_successor(Successor { probability, index });
 
-                        println!("        State {} with probability {}", index, probability);
                         for i in (0..n).rev() {
                             if update_indices[i] + 1
                                 < model.modules.modules[modules[i].module_index].commands

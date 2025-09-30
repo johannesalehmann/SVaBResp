@@ -1,9 +1,32 @@
+use std::hash::Hasher;
+
 #[derive(Copy, Clone, PartialEq)]
 enum Value {
     Int(i64),
     Bool(bool),
     Float(f64),
 }
+
+impl std::hash::Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Value::Int(i) => {
+                123.hash(state);
+                i.hash(state)
+            }
+            Value::Bool(b) => {
+                456.hash(state);
+                b.hash(state)
+            }
+            Value::Float(f) => {
+                789.hash(state);
+                ((f * 10000.0) as i64).hash(state) // TODO: This is not a good hash implementation
+            }
+        }
+    }
+}
+
+impl Eq for Value {}
 
 impl Value {
     fn as_int(self) -> i64 {
@@ -26,7 +49,7 @@ impl Value {
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone, Hash)]
 pub struct ValuationVector {
     values: Vec<Value>,
 }
