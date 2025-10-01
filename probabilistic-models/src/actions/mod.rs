@@ -8,9 +8,15 @@ use crate::{Action, ModelTypes};
 
 pub trait ActionCollection<M: ModelTypes>: Sized {
     type Builder: Builder<Self, M>;
+    type Iter<'a>: Iterator<Item = &'a Action<M>>
+    where
+        M: 'a,
+        Self: 'a;
     fn get_builder() -> Self::Builder;
     fn get_number_of_actions(&self) -> usize;
     fn get_action(&self, index: usize) -> &super::Action<M>;
+
+    fn iter<'a>(&'a self) -> Self::Iter<'a>;
 }
 
 pub trait Builder<A, M: ModelTypes> {

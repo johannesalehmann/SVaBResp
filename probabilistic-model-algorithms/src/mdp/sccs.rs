@@ -1,8 +1,16 @@
 use probabilistic_models::{ActionCollection, Distribution, ProbabilisticModel};
+use std::iter::successors;
 
-pub fn compute_sccs<M: probabilistic_models::ModelTypes>(model: &ProbabilisticModel<M>) -> Sccs {
+pub fn compute_sccs<M: probabilistic_models::ModelTypes>(
+    model: &ProbabilisticModel<M>,
+    exclude_states: &[usize],
+) -> Sccs {
     let mut visited = vec![false; model.states.len()];
     let mut l = Vec::with_capacity(model.states.len());
+
+    for &excluded in exclude_states {
+        visited[excluded] = true;
+    }
 
     for i in 0..model.states.len() {
         if !visited[i] {
@@ -11,11 +19,9 @@ pub fn compute_sccs<M: probabilistic_models::ModelTypes>(model: &ProbabilisticMo
     }
 
     let mut reverse_edges = vec![Vec::new(); model.states.len()];
-    for i in 0..model.states.len() {
-        for a in 0..model.states[i].actions.get_number_of_actions() {
-            let action = model.states[i].actions.get_action(a);
-            for t in 0..action.successors.number_of_successors() {
-                let successor = action.successors.get_successor(t);
+    for (i, state) in model.states.iter().enumerate() {
+        for action in state.actions.iter() {
+            for successor in action.successors.iter() {
                 reverse_edges[successor.index].push(i);
             }
         }
@@ -23,6 +29,9 @@ pub fn compute_sccs<M: probabilistic_models::ModelTypes>(model: &ProbabilisticMo
 
     for v in &mut visited {
         *v = false;
+    }
+    for &excluded in exclude_states {
+        visited[excluded] = true;
     }
 
     let mut sccs = Vec::new();
@@ -50,10 +59,8 @@ pub fn compute_sccs<M: probabilistic_models::ModelTypes>(model: &ProbabilisticMo
 
     for (scc_index, scc) in sccs.iter_mut().enumerate() {
         for &state in &scc.members {
-            for a in 0..model.states[state].actions.get_number_of_actions() {
-                let action = model.states[state].actions.get_action(a);
-                for t in 0..action.successors.number_of_successors() {
-                    let successor = action.successors.get_successor(t);
+            for action in model.states[state].actions.iter() {
+                for successor in action.successors.iter() {
                     let successor_scc = state_to_scc[successor.index];
                     if successor_scc != scc_index && !scc.depends_on.contains(&successor_scc) {
                         scc.depends_on.push(successor_scc);
@@ -79,10 +86,8 @@ fn visit<M: probabilistic_models::ModelTypes>(
         match top {
             (i, false) => {
                 stack.push((i, true));
-                for a in 0..model.states[i].actions.get_number_of_actions() {
-                    let action = model.states[i].actions.get_action(a);
-                    for t in 0..action.successors.number_of_successors() {
-                        let successor = action.successors.get_successor(t);
+                for action in model.states[i].actions.iter() {
+                    for successor in action.successors.iter() {
                         if !visited[successor.index] {
                             visited[successor.index] = true;
                             stack.push((successor.index, false));

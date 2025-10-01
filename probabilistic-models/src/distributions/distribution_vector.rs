@@ -6,6 +6,10 @@ pub struct DistributionVector {
 
 impl super::Distribution for DistributionVector {
     type Builder = Builder;
+    type Iter<'a>
+        = std::slice::Iter<'a, Successor>
+    where
+        Self: 'a;
 
     fn get_builder() -> Self::Builder {
         Builder::new()
@@ -17,6 +21,10 @@ impl super::Distribution for DistributionVector {
 
     fn get_successor(&self, index: usize) -> Successor {
         self.successors[index]
+    }
+
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        self.successors.iter()
     }
 }
 

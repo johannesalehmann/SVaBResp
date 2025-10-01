@@ -1,4 +1,4 @@
-use crate::Successor;
+use crate::{Distribution, Successor};
 
 pub struct SingleStateDistribution {
     successor: Successor,
@@ -6,6 +6,10 @@ pub struct SingleStateDistribution {
 
 impl super::Distribution for SingleStateDistribution {
     type Builder = Builder;
+    type Iter<'a>
+        = std::iter::Once<&'a Successor>
+    where
+        Self: 'a;
 
     fn get_builder() -> Self::Builder {
         Builder::new()
@@ -20,6 +24,10 @@ impl super::Distribution for SingleStateDistribution {
             panic!("Successor index out of bounds");
         }
         self.successor
+    }
+
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        std::iter::once(&self.successor)
     }
 }
 

@@ -1,4 +1,5 @@
 use crate::{Action, ModelTypes};
+use std::iter::Once;
 
 pub struct SingleAction<M: ModelTypes> {
     action: Action<M>,
@@ -6,6 +7,10 @@ pub struct SingleAction<M: ModelTypes> {
 
 impl<M: ModelTypes> super::ActionCollection<M> for SingleAction<M> {
     type Builder = Builder<M>;
+    type Iter<'a>
+        = std::iter::Once<&'a Action<M>>
+    where
+        M: 'a;
 
     fn get_builder() -> Self::Builder {
         Builder::new()
@@ -20,6 +25,9 @@ impl<M: ModelTypes> super::ActionCollection<M> for SingleAction<M> {
             panic!("Action index out of bounds");
         }
         &self.action
+    }
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        std::iter::once(&self.action)
     }
 }
 

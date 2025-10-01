@@ -1,76 +1,193 @@
 use probabilistic_models::{
     ActionCollection, AtomicPropositions, Distribution, ProbabilisticModel,
 };
-use std::collections::HashSet;
+
+pub fn optimistic_value_iteration<M: probabilistic_models::ModelTypes>(
+    model: &ProbabilisticModel<M>,
+    objective_ap_index: usize,
+    mut eps: f64,
+) {
+    let start_time = std::time::Instant::now();
+
+    let mut data = vec![StateData::new(); model.states.len()];
+    let mut upper_bound = vec![0.0; model.states.len()];
+    let excluded = handle_reachability_objective(model, objective_ap_index, &mut data);
+
+    let sccs = crate::mdp::sccs::compute_sccs(model, &excluded[..]);
+    let order = sccs.get_reverse_topological_order();
+
+    loop {
+        println!("Starting iterations for eps={}", eps);
+        value_iteration_internal(model, &mut data, eps, &sccs, &order[..]);
+
+        let factor = (1.0 + 2.0 * eps);
+        for i in 0..model.states.len() {
+            upper_bound[i] = match data[i].value {
+                0.0 => 0.0,
+                v => (v * factor).min(1.0),
+            }
+        }
+        println!("Verifying upper bound");
+        let is_upper_bound = is_upper_bound(model, &upper_bound[..], &sccs);
+        match is_upper_bound {
+            BoundCheckResult::UpperBound => {
+                println!("Is upper bound!");
+                for i in 0..model.states.len() {
+                    if i == 0 {
+                        println!(
+                            "Lower bound: {}, upper bound: {}",
+                            data[i].value, upper_bound[i]
+                        );
+                    }
+                    data[i].value = 0.5 * (data[i].value + upper_bound[i]);
+                }
+                break;
+            }
+            BoundCheckResult::LowerBound => {
+                println!("Is lower bound!");
+                for i in 0..model.states.len() {
+                    data[i].value = upper_bound[i];
+                }
+            }
+            BoundCheckResult::Neither => {
+                println!("Is neither bound!");
+                eps = eps * 0.5;
+            }
+        }
+    }
+
+    println!(
+        "Optimistic value iteration finished in {:?}: {}",
+        start_time.elapsed(),
+        data[0].value
+    );
+}
 
 pub fn value_iteration<M: probabilistic_models::ModelTypes>(
     model: &ProbabilisticModel<M>,
     objective_ap_index: usize,
+    eps: f64,
 ) {
     let start_time = std::time::Instant::now();
 
-    let n = model.states.len();
-    let mut data = vec![StateData::new(); n];
-    for (i, state) in model.states.iter().enumerate() {
-        if state.atomic_propositions.get_value(objective_ap_index) {
-            data[i].value = 1.0;
-        }
-    }
-    println!("Finding SCCs");
-    let sccs = crate::mdp::sccs::compute_sccs(model);
-    println!("SCCs: {}", sccs.sccs.len());
+    let mut data = vec![StateData::new(); model.states.len()];
+    let excluded = handle_reachability_objective(model, objective_ap_index, &mut data);
+
+    let sccs = crate::mdp::sccs::compute_sccs(model, &excluded[..]);
     let order = sccs.get_reverse_topological_order();
 
-    for scc in order {
-        for i in 0..200_000 {
-            let mut largest_change: f64 = 0.0;
-            for &state_index in &sccs.sccs[scc].members {
-                let state = &model.states[state_index];
-                if state.atomic_propositions.get_value(objective_ap_index) {
-                    continue;
-                }
+    value_iteration_internal(model, &mut data, eps, &sccs, &order[..]);
 
-                let mut best_value = 0.0; // data[state_index].value; // 0.0;
-                let mut best_action = 0; //data[state_index].action; // 0;
-
-                for action in 0..state.actions.get_number_of_actions() {
-                    let distribution = &state.actions.get_action(action).successors;
-                    let mut value = 0.0;
-                    for successor in 0..distribution.number_of_successors() {
-                        let successor = distribution.get_successor(successor);
-                        value += successor.probability * data[successor.index].value;
-                    }
-                    if value >= best_value {
-                        best_value = value;
-                        best_action = action;
-                    }
-                }
-
-                largest_change = largest_change.max(best_value - data[state_index].value);
-                data[state_index].value = best_value;
-                data[state_index].action = best_action;
-            }
-            if largest_change < 0.000_000_000_1 {
-                // if i > 1 {
-                //     println!(
-                //         "Aborting after {} iterations (size: {})",
-                //         i + 1,
-                //         sccs.sccs[scc].members.len()
-                //     );
-                // }
-                break;
-            }
-        }
-    }
-    // println!("Result of value iteration:");
-    // for state in 0..n {
-    //     println!("  {}: {}", state, data[state].value);
-    // }
     println!(
         "Value iteration finished in {:?}: {}",
         start_time.elapsed(),
         data[0].value
     );
+}
+
+fn handle_reachability_objective<M: probabilistic_models::ModelTypes>(
+    model: &ProbabilisticModel<M>,
+    objective_ap_index: usize,
+    data: &mut Vec<StateData>,
+) -> Vec<usize> {
+    let mut excluded = Vec::new();
+    for (i, state) in model.states.iter().enumerate() {
+        if state.atomic_propositions.get_value(objective_ap_index) {
+            data[i].value = 1.0;
+            excluded.push(i);
+        }
+    }
+    excluded
+}
+
+fn value_iteration_internal<M: probabilistic_models::ModelTypes>(
+    model: &ProbabilisticModel<M>,
+    data: &mut Vec<StateData>,
+    eps: f64,
+    sccs: &crate::mdp::sccs::Sccs,
+    scc_order: &[usize],
+) {
+    for &scc in scc_order {
+        let scc_start = std::time::Instant::now();
+        loop {
+            let mut largest_change: f64 = 0.0;
+            for &state_index in &sccs.sccs[scc].members {
+                let state = &model.states[state_index];
+
+                let mut best_value = 0.0;
+                let mut best_action = 0;
+
+                for (action_index, action) in state.actions.iter().enumerate() {
+                    let distribution = &action.successors;
+                    let mut value = 0.0;
+                    for successor in distribution.iter() {
+                        value += successor.probability * data[successor.index].value;
+                    }
+                    if value >= best_value {
+                        best_value = value;
+                        best_action = action_index;
+                    }
+                }
+
+                let absolute_error = best_value - data[state_index].value;
+                let relative_error = absolute_error / best_value;
+                if relative_error > largest_change {
+                    largest_change = relative_error;
+                }
+                data[state_index] = StateData {
+                    value: best_value,
+                    action: best_action,
+                };
+            }
+            if largest_change < eps {
+                break;
+            }
+        }
+    }
+}
+
+fn is_upper_bound<M: probabilistic_models::ModelTypes>(
+    model: &ProbabilisticModel<M>,
+    upper_bound: &[f64],
+    sccs: &crate::mdp::sccs::Sccs,
+) -> BoundCheckResult {
+    let mut all_decreasing = true;
+    let mut all_increasing = true;
+    for scc in &sccs.sccs {
+        for &state_index in &scc.members {
+            let state = &model.states[state_index];
+
+            let mut best_value = 0.0;
+
+            for action in state.actions.iter() {
+                let distribution = &action.successors;
+                let mut value = 0.0;
+                for successor in distribution.iter() {
+                    value += successor.probability * upper_bound[successor.index];
+                }
+                if value >= best_value {
+                    best_value = value;
+                }
+            }
+            if best_value < upper_bound[state_index] {
+                all_increasing = false;
+            } else if best_value > upper_bound[state_index] {
+                all_decreasing = false;
+            }
+        }
+    }
+    match (all_decreasing, all_increasing) {
+        (true, true) => BoundCheckResult::UpperBound, // Only happens when the model is empty or when the bound is exactly the true value for all states
+        (true, false) => BoundCheckResult::UpperBound,
+        (false, true) => BoundCheckResult::LowerBound,
+        (false, false) => BoundCheckResult::Neither,
+    }
+}
+
+enum BoundCheckResult {
+    UpperBound,
+    LowerBound,
+    Neither,
 }
 
 #[derive(Copy, Clone)]

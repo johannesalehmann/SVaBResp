@@ -6,6 +6,10 @@ pub struct ActionVector<M: ModelTypes> {
 
 impl<M: ModelTypes> super::ActionCollection<M> for ActionVector<M> {
     type Builder = Builder<M>;
+    type Iter<'a>
+        = std::slice::Iter<'a, Action<M>>
+    where
+        M: 'a;
 
     fn get_builder() -> Self::Builder {
         Builder::new()
@@ -17,6 +21,22 @@ impl<M: ModelTypes> super::ActionCollection<M> for ActionVector<M> {
 
     fn get_action(&self, index: usize) -> &Action<M> {
         &self.actions[index]
+    }
+
+    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+        self.actions.iter()
+    }
+}
+
+pub struct Iter<'a, M: ModelTypes> {
+    internal_iterator: std::slice::Iter<'a, Action<M>>,
+}
+
+impl<'a, M: ModelTypes> Iterator for Iter<'a, M> {
+    type Item = &'a Action<M>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.internal_iterator.next()
     }
 }
 
