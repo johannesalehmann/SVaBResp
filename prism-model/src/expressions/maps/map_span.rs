@@ -34,6 +34,10 @@ impl<V, S: Clone, S2: Clone, F: Fn(S) -> S2> MapExpression<V, S, super::Expressi
         Expression::VarOrConst(name, (self.map)(span))
     }
 
+    fn visit_label(&mut self, name: V, span: S) -> Expression<V, S2> {
+        Expression::Label(name, (self.map)(span))
+    }
+
     fn visit_function(
         &mut self,
         identifier: Identifier<S>,

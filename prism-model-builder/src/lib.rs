@@ -49,6 +49,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         model: &Model<(), Identifier<S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
     ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
+        let start_time = std::time::Instant::now();
         let (valuation_map, consts) =
             Self::prepare_valuation_map_and_consts(&model.variable_manager)?;
         let variable_bounds =
@@ -84,6 +85,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             result.states.push(state);
         }
 
+        println!("Model built in {:?}", start_time.elapsed());
         Ok(result)
     }
 
@@ -113,7 +115,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                         .expect("Consts must have an initial value expression"),
                     &const_value_source,
                 );
-                println!("Const {} has value {}", var.name, value);
                 const_valuations.valuations.push(ConstValuation::Int(value));
             } else {
                 valuation_map.entries.push(ValuationMapEntry::Var(
@@ -458,7 +459,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         &mut self,
         model: &Model<(), Identifier<S>, VariableReference, S>,
         atomic_proposition_len: usize,
-    ) -> Result<(), ModelBuildingError> {
+    ) -> Result<Vec<usize>, ModelBuildingError> {
         if model.init_constraint.is_some() {
             panic!("Init constraints are not yet supported by the model builder");
         }
@@ -523,9 +524,8 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         let valuation = valuation_builder.finish();
 
         let index = self.get_or_add_state(valuation, atomic_proposition_len);
-        println!("Initial state has index {}", index);
 
-        Ok(())
+        Ok(vec![index])
     }
 
     fn print_valuation<S: Clone>(

@@ -3,6 +3,7 @@ mod formula_substitution;
 mod renamed_module_expansion;
 mod variable_indexing;
 
+pub use formula_substitution::FormulaSubstitutionVisitor;
 pub use renamed_module_expansion::ModuleExpansionError;
 
 use crate::formulas::FormulaManager;

@@ -17,7 +17,7 @@ pub fn optimistic_value_iteration<M: probabilistic_models::ModelTypes>(
     let order = sccs.get_reverse_topological_order();
 
     loop {
-        println!("Starting iterations for eps={}", eps);
+        print!("eps={}:", eps);
         value_iteration_internal(model, &mut data, eps, &sccs, &order[..]);
 
         let factor = (1.0 + 2.0 * eps);
@@ -27,11 +27,10 @@ pub fn optimistic_value_iteration<M: probabilistic_models::ModelTypes>(
                 v => (v * factor).min(1.0),
             }
         }
-        println!("Verifying upper bound");
         let is_upper_bound = is_upper_bound(model, &upper_bound[..], &sccs);
         match is_upper_bound {
             BoundCheckResult::UpperBound => {
-                println!("Is upper bound!");
+                println!(" Upper bound candidate verified!");
                 for i in 0..model.states.len() {
                     if i == 0 {
                         println!(
@@ -44,13 +43,13 @@ pub fn optimistic_value_iteration<M: probabilistic_models::ModelTypes>(
                 break;
             }
             BoundCheckResult::LowerBound => {
-                println!("Is lower bound!");
+                println!(" Upper bound candidate is lower bound!");
                 for i in 0..model.states.len() {
                     data[i].value = upper_bound[i];
                 }
             }
             BoundCheckResult::Neither => {
-                println!("Is neither bound!");
+                println!(" Could not verify upper bound!");
                 eps = eps * 0.5;
             }
         }
@@ -129,12 +128,13 @@ fn value_iteration_internal<M: probabilistic_models::ModelTypes>(
                     }
                 }
 
-                let absolute_error = best_value - data[state_index].value;
+                let state_data = &mut data[state_index];
+                let absolute_error = best_value - state_data.value;
                 let relative_error = absolute_error / best_value;
                 if relative_error > largest_change {
                     largest_change = relative_error;
                 }
-                data[state_index] = StateData {
+                *state_data = StateData {
                     value: best_value,
                     action: best_action,
                 };

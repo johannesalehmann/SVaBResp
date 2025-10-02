@@ -60,8 +60,8 @@ impl<AM, A, S: Clone> super::Model<AM, A, crate::Identifier<S>, S> {
 }
 
 pub struct FormulaSubstitutionVisitor<'a, S: Clone> {
-    formula_name: &'a Identifier<S>,
-    expression: &'a crate::Expression<crate::Identifier<S>, S>,
+    pub formula_name: &'a Identifier<S>,
+    pub expression: &'a crate::Expression<crate::Identifier<S>, S>,
 }
 
 impl<'a, S: Clone> crate::expressions::identity_map::Private for FormulaSubstitutionVisitor<'a, S> {}

@@ -700,6 +700,9 @@ where
             .then_ignore(just(Token::RightBracket))
             .map_with(|(name, args), e| Expression::Function(name, args, e.span()));
 
+        let label = just(Token::Quote).ignore_then(identifier_parser()).then_ignore(just(Token::Quote))
+            .map_with(|name, e| Expression::Label(name, e.span()));
+
         let parenthesised = expr
             .clone()
             .delimited_by(just(Token::LeftBracket), just(Token::RightBracket));
@@ -710,7 +713,8 @@ where
             .or(false_exp)
             .or(parenthesised)
             .or(function)
-            .or(identifier);
+            .or(identifier)
+            .or(label);
 
         let unary = just(Token::Minus)
             .repeated()

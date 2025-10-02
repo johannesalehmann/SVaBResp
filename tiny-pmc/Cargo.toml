@@ -8,3 +8,4 @@ prism-model = { path = "../prism-model" }
 prism-parser = { path = "../prism-parser" }
 probabilistic-models = { path = "../probabilistic-models" }
 prism-model-builder = { path = "../prism-model-builder" }
+chumsky = "1.0.0-alpha.8"

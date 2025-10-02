@@ -17,6 +17,9 @@ pub trait IdentityMapExpression<V, S: Clone>: Private {
     fn visit_var_or_const(&mut self, name: V, span: S) -> Expression<V, S> {
         Expression::VarOrConst(name, span)
     }
+    fn visit_label(&mut self, name: V, span: S) -> Expression<V, S> {
+        Expression::Label(name, span)
+    }
     fn visit_function(
         &mut self,
         identifier: Identifier<S>,
@@ -166,6 +169,9 @@ impl<V, S: Clone, M: IdentityMapExpression<V, S>> MapExpression<V, S, Expression
     }
     fn visit_var_or_const(&mut self, name: V, span: S) -> Expression<V, S> {
         self.visit_var_or_const(name, span)
+    }
+    fn visit_label(&mut self, name: V, span: S) -> Expression<V, S> {
+        self.visit_label(name, span)
     }
     fn visit_function(
         &mut self,

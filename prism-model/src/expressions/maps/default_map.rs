@@ -15,6 +15,9 @@ pub trait DefaultMapExpression<V, S: Clone, T: Default> {
     fn visit_var_or_const(&mut self, name: V, span: S) -> T {
         T::default()
     }
+    fn visit_label(&mut self, name: V, span: S) -> T {
+        T::default()
+    }
     fn visit_function(&mut self, identifier: Identifier<S>, arguments: Vec<T>, span: S) -> T {
         T::default()
     }
@@ -83,6 +86,9 @@ impl<V, S: Clone, T: Default, M: DefaultMapExpression<V, S, T>> MapExpression<V,
     }
     fn visit_var_or_const(&mut self, name: V, span: S) -> T {
         self.visit_var_or_const(name, span)
+    }
+    fn visit_label(&mut self, name: V, span: S) -> T {
+        self.visit_label(name, span)
     }
     fn visit_function(&mut self, identifier: Identifier<S>, arguments: Vec<T>, span: S) -> T {
         self.visit_function(identifier, arguments, span)

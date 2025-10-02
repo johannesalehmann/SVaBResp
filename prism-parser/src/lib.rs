@@ -6,7 +6,7 @@ use chumsky::prelude::*;
 use chumsky::util::IntoMaybe;
 pub use error::{PrismParserError, PrismParserValidationError};
 pub use lexer::{Span, Token};
-use prism_model::{Identifier, VariableManager, VariableReference};
+use prism_model::{Expression, Identifier, VariableManager, VariableReference};
 use std::borrow::Cow;
 
 pub struct ParseResult<'a, O> {
@@ -14,64 +14,70 @@ pub struct ParseResult<'a, O> {
     pub errors: Vec<PrismParserError<'a, Span, String>>,
 }
 
-pub fn parse_expression<'a, 'b, R>(
-    expression: &'a str,
-    variable_manager: &VariableManager<R, Span>,
-) -> ParseResult<'b, prism_model::Expression<VariableReference, Span>> {
-    let mut errors = Vec::new();
-
-    if let Some(lexer_output) = lex(expression, &mut errors) {
-        let (output, parse_errors) = parser::expression_parser()
-            .map_with(|ast, e| (ast, e.span()))
-            .parse(
-                lexer_output
-                    .as_slice()
-                    .map((expression.len()..expression.len()).into(), |(t, s)| (t, s)),
-            )
-            .into_output_errors();
-
-        process_parser_errors(&mut errors, parse_errors);
-        let mut output = output.map(|(o, _)| o);
-
-        match output {
-            Some(expression) => {
-                match expression.replace_identifiers_by_variable_indices(variable_manager) {
-                    Ok(expr) => {
-                        return ParseResult {
-                            output: Some(expr),
-                            errors,
-                        }
-                    }
-                    Err(errs) => {
-                        for err in errs {
-                            errors.push(
-                                PrismParserValidationError::UnknownVariable {
-                                    identifier: err.identifier,
-                                }
-                                .into(),
-                            )
-                        }
-                    }
-                }
-            }
-            None => {}
-        }
-    }
-    ParseResult {
-        output: None,
-        errors,
-    }
+pub struct ParseResults<'a, 'b> {
+    pub model: ParseResult<
+        'a,
+        prism_model::Model<(), prism_model::Identifier<Span>, prism_model::VariableReference, Span>,
+    >,
+    pub properties: Vec<ParseResult<'b, prism_model::Expression<VariableReference, Span>>>,
 }
 
-pub fn parse_prism<'a, 'b>(
-    source: &'a str,
-) -> ParseResult<
-    'b,
-    prism_model::Model<(), prism_model::Identifier<Span>, prism_model::VariableReference, Span>,
-> {
-    let mut errors = Vec::new();
+// pub fn parse_expression<'a, 'b, R>(
+//     expression: &'a str,
+//     variable_manager: &VariableManager<R, Span>,
+// ) -> ParseResult<'b, prism_model::Expression<VariableReference, Span>> {
+//     let mut errors = Vec::new();
+//
+//     if let Some(lexer_output) = lex(expression, &mut errors) {
+//         let (output, parse_errors) = parser::expression_parser()
+//             .map_with(|ast, e| (ast, e.span()))
+//             .parse(
+//                 lexer_output
+//                     .as_slice()
+//                     .map((expression.len()..expression.len()).into(), |(t, s)| (t, s)),
+//             )
+//             .into_output_errors();
+//
+//         process_parser_errors(&mut errors, parse_errors);
+//         let mut output = output.map(|(o, _)| o);
+//
+//         match output {
+//             Some(expression) => {
+//                 match expression.replace_identifiers_by_variable_indices(variable_manager) {
+//                     Ok(expr) => {
+//                         return ParseResult {
+//                             output: Some(expr),
+//                             errors,
+//                         }
+//                     }
+//                     Err(errs) => {
+//                         for err in errs {
+//                             errors.push(
+//                                 PrismParserValidationError::UnknownVariable {
+//                                     identifier: err.identifier,
+//                                 }
+//                                 .into(),
+//                             )
+//                         }
+//                     }
+//                 }
+//             }
+//             None => {}
+//         }
+//     }
+//     ParseResult {
+//         output: None,
+//         errors,
+//     }
+// }
 
-    if let Some(lexer_output) = lex(source, &mut errors) {
+pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResults<'b, 'b> {
+    let mut model_errors = Vec::new();
+    let mut property_errors = (0..properties.len())
+        .map(|_| Vec::new())
+        .collect::<Vec<_>>();
+
+    if let Some(lexer_output) = lex(source, &mut model_errors) {
         let (output, parse_errors) = parser::program_parser()
             .map_with(|ast, e| (ast, e.span()))
             .parse(
@@ -80,45 +86,147 @@ pub fn parse_prism<'a, 'b>(
                     .map((source.len()..source.len()).into(), |(t, s)| (t, s)),
             )
             .into_output_errors();
-
-        process_parser_errors(&mut errors, parse_errors);
+        process_parser_errors(&mut model_errors, parse_errors);
         let mut output = output.map(|(o, _)| o);
 
-        let output = match output {
+        let lexed_properties = properties
+            .iter()
+            .zip(property_errors.iter_mut())
+            .map(|(p, errs)| lex(p, errs))
+            .collect::<Vec<_>>();
+        let mut parsed_properties = lexed_properties
+            .into_iter()
+            .zip(properties)
+            .zip(property_errors.iter_mut())
+            .map(|((lexer_output, source), errs)| {
+                lexer_output.map_or(None, |lexer_output| {
+                    let (output, parse_errors) = parser::expression_parser()
+                        .map_with(|ast, e| (ast, e.span()))
+                        .parse(
+                            lexer_output
+                                .as_slice()
+                                .map((source.len()..source.len()).into(), |(t, s)| (t, s)),
+                        )
+                        .into_output_errors();
+
+                    process_parser_errors(errs, parse_errors);
+                    println!("{:?}", output);
+                    output.map(|(o, _)| o)
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let (output, properties) = match output {
             Some(mut output) => {
+                parsed_properties
+                    .iter_mut()
+                    .zip(property_errors.iter_mut())
+                    .for_each(|(p_option, errs)| {
+                        if let Some(p) = p_option {
+                            p.substitute_labels(SimpleSpan::new(0, 1), &output.labels);
+                            let substitution =
+                                p.substitute_formulas(SimpleSpan::new(0, 1), &output.formulas);
+                            if let Err(err) = substitution {
+                                errs.push(
+                                    PrismParserValidationError::CyclicFormulaDependency {
+                                        cycle: err,
+                                    }
+                                    .into(),
+                                );
+                                *p_option = None
+                            }
+                        }
+                    });
+
                 if let Err(err) = output.substitute_formulas(SimpleSpan::new(0, 1)) {
-                    errors.push(
+                    model_errors.push(
                         PrismParserValidationError::CyclicFormulaDependency { cycle: err }.into(),
                     )
                 }
+
                 if let Err(error) = output.expand_renamed_models() {
-                    errors.push(PrismParserValidationError::ModuleExpansionError { error }.into());
-                    None
+                    model_errors
+                        .push(PrismParserValidationError::ModuleExpansionError { error }.into());
+                    (None, vec![None; properties.len()])
                 } else {
-                    match output.replace_identifiers_by_variable_indices() {
-                        Ok(output) => Some(output),
-                        Err(errs) => {
-                            for err in errs {
-                                errors.push(
-                                    PrismParserValidationError::UnknownVariable {
-                                        identifier: err.identifier,
+                    let properties = parsed_properties
+                        .into_iter()
+                        .zip(property_errors.iter_mut())
+                        .map(|(p, errs)| {
+                            p.map_or(None, |p| {
+                                match p.replace_identifiers_by_variable_indices(
+                                    &output.variable_manager,
+                                ) {
+                                    Ok(p) => Some(p),
+                                    Err(e) => {
+                                        for err in e {
+                                            errs.push(
+                                                PrismParserValidationError::UnknownVariable {
+                                                    identifier: err.identifier,
+                                                }
+                                                .into(),
+                                            );
+                                        }
+                                        None
                                     }
-                                    .into(),
-                                )
+                                }
+                            })
+                        })
+                        .collect::<Vec<_>>();
+
+                    (
+                        match output.replace_identifiers_by_variable_indices() {
+                            Ok(output) => Some(output),
+                            Err(errs) => {
+                                for err in errs {
+                                    model_errors.push(
+                                        PrismParserValidationError::UnknownVariable {
+                                            identifier: err.identifier,
+                                        }
+                                        .into(),
+                                    )
+                                }
+                                None
                             }
-                            None
-                        }
-                    }
+                        },
+                        properties,
+                    )
                 }
             }
-            None => None,
+            None => (None, vec![None; properties.len()]),
         };
 
-        ParseResult { output, errors }
+        let properties = properties
+            .into_iter()
+            .zip(property_errors.into_iter())
+            .map(|(p, e)| ParseResult {
+                output: p,
+                errors: e,
+            })
+            .collect::<Vec<_>>();
+
+        ParseResults {
+            model: ParseResult {
+                output,
+                errors: model_errors,
+            },
+            properties: properties,
+        }
     } else {
-        ParseResult {
-            output: None,
-            errors,
+        let properties = property_errors
+            .into_iter()
+            .map(|e| ParseResult {
+                output: None,
+                errors: e,
+            })
+            .collect::<Vec<_>>();
+
+        ParseResults {
+            model: ParseResult {
+                output: None,
+                errors: model_errors,
+            },
+            properties: properties,
         }
     }
 }

@@ -1,11 +1,16 @@
+mod label_substitution;
 mod maps;
 
 pub use maps::*;
 use std::fmt::{Display, Formatter};
 
+use crate::expressions::label_substitution::LabelSubstitutionVisitor;
 use crate::expressions::map_variable::MapVariable;
 use crate::module::RenameRules;
-use crate::{Identifier, ModuleExpansionError, VariableManager, VariableReference};
+use crate::{
+    CyclicDependency, FormulaManager, Identifier, LabelManager, ModuleExpansionError,
+    VariableManager, VariableReference,
+};
 
 #[derive(PartialEq, Clone)]
 pub struct GlobalVariableReference {
@@ -27,6 +32,7 @@ pub enum Expression<V, S: Clone> {
     Float(f64, S),
     Bool(bool, S),
     VarOrConst(V, S),
+    Label(V, S),
     Function(Identifier<S>, Vec<Expression<V, S>>, S),
     Minus(Box<Expression<V, S>>, S),
     Multiplication(Box<Expression<V, S>>, Box<Expression<V, S>>, S),
@@ -59,6 +65,7 @@ impl<V, S: Clone> Expression<V, S> {
             Expression::Float(_, s) => s,
             Expression::Bool(_, s) => s,
             Expression::VarOrConst(_, s) => s,
+            Expression::Label(_, s) => s,
             Expression::Function(_, _, s) => s,
             Expression::Minus(_, s) => s,
             Expression::Multiplication(_, _, s) => s,
@@ -95,6 +102,7 @@ impl<V, S: Clone> Expression<V, S> {
             Expression::Float(_, _) => 12,
             Expression::Bool(_, _) => 12,
             Expression::VarOrConst(_, _) => 12,
+            Expression::Label(_, _) => 12,
             Expression::Function(_, _, _) => 12,
             Expression::Minus(_, _) => 11,
             Expression::Multiplication(_, _, _) => 10,
@@ -114,6 +122,39 @@ impl<V, S: Clone> Expression<V, S> {
             Expression::Implies(_, _, _) => 2,
             Expression::Ternary(_, _, _, _) => 1,
         }
+    }
+}
+impl<S: Clone> Expression<Identifier<S>, S> {
+    pub fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
+        for label in &labels.labels {
+            let mut visitor = LabelSubstitutionVisitor {
+                label_name: &label.name,
+                expression: &label.condition,
+            };
+
+            let condition = std::mem::replace(self, Expression::Bool(false, default_span.clone()));
+            *self = condition.visit(&mut visitor);
+        }
+    }
+    pub fn substitute_formulas(
+        &mut self,
+        default_span: S,
+        formulas: &FormulaManager<Identifier<S>, S>,
+    ) -> Result<(), CyclicDependency<S>> {
+        let order = formulas.get_formula_replacement_ordering()?;
+
+        for formula_index in order {
+            let formula = formulas.get(formula_index).unwrap();
+            let mut visitor = crate::model::FormulaSubstitutionVisitor {
+                formula_name: &formula.name,
+                expression: &formula.condition,
+            };
+
+            let condition = std::mem::replace(self, Expression::Bool(false, default_span.clone()));
+            *self = condition.visit(&mut visitor);
+        }
+
+        Ok(())
     }
 }
 
@@ -191,6 +232,9 @@ impl<V: Display, S: Clone> Expression<V, S> {
             }
             Expression::VarOrConst(name, _) => {
                 write!(f, "{}", name)?;
+            }
+            Expression::Label(name, _) => {
+                write!(f, "\"{}\"", name)?;
             }
             Expression::Bool(false, _) => {
                 write!(f, "false")?;
@@ -314,6 +358,9 @@ impl<V: std::fmt::Debug, S: Clone> std::fmt::Debug for Expression<V, S> {
             }
             Expression::VarOrConst(name, _) => {
                 write!(f, "{:?}", name)
+            }
+            Expression::Label(name, _) => {
+                write!(f, "\"{:?}\"", name)
             }
             Expression::Bool(false, _) => {
                 write!(f, "false")

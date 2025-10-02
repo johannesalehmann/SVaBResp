@@ -273,6 +273,7 @@ dependencies = [
 name = "tiny-pmc"
 version = "0.1.0"
 dependencies = [
+ "chumsky",
  "prism-model",
  "prism-model-builder",
  "prism-parser",

@@ -22,6 +22,9 @@ impl TreeWalkingEvaluator {
                 // TODO: This is just temporary -- we need to identify the type of a variable reference before-hand
                 Value::Int(valuations.get_int(*id))
             }
+            Expression::Label(id, _) => {
+                panic!("Cannot evaluate expression containing label. They must only occur in objectives")
+            }
             Expression::Function(name, params, _) => {
                 self.evaluate_function(name, params, valuations)
             }

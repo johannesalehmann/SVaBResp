@@ -15,6 +15,7 @@ pub trait MapExpression<V, S: Clone, T> {
     fn visit_float(&mut self, val: f64, span: S) -> T;
     fn visit_bool(&mut self, val: bool, span: S) -> T;
     fn visit_var_or_const(&mut self, name: V, span: S) -> T;
+    fn visit_label(&mut self, name: V, span: S) -> T;
     fn visit_function(&mut self, identifier: Identifier<S>, arguments: Vec<T>, span: S) -> T;
     fn visit_minus(&mut self, inner: T, span: S) -> T;
     fn visit_multiplication(&mut self, left: T, right: T, span: S) -> T;
@@ -42,6 +43,7 @@ impl<V, S: Clone> Expression<V, S> {
             Expression::Float(val, s) => m.visit_float(val, s),
             Expression::Bool(val, s) => m.visit_bool(val, s),
             Expression::VarOrConst(name, s) => m.visit_var_or_const(name, s),
+            Expression::Label(name, s) => m.visit_label(name, s),
             Expression::Function(identifier, arguments, s) => {
                 let mapped_args = arguments
                     .into_iter()

@@ -31,6 +31,9 @@ impl<V, V2, C, S: Clone, F: Fn(V, &mut C) -> V2> MapExpression<V, S, Expression<
     fn visit_var_or_const(&mut self, name: V, span: S) -> Expression<V2, S> {
         Expression::VarOrConst((self.map)(name, &mut self.context), span)
     }
+    fn visit_label(&mut self, name: V, span: S) -> Expression<V2, S> {
+        Expression::Label((self.map)(name, &mut self.context), span)
+    }
     fn visit_function(
         &mut self,
         identifier: Identifier<S>,

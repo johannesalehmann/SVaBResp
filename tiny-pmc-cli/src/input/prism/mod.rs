@@ -9,38 +9,37 @@ use prism_model::{
 };
 use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
+use tiny_pmc::high_level_models::{HighLevelModel, HighLevelProperty, StateDescriptor};
+use tiny_pmc::parsing::ErrorSource;
 
 pub fn parse_prism(
     file_name: Option<&str>,
     source: &str,
-) -> Option<Model<(), Identifier<SimpleSpan>, VariableReference, SimpleSpan>> {
-    let parse_result = prism_parser::parse_prism(source);
-
-    let has_errors = !parse_result.errors.is_empty();
-    for error in parse_result.errors {
-        print_error(&file_name, source, error);
-    }
-    if has_errors {
-        None
-    } else {
-        parse_result.output
-    }
-}
-
-pub fn parse_expression<R>(
-    expression: &str,
-    variable_manager: &VariableManager<R, Span>,
-) -> Option<Expression<VariableReference, SimpleSpan>> {
-    let parse_result = prism_parser::parse_expression(expression, variable_manager);
-
-    let has_errors = !parse_result.errors.is_empty();
-    for error in parse_result.errors {
-        print_error(&Some("Objective specification"), expression, error);
-    }
-    if has_errors {
-        None
-    } else {
-        parse_result.output
+    properties: &[&str],
+) -> Option<(HighLevelModel, Vec<HighLevelProperty>)> {
+    let parse_result = tiny_pmc::parsing::parse_model_from_source(source, properties);
+    match parse_result {
+        Err(errors) => {
+            for (error_source, error) in errors {
+                match error_source {
+                    ErrorSource::Model => {
+                        print_error(&file_name, source, error);
+                    }
+                    ErrorSource::Property(i) => {
+                        let name = format!("Property {}", i + 1);
+                        print_error(&Some(&name[..]), properties[i], error);
+                    }
+                }
+            }
+            None
+        }
+        Ok((model, properties)) => Some((
+            model,
+            properties
+                .into_iter()
+                .map(|p| HighLevelProperty::PMaxReach(StateDescriptor::Expression(p)))
+                .collect(),
+        )),
     }
 }
 
@@ -49,9 +48,6 @@ fn print_error(file_name: &Option<&str>, source: &str, error: PrismParserError<S
         Some(name) => name,
         None => "input",
     };
-
-    // let mut cg = ColorGenerator::new();
-    // let context_color = cg.next();
 
     let builder = match error {
         PrismParserError::ExpectedFound {
