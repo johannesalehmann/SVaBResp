@@ -1,5 +1,4 @@
 use crate::{Action, ModelTypes};
-use std::iter::Once;
 
 pub struct SingleAction<M: ModelTypes> {
     action: Action<M>,

@@ -1,6 +1,6 @@
-use crate::high_level_models::{HighLevelModel, HighLevelProperty, StateDescriptor};
+use crate::high_level_models::HighLevelModel;
 use chumsky::span::SimpleSpan;
-use prism_model::{Expression, FormulaManager, Identifier, VariableManager, VariableReference};
+use prism_model::{Expression, VariableReference};
 use prism_parser::{PrismParserError, Span};
 
 pub enum ErrorSource {

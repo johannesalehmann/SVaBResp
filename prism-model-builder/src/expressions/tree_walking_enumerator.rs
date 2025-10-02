@@ -19,10 +19,11 @@ impl TreeWalkingEvaluator {
             Expression::Float(val, _) => Value::Float(*val),
             Expression::Bool(val, _) => Value::Bool(*val),
             Expression::VarOrConst(id, _) => {
+                valuations.
                 // TODO: This is just temporary -- we need to identify the type of a variable reference before-hand
                 Value::Int(valuations.get_int(*id))
             }
-            Expression::Label(id, _) => {
+            Expression::Label(_, _) => {
                 panic!("Cannot evaluate expression containing label. They must only occur in objectives")
             }
             Expression::Function(name, params, _) => {
@@ -32,8 +33,10 @@ impl TreeWalkingEvaluator {
                 let inner = self.evaluate(inner, valuations);
                 if inner.is_int() {
                     Value::Int(-inner.as_int())
-                } else {
+                } else if inner.is_float() {
                     Value::Float(-inner.as_float())
+                } else {
+                    panic!("Invalid element in subtraction");
                 }
             }
             Expression::Multiplication(lhs, rhs, _) => {
@@ -43,7 +46,7 @@ impl TreeWalkingEvaluator {
                 lhs,
                 rhs,
                 valuations,
-                |lhs: i64, rhs: i64| (lhs as f64 / rhs as f64),
+                |lhs: i64, rhs: i64| lhs as f64 / rhs as f64,
                 f64::div,
             ),
             Expression::Addition(lhs, rhs, _) => {

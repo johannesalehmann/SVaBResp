@@ -20,7 +20,7 @@ pub fn optimistic_value_iteration<M: probabilistic_models::ModelTypes>(
         print!("eps={}:", eps);
         value_iteration_internal(model, &mut data, eps, &sccs, &order[..]);
 
-        let factor = (1.0 + 2.0 * eps);
+        let factor = 1.0 + 2.0 * eps;
         for i in 0..model.states.len() {
             upper_bound[i] = match data[i].value {
                 0.0 => 0.0,
@@ -107,7 +107,6 @@ fn value_iteration_internal<M: probabilistic_models::ModelTypes>(
     scc_order: &[usize],
 ) {
     for &scc in scc_order {
-        let scc_start = std::time::Instant::now();
         loop {
             let mut largest_change: f64 = 0.0;
             for &state_index in &sccs.sccs[scc].members {
@@ -193,6 +192,7 @@ enum BoundCheckResult {
 #[derive(Copy, Clone)]
 struct StateData {
     value: f64,
+    #[allow(unused)]
     action: usize,
 }
 

@@ -1,12 +1,8 @@
 use ariadne::ReportBuilder;
 use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::error::RichPattern;
-use chumsky::prelude::SimpleSpan;
 use chumsky::util::MaybeRef;
-use prism_model::{
-    Expression, Identifier, InvalidName, Model, ModuleExpansionError, VariableManager,
-    VariableReference,
-};
+use prism_model::{InvalidName, ModuleExpansionError};
 use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
 use tiny_pmc::high_level_models::{HighLevelModel, HighLevelProperty, StateDescriptor};
@@ -151,7 +147,7 @@ fn pattern_to_string(pattern: &RichPattern<String>) -> String {
 fn build_validation(
     file_name: &str,
     error: PrismParserValidationError<Span>,
-) -> ReportBuilder<(&str, Range<usize>)> {
+) -> ReportBuilder<'_, (&str, Range<usize>)> {
     match error {
         PrismParserValidationError::UnsupportedModelType { model_type, span } => {
             let mut builder = Report::build(ReportKind::Error, (file_name, span.into_range()));

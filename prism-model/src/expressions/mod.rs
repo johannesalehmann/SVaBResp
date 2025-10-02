@@ -8,8 +8,7 @@ use crate::expressions::label_substitution::LabelSubstitutionVisitor;
 use crate::expressions::map_variable::MapVariable;
 use crate::module::RenameRules;
 use crate::{
-    CyclicDependency, FormulaManager, Identifier, LabelManager, ModuleExpansionError,
-    VariableManager, VariableReference,
+    CyclicDependency, FormulaManager, Identifier, LabelManager, VariableManager, VariableReference,
 };
 
 #[derive(PartialEq, Clone)]

@@ -5,9 +5,8 @@ use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use prism_model::{
     Identifier, ModelType, ModuleManager, RewardsTarget, VariableAddError, VariableInfo,
-    VariableManager, VariableReference,
+    VariableManager,
 };
-use std::env::var;
 
 pub type E<'a> = extra::Err<crate::PrismParserError<'a, Span, Token>>; // Rich<'a, Token, Span>
 
@@ -375,7 +374,7 @@ fn create_module_from_name_and_elements(
     name: Identifier<Span>,
     module_elements: Vec<ModuleElement>,
     span: Span,
-    emitter: &mut chumsky::input::Emitter<PrismParserError<Span, Token>>,
+    _emitter: &mut chumsky::input::Emitter<PrismParserError<Span, Token>>,
 ) -> (
     prism_model::Module<Identifier<Span>, Identifier<Span>, Span>,
     Vec<VariableInfo<Identifier<Span>, Span>>,

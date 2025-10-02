@@ -1,9 +1,8 @@
 use crate::expressions::UnknownVariableError;
 use crate::{
-    Assignment, Command, Expression, Identifier, Label, LabelManager, Model, ModuleExpansionError,
-    RewardsElement, RewardsManager, VariableInfo, VariableReference,
+    Assignment, Command, Identifier, Label, LabelManager, Model, RewardsElement, RewardsManager,
+    VariableInfo, VariableReference,
 };
-use log::error;
 
 impl<S: Clone> super::Model<(), Identifier<S>, Identifier<S>, S> {
     pub fn replace_identifiers_by_variable_indices(

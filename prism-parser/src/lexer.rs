@@ -239,6 +239,8 @@ fn lexer<'a>(
         .collect()
 }
 
-pub fn raw_lex(program: &str) -> ParseResult<Vec<Spanned<Token>>, PrismParserError<Span, char>> {
+pub fn raw_lex(
+    program: &str,
+) -> ParseResult<Vec<Spanned<Token>>, PrismParserError<'_, Span, char>> {
     lexer().parse(program)
 }

@@ -2,7 +2,6 @@ mod distribution_vector;
 pub use distribution_vector::DistributionVector;
 
 mod single_state_distribution;
-use crate::Action;
 pub use single_state_distribution::SingleStateDistribution;
 
 pub trait Distribution: Sized {

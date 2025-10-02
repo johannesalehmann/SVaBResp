@@ -23,20 +23,8 @@ impl<M: ModelTypes> super::ActionCollection<M> for ActionVector<M> {
         &self.actions[index]
     }
 
-    fn iter<'a>(&'a self) -> Self::Iter<'a> {
+    fn iter(&self) -> Self::Iter<'_> {
         self.actions.iter()
-    }
-}
-
-pub struct Iter<'a, M: ModelTypes> {
-    internal_iterator: std::slice::Iter<'a, Action<M>>,
-}
-
-impl<'a, M: ModelTypes> Iterator for Iter<'a, M> {
-    type Item = &'a Action<M>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.internal_iterator.next()
     }
 }
 

@@ -57,13 +57,6 @@ pub enum PrismParserValidationError<S: Clone> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct CyclicDependencyEntry<S: Clone> {
-    formula_name: Identifier<S>,
-    formula_span: S,
-    dependency_span: S,
-}
-
-#[derive(Debug, PartialEq)]
 pub enum ElementKind {
     GlobalVar,
     LocalVar,

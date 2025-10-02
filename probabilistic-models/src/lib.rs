@@ -41,7 +41,7 @@ pub struct Action<M: ModelTypes> {
     pub successors: M::Distribution,
 }
 
-type Mdp = ProbabilisticModel<MdpType>;
+pub type Mdp = ProbabilisticModel<MdpType>;
 pub struct MdpType {}
 impl ModelTypes for MdpType {
     type Valuation = ValuationVector;
@@ -51,7 +51,7 @@ impl ModelTypes for MdpType {
     type AtomicPropositions = BitFlagsAtomicPropositions;
 }
 
-type Dtmc = ProbabilisticModel<DtmcType>;
+pub type Dtmc = ProbabilisticModel<DtmcType>;
 pub struct DtmcType {}
 impl ModelTypes for DtmcType {
     type Valuation = ValuationVector;
@@ -61,7 +61,7 @@ impl ModelTypes for DtmcType {
     type AtomicPropositions = BitFlagsAtomicPropositions;
 }
 
-type TransitionSystem = ProbabilisticModel<TransitionSystemType>;
+pub type TransitionSystem = ProbabilisticModel<TransitionSystemType>;
 pub struct TransitionSystemType {}
 impl ModelTypes for TransitionSystemType {
     type Valuation = ValuationVector;

@@ -1,5 +1,4 @@
 use crate::module::AddModuleError;
-use crate::variables::MissingVariableRenaming;
 use crate::{Identifier, Module};
 
 impl<S: Clone> super::Model<(), Identifier<S>, Identifier<S>, S> {

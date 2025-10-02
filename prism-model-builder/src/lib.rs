@@ -76,7 +76,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         }
 
         let mut result = ProbabilisticModel::new();
-        for (i, state_in_progress) in builder.states.into_iter().enumerate() {
+        for state_in_progress in builder.states.into_iter() {
             let state = State {
                 valuation: state_in_progress.valuation,
                 actions: state_in_progress.actions.finish(),
@@ -129,7 +129,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         variables: &VariableManager<VariableReference, S>,
         consts: &ConstValuations,
         valuation_map: &ValuationMap,
-    ) -> Result<(VariableBounds), ModelBuildingError> {
+    ) -> Result<VariableBounds, ModelBuildingError> {
         let const_value_source: ConstOnlyEvaluator<'_, '_, B::ExpressionEvaluator> =
             ConstOnlyEvaluator {
                 valuation_map: &valuation_map,
@@ -139,7 +139,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
 
         let mut bounds = Vec::new();
         for (i, variable) in variables.variables.iter().enumerate() {
-            if let ValuationMapEntry::Var(index) = valuation_map.entries[i] {
+            if let ValuationMapEntry::Var(_) = valuation_map.entries[i] {
                 bounds.push(match &variable.range {
                     VariableRange::BoundedInt { min, max, .. } => {
                         let min = B::ExpressionEvaluator::create()
@@ -165,7 +165,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         for (i, var) in model.variable_manager.variables.iter().enumerate() {
             if let ValuationMapEntry::Var(var_index) = &valuation_map.entries[i] {
                 match &var.range {
-                    VariableRange::BoundedInt { min, max, .. } => {
+                    VariableRange::BoundedInt { .. } => {
                         if let Some((min, max)) = variable_bounds.bounds[*var_index] {
                             context_builder.register_bounded_int(min, max);
                         } else {
@@ -202,7 +202,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                 let action_builder: <M::ActionCollection as ActionCollection<M>>::Builder =
                     M::ActionCollection::get_builder();
                 let atomic_propositions =
-                    <(M::AtomicPropositions)>::get_empty(atomic_proposition_len);
+                    <M::AtomicPropositions>::get_empty(atomic_proposition_len);
                 self.valuation_to_state.insert(valuation.clone(), index);
                 self.states.push(StateInProgress {
                     valuation,
@@ -528,6 +528,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         Ok(vec![index])
     }
 
+    #[allow(unused)]
     fn print_valuation<S: Clone>(
         valuation: &M::Valuation,
         valuation_map: &ValuationMap,
@@ -562,6 +563,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     }
 }
 
+#[derive(Debug)]
 pub enum ModelBuildingError {}
 
 struct ConstsAndVars<'a, 'b, 'c, V: Valuation> {
@@ -684,11 +686,31 @@ impl<'a, S: Clone, E: Evaluator> ValuationSource for ConstRecursiveEvaluator<'a,
     }
 
     fn get_bool(&self, index: VariableReference) -> bool {
-        todo!()
+        let var = self.variables.get(&index).unwrap();
+        if !var.is_constant {
+            panic!("Const depends on non-constant value");
+        }
+        let inner_eval = E::create();
+        inner_eval.evaluate_as_bool(
+            &var.initial_value
+                .as_ref()
+                .expect("Constant without initial value"),
+            self,
+        )
     }
 
     fn get_float(&self, index: VariableReference) -> f64 {
-        todo!()
+        let var = self.variables.get(&index).unwrap();
+        if !var.is_constant {
+            panic!("Const depends on non-constant value");
+        }
+        let inner_eval = E::create();
+        inner_eval.evaluate_as_float(
+            &var.initial_value
+                .as_ref()
+                .expect("Constant without initial value"),
+            self,
+        )
     }
 }
 
@@ -771,7 +793,7 @@ impl SynchronisedActions {
         }
 
         SynchronisedActions {
-            actions: actions.into_iter().map(|(n, a)| a).collect(),
+            actions: actions.into_iter().map(|(_, a)| a).collect(),
         }
     }
 }

@@ -52,21 +52,21 @@ impl<V, S: Clone> VariableManager<V, S> {
         }
     }
 
-    pub fn format_as_consts(&self) -> PrintableVariableManager<V, S> {
+    pub fn format_as_consts(&self) -> PrintableVariableManager<'_, V, S> {
         PrintableVariableManager {
             vm: &self,
             display_kind: VariablePrintingStyle::Const,
             filter: VariableFilter::Constant,
         }
     }
-    pub fn format_as_global_vars(&self) -> PrintableVariableManager<V, S> {
+    pub fn format_as_global_vars(&self) -> PrintableVariableManager<'_, V, S> {
         PrintableVariableManager {
             vm: &self,
             display_kind: VariablePrintingStyle::GlobalVar,
             filter: VariableFilter::GlobalVar,
         }
     }
-    pub fn format_as_local_vars(&self, module: usize) -> PrintableVariableManager<V, S> {
+    pub fn format_as_local_vars(&self, module: usize) -> PrintableVariableManager<'_, V, S> {
         PrintableVariableManager {
             vm: &self,
             display_kind: VariablePrintingStyle::LocalVar,
@@ -81,7 +81,7 @@ impl<S: Clone> VariableManager<Identifier<S>, S> {
         new_module_index: usize,
         rename_rules: &RenameRules<S>,
     ) -> Result<VariableManager<Identifier<S>, S>, MissingVariableRenaming<S>> {
-        let mut variables = Vec::with_capacity(self.variables.len());
+        let variables = Vec::with_capacity(self.variables.len());
         for i in 0..self.variables.len() {
             let variable = &self.variables[i];
             if variable.is_constant || variable.scope != Some(old_module_index) {
@@ -303,10 +303,10 @@ impl<S: Clone> VariableRange<Identifier<S>, S> {
         match self {
             VariableRange::BoundedInt { min, max, span } => {
                 let mut errors = Vec::new();
-                let mut min = min
+                let min = min
                     .clone()
                     .replace_identifiers_by_variable_indices(variable_manager);
-                let mut max = max
+                let max = max
                     .clone()
                     .replace_identifiers_by_variable_indices(variable_manager);
                 if let Err(err) = &min {

@@ -3,10 +3,9 @@ mod lexer;
 mod parser;
 
 use chumsky::prelude::*;
-use chumsky::util::IntoMaybe;
 pub use error::{PrismParserError, PrismParserValidationError};
 pub use lexer::{Span, Token};
-use prism_model::{Expression, Identifier, VariableManager, VariableReference};
+use prism_model::VariableReference;
 use std::borrow::Cow;
 
 pub struct ParseResult<'a, O> {
@@ -87,7 +86,7 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
             )
             .into_output_errors();
         process_parser_errors(&mut model_errors, parse_errors);
-        let mut output = output.map(|(o, _)| o);
+        let output = output.map(|(o, _)| o);
 
         let lexed_properties = properties
             .iter()

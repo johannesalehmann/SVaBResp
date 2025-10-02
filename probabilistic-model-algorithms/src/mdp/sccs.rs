@@ -1,5 +1,4 @@
 use probabilistic_models::{ActionCollection, Distribution, ProbabilisticModel};
-use std::iter::successors;
 
 pub fn compute_sccs<M: probabilistic_models::ModelTypes>(
     model: &ProbabilisticModel<M>,

@@ -1,4 +1,4 @@
-use crate::{Distribution, Successor};
+use crate::Successor;
 
 pub struct SingleStateDistribution {
     successor: Successor,
