@@ -1,4 +1,4 @@
-use crate::expressions::ValuationSource;
+use crate::expressions::{ValuationSource, VariableType};
 use prism_model::{Expression, Identifier, VariableReference};
 use std::ops::{Add, Div, Mul, Sub};
 
@@ -18,11 +18,11 @@ impl TreeWalkingEvaluator {
             Expression::Int(val, _) => Value::Int(*val),
             Expression::Float(val, _) => Value::Float(*val),
             Expression::Bool(val, _) => Value::Bool(*val),
-            Expression::VarOrConst(id, _) => {
-                valuations.
-                // TODO: This is just temporary -- we need to identify the type of a variable reference before-hand
-                Value::Int(valuations.get_int(*id))
-            }
+            Expression::VarOrConst(id, _) => match valuations.get_type(*id) {
+                VariableType::Int => Value::Int(valuations.get_int(*id)),
+                VariableType::Bool => Value::Bool(valuations.get_bool(*id)),
+                VariableType::Float => Value::Float(valuations.get_float(*id)),
+            },
             Expression::Label(_, _) => {
                 panic!("Cannot evaluate expression containing label. They must only occur in objectives")
             }

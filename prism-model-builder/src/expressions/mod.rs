@@ -26,4 +26,12 @@ pub trait ValuationSource {
     fn get_int(&self, index: VariableReference) -> i64;
     fn get_bool(&self, index: VariableReference) -> bool;
     fn get_float(&self, index: VariableReference) -> f64;
+    fn get_type(&self, index: VariableReference) -> VariableType;
+}
+
+#[derive(Copy, Clone)]
+pub enum VariableType {
+    Int,
+    Bool,
+    Float,
 }
