@@ -4,11 +4,53 @@ use crate::{PrismParserError, PrismParserValidationError};
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use prism_model::{
-    Identifier, ModelType, ModuleManager, RewardsTarget, VariableAddError, VariableInfo,
+    Identifier, ModelType, ModuleManager, Operator, RewardsTarget, VariableAddError, VariableInfo,
     VariableManager,
 };
 
 pub type E<'a> = extra::Err<crate::PrismParserError<'a, Span, Token>>; // Rich<'a, Token, Span>
+
+pub fn property_parser<'a, 'b, I>(
+) -> impl Parser<'a, I, prism_model::Property<Identifier<Span>, Span>, E<'a>>
+where
+    I: ValueInput<'a, Token = Token, Span = Span>,
+{
+    operator_parser()
+        .then_ignore(just(Token::LeftSqBracket))
+        .then(path_parser())
+        .then_ignore(just(Token::RightSqBracket))
+        .map(|(o, p)| prism_model::Property {
+            operator: o,
+            path: p,
+        })
+}
+pub fn operator_parser<'a, 'b, I>() -> impl Parser<'a, I, prism_model::Operator, E<'a>>
+where
+    I: ValueInput<'a, Token = Token, Span = Span>,
+{
+    just(Token::PMax)
+        .then_ignore(just(Token::Equal))
+        .then_ignore(just(Token::Questionmark))
+        .map(|_| Operator::ValueOfPMax)
+        .or(just(Token::PMin)
+            .then_ignore(just(Token::Equal))
+            .then_ignore(just(Token::Questionmark))
+            .map(|_| Operator::ValueOfPMin))
+        .or(just(Token::P)
+            .then_ignore(just(Token::Equal))
+            .then_ignore(just(Token::Questionmark))
+            .map(|_| Operator::ValueOfP))
+}
+
+pub fn path_parser<'a, 'b, I>(
+) -> impl Parser<'a, I, prism_model::Path<Identifier<Span>, Span>, E<'a>>
+where
+    I: ValueInput<'a, Token = Token, Span = Span>,
+{
+    just(Token::Finally)
+        .ignore_then(expression_parser())
+        .map(|e| prism_model::Path::Eventually(e))
+}
 
 pub fn program_parser<'a, 'b, I>(
 ) -> impl Parser<'a, I, prism_model::Model<(), Identifier<Span>, Identifier<Span>, Span>, E<'a>>

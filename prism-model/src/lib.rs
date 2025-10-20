@@ -34,3 +34,6 @@ pub use variables::{
 
 mod identifier;
 pub use identifier::{Identifier, InvalidName};
+
+mod properties;
+pub use properties::{Operator, Path, Property};

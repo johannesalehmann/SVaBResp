@@ -15,8 +15,19 @@ use probabilistic_models::DistributionBuilder;
 pub fn build_model<S: Clone>(
     model: &Model<(), Identifier<S>, VariableReference, S>,
     atomic_propositions: &[Expression<VariableReference, S>],
+    const_values: HashMap<String, ConstValue>,
 ) -> Result<ProbabilisticModel<MdpType>, ModelBuildingError> {
-    ExplicitModelBuilder::<MdpType, DefaultModelBuilderTypes>::run(model, atomic_propositions)
+    ExplicitModelBuilder::<MdpType, DefaultModelBuilderTypes>::run(
+        model,
+        atomic_propositions,
+        const_values,
+    )
+}
+
+pub enum ConstValue {
+    Int(i64),
+    Bool(bool),
+    Float(f64),
 }
 
 pub trait ModelBuilderTypes {
@@ -49,10 +60,11 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     pub fn run<S: Clone>(
         model: &Model<(), Identifier<S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
+        const_values: HashMap<String, ConstValue>,
     ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
         let start_time = std::time::Instant::now();
         let (valuation_map, consts) =
-            Self::prepare_valuation_map_and_consts(&model.variable_manager)?;
+            Self::prepare_valuation_map_and_consts(&model.variable_manager, &const_values)?;
         let variable_bounds =
             Self::prepare_variable_bounds(&model.variable_manager, &consts, &valuation_map)?;
         let variable_types = Self::prepare_variable_types(&model.variable_manager);
@@ -94,6 +106,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
 
     fn prepare_valuation_map_and_consts<S: Clone>(
         variables: &VariableManager<VariableReference, S>,
+        const_values: &HashMap<String, ConstValue>,
     ) -> Result<(ValuationMap, ConstValuations), ModelBuildingError> {
         let mut valuation_map = ValuationMap {
             entries: Vec::new(),
@@ -107,32 +120,55 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     .entries
                     .push(ValuationMapEntry::Const(const_valuations.valuations.len()));
 
-                let const_value_source: ConstRecursiveEvaluator<'_, S, B::ExpressionEvaluator> =
-                    ConstRecursiveEvaluator {
+                if let Some(value) = const_values.get(&var.name.name) {
+                    match (&var.range, value) {
+                        (VariableRange::BoundedInt { .. }, ConstValue::Int(i)) => {
+                            const_valuations.valuations.push(ConstValuation::Int(*i))
+                        }
+                        (VariableRange::UnboundedInt { .. }, ConstValue::Int(i)) => {
+                            const_valuations.valuations.push(ConstValuation::Int(*i))
+                        }
+                        (VariableRange::Boolean { .. }, ConstValue::Bool(b)) => {
+                            const_valuations.valuations.push(ConstValuation::Bool(*b))
+                        }
+                        (VariableRange::Float { .. }, ConstValue::Float(f)) => {
+                            const_valuations.valuations.push(ConstValuation::Float(*f))
+                        }
+                        _ => panic!("Incompatible value assigned to constant"),
+                    }
+                } else {
+                    let const_value_source: ConstRecursiveEvaluator<
+                        '_,
+                        '_,
+                        S,
+                        B::ExpressionEvaluator,
+                    > = ConstRecursiveEvaluator {
                         variables,
+                        const_values,
                         phantom_data: Default::default(),
                     };
-                let evaluator = B::ExpressionEvaluator::create();
-                let initial = var
-                    .initial_value
-                    .as_ref()
-                    .expect("Consts must have an initial value expression");
-                match var.range {
-                    VariableRange::BoundedInt { .. } | VariableRange::UnboundedInt { .. } => {
-                        let value = evaluator.evaluate_as_int(initial, &const_value_source);
-                        const_valuations.valuations.push(ConstValuation::Int(value));
-                    }
-                    VariableRange::Boolean { .. } => {
-                        let value = evaluator.evaluate_as_bool(initial, &const_value_source);
-                        const_valuations
-                            .valuations
-                            .push(ConstValuation::Bool(value));
-                    }
-                    VariableRange::Float { .. } => {
-                        let value = evaluator.evaluate_as_float(initial, &const_value_source);
-                        const_valuations
-                            .valuations
-                            .push(ConstValuation::Float(value));
+                    let evaluator = B::ExpressionEvaluator::create();
+                    let initial = var
+                        .initial_value
+                        .as_ref()
+                        .expect("Consts must have an initial value expression");
+                    match var.range {
+                        VariableRange::BoundedInt { .. } | VariableRange::UnboundedInt { .. } => {
+                            let value = evaluator.evaluate_as_int(initial, &const_value_source);
+                            const_valuations.valuations.push(ConstValuation::Int(value));
+                        }
+                        VariableRange::Boolean { .. } => {
+                            let value = evaluator.evaluate_as_bool(initial, &const_value_source);
+                            const_valuations
+                                .valuations
+                                .push(ConstValuation::Bool(value));
+                        }
+                        VariableRange::Float { .. } => {
+                            let value = evaluator.evaluate_as_float(initial, &const_value_source);
+                            const_valuations
+                                .valuations
+                                .push(ConstValuation::Float(value));
+                        }
                     }
                 }
             } else {
@@ -754,24 +790,37 @@ impl ConstValuation {
     }
 }
 
-struct ConstRecursiveEvaluator<'a, S: Clone, E: Evaluator> {
+struct ConstRecursiveEvaluator<'a, 'b, S: Clone, E: Evaluator> {
     variables: &'a VariableManager<VariableReference, S>,
+    const_values: &'b HashMap<String, ConstValue>,
     phantom_data: PhantomData<E>,
 }
 
-impl<'a, S: Clone, E: Evaluator> ValuationSource for ConstRecursiveEvaluator<'a, S, E> {
+impl<'a, 'b, S: Clone, E: Evaluator> ValuationSource for ConstRecursiveEvaluator<'a, 'b, S, E> {
     fn get_int(&self, index: VariableReference) -> i64 {
         let var = self.variables.get(&index).unwrap();
         if !var.is_constant {
             panic!("Const depends on non-constant value");
         }
-        let inner_eval = E::create();
-        inner_eval.evaluate_as_int(
-            &var.initial_value
-                .as_ref()
-                .expect("Constant without initial value"),
-            self,
-        )
+        if let Some(value) = self.const_values.get(&var.name.name) {
+            match value {
+                ConstValue::Int(i) => *i,
+                ConstValue::Bool(_) => {
+                    panic!("Integer constant assigned boolean value")
+                }
+                ConstValue::Float(_) => {
+                    panic!("Integer constant assigned float value")
+                }
+            }
+        } else {
+            let inner_eval = E::create();
+            inner_eval.evaluate_as_int(
+                &var.initial_value
+                    .as_ref()
+                    .expect("Constant without initial value"),
+                self,
+            )
+        }
     }
 
     fn get_bool(&self, index: VariableReference) -> bool {
@@ -779,13 +828,25 @@ impl<'a, S: Clone, E: Evaluator> ValuationSource for ConstRecursiveEvaluator<'a,
         if !var.is_constant {
             panic!("Const depends on non-constant value");
         }
-        let inner_eval = E::create();
-        inner_eval.evaluate_as_bool(
-            &var.initial_value
-                .as_ref()
-                .expect("Constant without initial value"),
-            self,
-        )
+        if let Some(value) = self.const_values.get(&var.name.name) {
+            match value {
+                ConstValue::Int(_) => {
+                    panic!("Boolean constant assigned integer value")
+                }
+                ConstValue::Bool(b) => *b,
+                ConstValue::Float(_) => {
+                    panic!("Boolean constant assigned float value")
+                }
+            }
+        } else {
+            let inner_eval = E::create();
+            inner_eval.evaluate_as_bool(
+                &var.initial_value
+                    .as_ref()
+                    .expect("Constant without initial value"),
+                self,
+            )
+        }
     }
 
     fn get_float(&self, index: VariableReference) -> f64 {
@@ -793,13 +854,25 @@ impl<'a, S: Clone, E: Evaluator> ValuationSource for ConstRecursiveEvaluator<'a,
         if !var.is_constant {
             panic!("Const depends on non-constant value");
         }
-        let inner_eval = E::create();
-        inner_eval.evaluate_as_float(
-            &var.initial_value
-                .as_ref()
-                .expect("Constant without initial value"),
-            self,
-        )
+        if let Some(value) = self.const_values.get(&var.name.name) {
+            match value {
+                ConstValue::Int(_) => {
+                    panic!("Float constant assigned integer value")
+                }
+                ConstValue::Bool(_) => {
+                    panic!("Float constant assigned boolean value")
+                }
+                ConstValue::Float(f) => *f,
+            }
+        } else {
+            let inner_eval = E::create();
+            inner_eval.evaluate_as_float(
+                &var.initial_value
+                    .as_ref()
+                    .expect("Constant without initial value"),
+                self,
+            )
+        }
     }
 
     fn get_type(&self, index: VariableReference) -> VariableType {

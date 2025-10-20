@@ -1,6 +1,5 @@
-use crate::high_level_models::HighLevelModel;
+use crate::PrismModel;
 use chumsky::span::SimpleSpan;
-use prism_model::{Expression, VariableReference};
 use prism_parser::{PrismParserError, Span};
 
 pub enum ErrorSource {
@@ -12,7 +11,7 @@ pub fn parse_model_from_source<'a>(
     source: &str,
     properties: &[&str],
 ) -> Result<
-    (HighLevelModel, Vec<Expression<VariableReference, Span>>),
+    (PrismModel, Vec<crate::Property>),
     Vec<(ErrorSource, PrismParserError<'a, SimpleSpan, String>)>,
 > {
     let parse_results = prism_parser::parse_prism(source, properties);
@@ -32,7 +31,7 @@ pub fn parse_model_from_source<'a>(
     }
     if attributed_errors.is_empty() {
         if let Some(model) = parse_results.model.output {
-            Ok((HighLevelModel::Prism(model), properties))
+            Ok((model, properties))
         } else {
             Err(vec![])
         }

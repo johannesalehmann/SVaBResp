@@ -2,17 +2,17 @@ use ariadne::ReportBuilder;
 use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::error::RichPattern;
 use chumsky::util::MaybeRef;
-use prism_model::{InvalidName, ModuleExpansionError};
+use prism_model::{InvalidName, ModuleExpansionError, Property};
 use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
-use tiny_pmc::high_level_models::{HighLevelModel, HighLevelProperty, StateDescriptor};
 use tiny_pmc::parsing::ErrorSource;
+use tiny_pmc::PrismModel;
 
 pub fn parse_prism(
     file_name: Option<&str>,
     source: &str,
     properties: &[&str],
-) -> Option<(HighLevelModel, Vec<HighLevelProperty>)> {
+) -> Option<(PrismModel, Vec<tiny_pmc::Property>)> {
     let parse_result = tiny_pmc::parsing::parse_model_from_source(source, properties);
     match parse_result {
         Err(errors) => {
@@ -29,13 +29,7 @@ pub fn parse_prism(
             }
             None
         }
-        Ok((model, properties)) => Some((
-            model,
-            properties
-                .into_iter()
-                .map(|p| HighLevelProperty::PMaxReach(StateDescriptor::Expression(p)))
-                .collect(),
-        )),
+        Ok((model, properties)) => Some((model, properties)),
     }
 }
 

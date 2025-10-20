@@ -30,6 +30,11 @@ pub enum Token {
     Double,
     Bool,
 
+    P,
+    PMax,
+    PMin,
+    Finally,
+
     Identifier(String),
 
     // Syntax elements:
@@ -108,6 +113,10 @@ impl Display for Token {
             Token::Int => write!(f, "int"),
             Token::Double => write!(f, "double"),
             Token::Bool => write!(f, "bool"),
+            Token::PMax => write!(f, "PMax"),
+            Token::PMin => write!(f, "PMin"),
+            Token::P => write!(f, "P"),
+            Token::Finally => write!(f, "F"),
             Token::Identifier(_) => write!(f, "[Identifier]"),
             Token::LeftSqBracket => write!(f, "["),
             Token::RightSqBracket => write!(f, "]"),
@@ -217,6 +226,12 @@ fn lexer<'a>(
         "int" => Token::Int,
         "double" => Token::Double,
         "bool" => Token::Bool,
+
+        "PMax" => Token::PMax,
+        "PMin" => Token::PMin,
+        "P" => Token::P,
+
+        "F" => Token::Finally,
 
         "true" => Token::True,
         "false" => Token::False,
