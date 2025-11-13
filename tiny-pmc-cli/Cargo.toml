@@ -11,3 +11,4 @@ probabilistic-model-algorithms = { path = "../probabilistic-model-algorithms" }
 tiny-pmc = { path = "../tiny-pmc" }
 ariadne = { version = "0.5.1", features = ["auto-color"] }
 chumsky = "1.0.0-alpha.8"
+clap = { version = "4.5.51", features = ["derive"] }

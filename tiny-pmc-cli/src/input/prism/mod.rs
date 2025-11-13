@@ -2,13 +2,13 @@ use ariadne::ReportBuilder;
 use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::error::RichPattern;
 use chumsky::util::MaybeRef;
-use prism_model::{InvalidName, ModuleExpansionError, Property};
+use prism_model::{InvalidName, ModuleExpansionError};
 use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
 use tiny_pmc::parsing::ErrorSource;
 use tiny_pmc::PrismModel;
 
-pub fn parse_prism(
+pub fn parse_prism_and_print_errors(
     file_name: Option<&str>,
     source: &str,
     properties: &[&str],

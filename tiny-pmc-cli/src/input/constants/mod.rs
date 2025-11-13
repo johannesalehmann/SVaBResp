@@ -1,7 +1,29 @@
 use prism_model_builder::ConstValue;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 
-pub fn parse_const_assignments(assignments: &str) -> HashMap<String, ConstValue> {
+pub enum ConstParsingError {
+    InvalidValue { name: String, value: String },
+    InvalidAssigment { assignment: String },
+}
+
+impl Display for ConstParsingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error parsing constant: ")?;
+        match self {
+            ConstParsingError::InvalidValue { name, value } => {
+                write!(f, "Invalid value `{}` for constant `{}`", value, name)
+            }
+            ConstParsingError::InvalidAssigment { assignment } => {
+                write!(f, "Invalid assigment `{}`", assignment)
+            }
+        }
+    }
+}
+
+pub fn parse_const_assignments(
+    assignments: &str,
+) -> Result<HashMap<String, ConstValue>, ConstParsingError> {
     let mut result = HashMap::new();
 
     for assignment in assignments.split(";") {
@@ -14,13 +36,18 @@ pub fn parse_const_assignments(assignments: &str) -> HashMap<String, ConstValue>
             } else if let Ok(b) = rhs.parse::<bool>() {
                 ConstValue::Bool(b)
             } else {
-                panic!("Cannot parse value {} for constant {}", rhs, name);
+                return Err(ConstParsingError::InvalidValue {
+                    name,
+                    value: rhs.to_string(),
+                });
             };
             result.insert(name, value);
         } else {
-            panic!("Cannot parse constant assignment {}", assignment);
+            return Err(ConstParsingError::InvalidAssigment {
+                assignment: assignment.to_string(),
+            });
         }
     }
 
-    result
+    Ok(result)
 }

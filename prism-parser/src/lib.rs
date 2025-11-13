@@ -60,7 +60,6 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
                         .into_output_errors();
 
                     process_parser_errors(errs, parse_errors);
-                    println!("{:?}", output);
                     output.map(|(o, _)| o)
                 })
             })

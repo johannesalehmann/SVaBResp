@@ -1,6 +1,6 @@
 use crate::PrismModel;
 use chumsky::span::SimpleSpan;
-use prism_parser::{PrismParserError, Span};
+use prism_parser::PrismParserError;
 
 pub enum ErrorSource {
     Model,
