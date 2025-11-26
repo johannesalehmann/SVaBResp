@@ -12,22 +12,29 @@ pub use state_valuations::*;
 mod atomic_propositions;
 pub use atomic_propositions::*;
 
+mod initial_states;
+pub use initial_states::*;
+
 pub trait ModelTypes: Sized {
     type Valuation: Valuation + std::hash::Hash + Eq;
     type Distribution: Distribution;
     type Owners: Owners;
     type ActionCollection: ActionCollection<Self>;
-
     type AtomicPropositions: AtomicPropositions;
+    type InitialStates: InitialStates;
 }
 
 pub struct ProbabilisticModel<M: ModelTypes> {
     pub states: Vec<State<M>>,
+    pub initial_states: M::InitialStates,
 }
 
 impl<M: ModelTypes> ProbabilisticModel<M> {
-    pub fn new() -> Self {
-        Self { states: Vec::new() }
+    pub fn new(initial_states: M::InitialStates) -> Self {
+        Self {
+            states: Vec::new(),
+            initial_states,
+        }
     }
 }
 
@@ -49,6 +56,7 @@ impl ModelTypes for MdpType {
     type Owners = SinglePlayer;
     type ActionCollection = ActionVector<Self>;
     type AtomicPropositions = BitFlagsAtomicPropositions;
+    type InitialStates = SingleInitialState;
 }
 
 pub type Dtmc = ProbabilisticModel<DtmcType>;
@@ -59,6 +67,7 @@ impl ModelTypes for DtmcType {
     type Owners = SinglePlayer;
     type ActionCollection = SingleAction<Self>;
     type AtomicPropositions = BitFlagsAtomicPropositions;
+    type InitialStates = SingleInitialState;
 }
 
 pub type TransitionSystem = ProbabilisticModel<TransitionSystemType>;
@@ -69,4 +78,5 @@ impl ModelTypes for TransitionSystemType {
     type Owners = SinglePlayer;
     type ActionCollection = ActionVector<Self>;
     type AtomicPropositions = BitFlagsAtomicPropositions;
+    type InitialStates = SingleInitialState;
 }
