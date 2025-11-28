@@ -411,6 +411,7 @@ dependencies = [
  "prism-model",
  "prism-model-builder",
  "prism-parser",
+ "probabilistic-model-algorithms",
  "probabilistic-models",
  "probabilistic-properties",
 ]
@@ -425,7 +426,6 @@ dependencies = [
  "prism-model",
  "prism-model-builder",
  "prism-parser",
- "probabilistic-model-algorithms",
  "probabilistic-models",
  "probabilistic-properties",
  "tiny-pmc",

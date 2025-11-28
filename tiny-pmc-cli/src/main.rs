@@ -39,45 +39,20 @@ fn checker() -> Result<(), ModelCheckerError> {
     };
 
     let mut atomic_propositions = Vec::new();
-    let properties = prism_objectives_to_atomic_propositions(&mut atomic_propositions, properties);
+    let properties = tiny_pmc::building::prism_objectives_to_atomic_propositions(
+        &mut atomic_propositions,
+        properties,
+    );
 
     let model =
         prism_model_builder::build_model(&prism_model, &atomic_propositions[..], constants)?;
     for (i, property) in properties.iter().enumerate() {
         println!("Checking property {} of {}", i + 1, properties.len());
-        match (&property.operator, &property.path) {
-            (Operator::ValueOfPMax, Path::Eventually(AtomicProposition { index })) => {
-                probabilistic_model_algorithms::mdp::optimistic_value_iteration(
-                    &model, *index, 0.000_001,
-                );
-            }
-            _ => panic!("This combination of operator and path formula is not supported"),
-        }
+        tiny_pmc::checking::check(&model, property);
     }
 
     println!("Finished in {:?}", start_time.elapsed());
     Ok(())
-}
-
-fn prism_objectives_to_atomic_propositions(
-    atomic_proposition: &mut Vec<Expression<VariableReference, SimpleSpan>>,
-    properties: Vec<PrismProperty>,
-) -> Vec<probabilistic_properties::Property<probabilistic_models::AtomicProposition>> {
-    let mut new_properties = Vec::new();
-    for property in properties {
-        match property.path {
-            Path::Eventually(e) => {
-                new_properties.push(probabilistic_properties::Property {
-                    operator: property.operator,
-                    path: Path::Eventually(probabilistic_models::AtomicProposition::new(
-                        atomic_proposition.len(),
-                    )),
-                });
-                atomic_proposition.push(e);
-            }
-        }
-    }
-    new_properties
 }
 
 fn read_model_file(path: &str) -> Result<String, std::io::Error> {
