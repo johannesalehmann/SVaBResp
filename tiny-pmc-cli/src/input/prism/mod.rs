@@ -12,7 +12,7 @@ pub fn parse_prism_and_print_errors(
     file_name: Option<&str>,
     source: &str,
     properties: &[&str],
-) -> Option<(PrismModel, Vec<tiny_pmc::Property>)> {
+) -> Option<(PrismModel, Vec<tiny_pmc::PrismProperty>)> {
     let parse_result = tiny_pmc::parsing::parse_model_from_source(source, properties);
     match parse_result {
         Err(errors) => {

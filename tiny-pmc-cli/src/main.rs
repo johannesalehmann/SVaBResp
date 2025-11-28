@@ -1,9 +1,11 @@
 use crate::input::constants::ConstParsingError;
 use chumsky::prelude::SimpleSpan;
 use clap::Parser;
-use prism_model::{Expression, Path, VariableReference};
+use prism_model::{Expression, VariableReference};
 use prism_model_builder::ModelBuildingError;
-use tiny_pmc::Property;
+use probabilistic_models::AtomicProposition;
+use probabilistic_properties::{Operator, Path};
+use tiny_pmc::PrismProperty;
 
 mod input;
 
@@ -36,27 +38,46 @@ fn checker() -> Result<(), ModelCheckerError> {
         Some((prism_model, properties)) => (prism_model, properties),
     };
 
-    let atomic_propositions = collect_atomic_propositions(properties);
+    let mut atomic_propositions = Vec::new();
+    let properties = prism_objectives_to_atomic_propositions(&mut atomic_propositions, properties);
 
     let model =
         prism_model_builder::build_model(&prism_model, &atomic_propositions[..], constants)?;
-
-    probabilistic_model_algorithms::mdp::optimistic_value_iteration(&model, 0, 0.000_001);
+    for (i, property) in properties.iter().enumerate() {
+        println!("Checking property {} of {}", i + 1, properties.len());
+        match (&property.operator, &property.path) {
+            (Operator::ValueOfPMax, Path::Eventually(AtomicProposition { index })) => {
+                probabilistic_model_algorithms::mdp::optimistic_value_iteration(
+                    &model, *index, 0.000_001,
+                );
+            }
+            _ => panic!("This combination of operator and path formula is not supported"),
+        }
+    }
 
     println!("Finished in {:?}", start_time.elapsed());
     Ok(())
 }
 
-fn collect_atomic_propositions(
-    properties: Vec<Property>,
-) -> Vec<Expression<VariableReference, SimpleSpan>> {
-    let atomic_propositions = properties
-        .into_iter()
-        .map(|o| match o.path {
-            Path::Eventually(e) => e,
-        })
-        .collect::<Vec<_>>();
-    atomic_propositions
+fn prism_objectives_to_atomic_propositions(
+    atomic_proposition: &mut Vec<Expression<VariableReference, SimpleSpan>>,
+    properties: Vec<PrismProperty>,
+) -> Vec<probabilistic_properties::Property<probabilistic_models::AtomicProposition>> {
+    let mut new_properties = Vec::new();
+    for property in properties {
+        match property.path {
+            Path::Eventually(e) => {
+                new_properties.push(probabilistic_properties::Property {
+                    operator: property.operator,
+                    path: Path::Eventually(probabilistic_models::AtomicProposition::new(
+                        atomic_proposition.len(),
+                    )),
+                });
+                atomic_proposition.push(e);
+            }
+        }
+    }
+    new_properties
 }
 
 fn read_model_file(path: &str) -> Result<String, std::io::Error> {

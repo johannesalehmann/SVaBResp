@@ -44,6 +44,62 @@ pub struct State<M: ModelTypes> {
     pub atomic_propositions: M::AtomicPropositions,
 }
 
+impl<M: ModelTypes> State<M> {
+    pub fn get_all_successors(&self) -> StateSuccessorIterator<'_, '_, M> {
+        let mut action_iterator = self.actions.iter();
+        let transition_iterator = if let Some(action) = action_iterator.next() {
+            Some(action.successors.iter())
+        } else {
+            None
+        };
+
+        StateSuccessorIterator {
+            action_iterator,
+            transition_iterator,
+            action_index: 0,
+        }
+    }
+}
+
+pub struct StateSuccessorIterator<'a: 'b, 'b, M: ModelTypes + 'a + 'b> {
+    action_index: usize,
+    action_iterator: <<M as ModelTypes>::ActionCollection as ActionCollection<M>>::Iter<'a>,
+    transition_iterator: Option<<<M as ModelTypes>::Distribution as Distribution>::Iter<'b>>,
+}
+
+impl<'a: 'b, 'b, M: ModelTypes> Iterator for StateSuccessorIterator<'a, 'b, M> {
+    type Item = StateSuccessor;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(transition_iterator) = &mut self.transition_iterator {
+                if let Some(transition) = transition_iterator.next() {
+                    return Some(StateSuccessor {
+                        action_index: self.action_index,
+                        target_index: transition.index,
+                        probability: transition.probability,
+                    });
+                } else {
+                    if let Some(action) = self.action_iterator.next() {
+                        self.action_index += 1;
+                        self.transition_iterator = Some(action.successors.iter());
+                    } else {
+                        self.transition_iterator = None;
+                    }
+                }
+            } else {
+                return None;
+            }
+        }
+    }
+}
+
+pub struct StateSuccessor {
+    pub action_index: usize,
+    pub target_index: usize,
+    pub probability: f64,
+}
+
 pub struct Action<M: ModelTypes> {
     pub successors: M::Distribution,
 }

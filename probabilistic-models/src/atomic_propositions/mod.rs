@@ -1,3 +1,5 @@
+use probabilistic_properties::StateSpecifier;
+
 pub trait AtomicPropositions {
     fn get_empty(capacity: usize) -> Self;
     fn set_value(&mut self, index: usize, value: bool);
@@ -27,3 +29,14 @@ impl AtomicPropositions for BitFlagsAtomicPropositions {
         (self.values & 1 << index) != 0
     }
 }
+pub struct AtomicProposition {
+    pub index: usize,
+}
+
+impl AtomicProposition {
+    pub fn new(index: usize) -> Self {
+        Self { index }
+    }
+}
+
+impl StateSpecifier for AtomicProposition {}

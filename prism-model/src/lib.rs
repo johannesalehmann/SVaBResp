@@ -36,4 +36,4 @@ mod identifier;
 pub use identifier::{Identifier, InvalidName};
 
 mod properties;
-pub use properties::{Operator, Path, Property};
+pub use properties::{SubstitutablePath, SubstitutableProperty};

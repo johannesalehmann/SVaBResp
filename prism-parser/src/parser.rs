@@ -4,14 +4,14 @@ use crate::{PrismParserError, PrismParserValidationError};
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use prism_model::{
-    Identifier, ModelType, ModuleManager, Operator, RewardsTarget, VariableAddError, VariableInfo,
-    VariableManager,
+    Expression, Identifier, ModelType, ModuleManager, RewardsTarget, VariableAddError,
+    VariableInfo, VariableManager,
 };
 
 pub type E<'a> = extra::Err<crate::PrismParserError<'a, Span, Token>>; // Rich<'a, Token, Span>
 
 pub fn property_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Property<Identifier<Span>, Span>, E<'a>>
+) -> impl Parser<'a, I, probabilistic_properties::Property<Expression<Identifier<Span>, Span>>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -19,37 +19,37 @@ where
         .then_ignore(just(Token::LeftSqBracket))
         .then(path_parser())
         .then_ignore(just(Token::RightSqBracket))
-        .map(|(o, p)| prism_model::Property {
+        .map(|(o, p)| probabilistic_properties::Property {
             operator: o,
             path: p,
         })
 }
-pub fn operator_parser<'a, 'b, I>() -> impl Parser<'a, I, prism_model::Operator, E<'a>>
+pub fn operator_parser<'a, 'b, I>() -> impl Parser<'a, I, probabilistic_properties::Operator, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
     just(Token::PMax)
         .then_ignore(just(Token::Equal))
         .then_ignore(just(Token::Questionmark))
-        .map(|_| Operator::ValueOfPMax)
+        .map(|_| probabilistic_properties::Operator::ValueOfPMax)
         .or(just(Token::PMin)
             .then_ignore(just(Token::Equal))
             .then_ignore(just(Token::Questionmark))
-            .map(|_| Operator::ValueOfPMin))
+            .map(|_| probabilistic_properties::Operator::ValueOfPMin))
         .or(just(Token::P)
             .then_ignore(just(Token::Equal))
             .then_ignore(just(Token::Questionmark))
-            .map(|_| Operator::ValueOfP))
+            .map(|_| probabilistic_properties::Operator::ValueOfP))
 }
 
 pub fn path_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Path<Identifier<Span>, Span>, E<'a>>
+) -> impl Parser<'a, I, probabilistic_properties::Path<Expression<Identifier<Span>, Span>>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
     just(Token::Finally)
         .ignore_then(expression_parser())
-        .map(|e| prism_model::Path::Eventually(e))
+        .map(|e| probabilistic_properties::Path::Eventually(e))
 }
 
 pub fn program_parser<'a, 'b, I>(

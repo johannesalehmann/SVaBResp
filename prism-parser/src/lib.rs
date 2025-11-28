@@ -18,7 +18,12 @@ pub struct ParseResults<'a, 'b> {
         'a,
         prism_model::Model<(), prism_model::Identifier<Span>, prism_model::VariableReference, Span>,
     >,
-    pub properties: Vec<ParseResult<'b, prism_model::Property<VariableReference, Span>>>,
+    pub properties: Vec<
+        ParseResult<
+            'b,
+            probabilistic_properties::Property<prism_model::Expression<VariableReference, Span>>,
+        >,
+    >,
 }
 
 pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResults<'b, 'b> {
@@ -72,6 +77,7 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
                     .zip(property_errors.iter_mut())
                     .for_each(|(p_option, errs)| {
                         if let Some(p) = p_option {
+                            use prism_model::{SubstitutablePath, SubstitutableProperty};
                             p.substitute_labels(SimpleSpan::new(0, 1), &output.labels);
                             let substitution =
                                 p.substitute_formulas(SimpleSpan::new(0, 1), &output.formulas);
@@ -103,6 +109,7 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
                         .zip(property_errors.iter_mut())
                         .map(|(p, errs)| {
                             p.map_or(None, |p| {
+                                use prism_model::SubstitutableProperty;
                                 match p.replace_identifiers_by_variable_indices(
                                     &output.variable_manager,
                                 ) {

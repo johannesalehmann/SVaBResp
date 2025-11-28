@@ -5,8 +5,9 @@ use prism_model::{
     Expression, Identifier, Model, Update, VariableManager, VariableRange, VariableReference,
 };
 use probabilistic_models::{
-    Action, ActionCollection, AtomicPropositions, Builder, ContextBuilder, Distribution, MdpType,
-    ModelTypes, ProbabilisticModel, State, Successor, Valuation, ValuationBuilder,
+    Action, ActionCollection, AtomicPropositions, Builder, ContextBuilder, Distribution,
+    InitialStates, InitialStatesBuilder, MdpType, ModelTypes, ProbabilisticModel,
+    SingleInitialState, State, Successor, Valuation, ValuationBuilder,
 };
 use std::collections::HashMap;
 use std::marker::PhantomData;
@@ -84,13 +85,19 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             context,
         };
 
-        builder.create_initial_states(model, atomic_propositions.len())?;
+        let initial_states = builder.create_initial_states(model, atomic_propositions.len())?;
 
         while let Some(state) = builder.open_states.pop() {
             builder.process_state(state, &model, atomic_propositions, &synchronised_actions)?;
         }
 
-        let mut result = ProbabilisticModel::new();
+        let mut initial_states_builder = M::InitialStates::get_builder();
+        for initial_state in initial_states {
+            initial_states_builder.add_by_index(initial_state)
+        }
+        let initial_states = initial_states_builder.finish();
+
+        let mut result = ProbabilisticModel::new(initial_states);
         for state_in_progress in builder.states.into_iter() {
             let state = State {
                 valuation: state_in_progress.valuation,

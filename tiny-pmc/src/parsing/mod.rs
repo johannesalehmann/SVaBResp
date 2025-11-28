@@ -11,7 +11,7 @@ pub fn parse_model_from_source<'a>(
     source: &str,
     properties: &[&str],
 ) -> Result<
-    (PrismModel, Vec<crate::Property>),
+    (PrismModel, Vec<crate::PrismProperty>),
     Vec<(ErrorSource, PrismParserError<'a, SimpleSpan, String>)>,
 > {
     let parse_results = prism_parser::parse_prism(source, properties);

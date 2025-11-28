@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 prism-model = { path = "../prism-model" }
+probabilistic-properties = { path = "../probabilistic-properties" }
 chumsky = "1.0.0-alpha.8"

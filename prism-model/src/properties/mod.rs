@@ -5,29 +5,45 @@ use crate::{
 };
 use std::fmt::Formatter;
 
-#[derive(Clone)]
-pub struct Property<V, S: Clone> {
-    pub operator: Operator,
-    pub path: Path<V, S>,
-}
+// #[derive(Clone)]
+// pub struct Property<V, S: Clone> {
+//     pub operator: Operator,
+//     pub path: Path<V, S>,
+// }
+//
+// #[derive(Clone)]
+// pub enum Operator {
+//     ValueOfPMax,
+//     ValueOfPMin,
+//     ValueOfP,
+// }
+//
+// #[derive(Clone)]
+// pub enum Path<V, S: Clone> {
+//     Eventually(Expression<V, S>),
+// }
+use probabilistic_properties::{Path, Property, StateSpecifier};
+impl<V, S: Clone> StateSpecifier for Expression<V, S> {}
 
-#[derive(Clone)]
-pub enum Operator {
-    ValueOfPMax,
-    ValueOfPMin,
-    ValueOfP,
-}
+pub trait SubstitutableProperty<S: Clone> {
+    fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>);
 
-#[derive(Clone)]
-pub enum Path<V, S: Clone> {
-    Eventually(Expression<V, S>),
-}
+    fn substitute_formulas(
+        &mut self,
+        default_span: S,
+        formulas: &FormulaManager<Identifier<S>, S>,
+    ) -> Result<(), CyclicDependency<S>>;
 
-impl<S: Clone> Property<Identifier<S>, S> {
-    pub fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
+    fn replace_identifiers_by_variable_indices<R>(
+        self,
+        variable_manager: &VariableManager<R, S>,
+    ) -> Result<Property<Expression<VariableReference, S>>, Vec<UnknownVariableError<S>>>;
+}
+impl<S: Clone> SubstitutableProperty<S> for Property<Expression<Identifier<S>, S>> {
+    fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
         self.path.substitute_labels(default_span, labels);
     }
-    pub fn substitute_formulas(
+    fn substitute_formulas(
         &mut self,
         default_span: S,
         formulas: &FormulaManager<Identifier<S>, S>,
@@ -35,10 +51,10 @@ impl<S: Clone> Property<Identifier<S>, S> {
         self.path.substitute_formulas(default_span, formulas)
     }
 
-    pub fn replace_identifiers_by_variable_indices<R>(
+    fn replace_identifiers_by_variable_indices<R>(
         self,
         variable_manager: &VariableManager<R, S>,
-    ) -> Result<Property<VariableReference, S>, Vec<UnknownVariableError<S>>> {
+    ) -> Result<Property<Expression<VariableReference, S>>, Vec<UnknownVariableError<S>>> {
         let path = self
             .path
             .replace_identifiers_by_variable_indices(variable_manager)?;
@@ -49,13 +65,28 @@ impl<S: Clone> Property<Identifier<S>, S> {
         })
     }
 }
-impl<S: Clone> Path<Identifier<S>, S> {
-    pub fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
+
+pub trait SubstitutablePath<S: Clone> {
+    fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>);
+    fn substitute_formulas(
+        &mut self,
+        default_span: S,
+        formulas: &FormulaManager<Identifier<S>, S>,
+    ) -> Result<(), CyclicDependency<S>>;
+
+    fn replace_identifiers_by_variable_indices<R>(
+        self,
+        variable_manager: &VariableManager<R, S>,
+    ) -> Result<Path<Expression<VariableReference, S>>, Vec<UnknownVariableError<S>>>;
+}
+
+impl<S: Clone> SubstitutablePath<S> for Path<Expression<Identifier<S>, S>> {
+    fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
         match self {
             Path::Eventually(e) => e.substitute_labels(default_span, labels),
         }
     }
-    pub fn substitute_formulas(
+    fn substitute_formulas(
         &mut self,
         default_span: S,
         formulas: &FormulaManager<Identifier<S>, S>,
@@ -65,44 +96,14 @@ impl<S: Clone> Path<Identifier<S>, S> {
         }
     }
 
-    pub fn replace_identifiers_by_variable_indices<R>(
+    fn replace_identifiers_by_variable_indices<R>(
         self,
         variable_manager: &VariableManager<R, S>,
-    ) -> Result<Path<VariableReference, S>, Vec<UnknownVariableError<S>>> {
+    ) -> Result<Path<Expression<VariableReference, S>>, Vec<UnknownVariableError<S>>> {
         Ok(match self {
             Path::Eventually(e) => {
                 Path::Eventually(e.replace_identifiers_by_variable_indices(variable_manager)?)
             }
         })
-    }
-}
-
-impl<V: std::fmt::Debug, S: Clone> std::fmt::Debug for Property<V, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} [{:?}]", self.operator, self.path)
-    }
-}
-impl std::fmt::Debug for Operator {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Operator::ValueOfPMax => {
-                write!(f, "Pmax=?")
-            }
-            Operator::ValueOfPMin => {
-                write!(f, "Pmin=?")
-            }
-            Operator::ValueOfP => {
-                write!(f, "P=?")
-            }
-        }
-    }
-}
-impl<V: std::fmt::Debug, S: Clone> std::fmt::Debug for Path<V, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Path::Eventually(e) => {
-                write!(f, "F {:?}", e)
-            }
-        }
     }
 }

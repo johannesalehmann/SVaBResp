@@ -238,12 +238,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1171693293099992e19cddea4e8b849964e9846f4acee11b3948bcc337be8776"
 
 [[package]]
-name = "log"
-version = "0.4.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
-
-[[package]]
 name = "memchr"
 version = "2.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -259,7 +253,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 name = "prism-model"
 version = "0.1.0"
 dependencies = [
- "log",
+ "probabilistic-properties",
 ]
 
 [[package]]
@@ -276,6 +270,7 @@ version = "0.1.0"
 dependencies = [
  "chumsky",
  "prism-model",
+ "probabilistic-properties",
 ]
 
 [[package]]
@@ -287,6 +282,13 @@ dependencies = [
 
 [[package]]
 name = "probabilistic-models"
+version = "0.1.0"
+dependencies = [
+ "probabilistic-properties",
+]
+
+[[package]]
+name = "probabilistic-properties"
 version = "0.1.0"
 
 [[package]]
@@ -379,6 +381,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
+name = "svabresp"
+version = "0.1.0"
+dependencies = [
+ "probabilistic-model-algorithms",
+ "probabilistic-models",
+]
+
+[[package]]
+name = "svabresp-cli"
+version = "0.1.0"
+
+[[package]]
 name = "syn"
 version = "2.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -398,6 +412,7 @@ dependencies = [
  "prism-model-builder",
  "prism-parser",
  "probabilistic-models",
+ "probabilistic-properties",
 ]
 
 [[package]]
@@ -411,6 +426,8 @@ dependencies = [
  "prism-model-builder",
  "prism-parser",
  "probabilistic-model-algorithms",
+ "probabilistic-models",
+ "probabilistic-properties",
  "tiny-pmc",
 ]
 

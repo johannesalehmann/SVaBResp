@@ -5,8 +5,10 @@ edition = "2021"
 
 [dependencies]
 prism-model = { path = "../prism-model" }
+probabilistic-properties = { path = "../probabilistic-properties" }
 prism-parser = { path = "../prism-parser" }
 prism-model-builder = { path = "../prism-model-builder" }
+probabilistic-models = { path = "../probabilistic-models" }
 probabilistic-model-algorithms = { path = "../probabilistic-model-algorithms" }
 tiny-pmc = { path = "../tiny-pmc" }
 ariadne = { version = "0.5.1", features = ["auto-color"] }
