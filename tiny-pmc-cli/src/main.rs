@@ -4,7 +4,7 @@ use clap::Parser;
 use prism_model::{Expression, VariableReference};
 use prism_model_builder::ModelBuildingError;
 use probabilistic_models::AtomicProposition;
-use probabilistic_properties::{Operator, Path};
+use probabilistic_properties::{Path, ProbabilityOperator};
 use tiny_pmc::PrismProperty;
 
 mod input;
@@ -28,7 +28,7 @@ fn checker() -> Result<(), ModelCheckerError> {
     let source = read_model_file(&arguments.model)?;
     let constants = input::constants::parse_const_assignments(&arguments.constants)?;
 
-    let parsed_model_and_objectives = input::prism::parse_prism_and_print_errors(
+    let parsed_model_and_objectives = tiny_pmc::parsing::parse_prism_and_print_errors(
         Some(&arguments.model),
         &source,
         &[&arguments.property],
@@ -43,9 +43,11 @@ fn checker() -> Result<(), ModelCheckerError> {
         &mut atomic_propositions,
         properties,
     );
+    let properties =
+        prism_model_builder::build_properties(&prism_model, properties.into_iter(), &constants)?;
 
     let model =
-        prism_model_builder::build_model(&prism_model, &atomic_propositions[..], constants)?;
+        prism_model_builder::build_model(&prism_model, &atomic_propositions[..], &constants)?;
     for (i, property) in properties.iter().enumerate() {
         println!("Checking property {} of {}", i + 1, properties.len());
         tiny_pmc::checking::check(&model, property);

@@ -4,5 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+prism-model = { path = "../prism-model" }
 probabilistic-models = { path = "../probabilistic-models" }
 probabilistic-model-algorithms = { path = "../probabilistic-model-algorithms" }
+probabilistic-properties = { path = "../probabilistic-properties" }
+tiny-pmc = { path = "../tiny-pmc" }
+prism-model-builder = { path = "../prism-model-builder" }
+chumsky = "1.0.0-alpha.8"

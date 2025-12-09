@@ -10,6 +10,7 @@ impl<M: ModelTypes> super::ActionCollection<M> for SingleAction<M> {
         = std::iter::Once<&'a Action<M>>
     where
         M: 'a;
+    type IntoIter = std::iter::Once<Action<M>>;
 
     fn get_builder() -> Self::Builder {
         Builder::new()
@@ -27,6 +28,9 @@ impl<M: ModelTypes> super::ActionCollection<M> for SingleAction<M> {
     }
     fn iter<'a>(&'a self) -> Self::Iter<'a> {
         std::iter::once(&self.action)
+    }
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::once(self.action)
     }
 }
 

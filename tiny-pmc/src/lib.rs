@@ -6,5 +6,7 @@ pub mod checking;
 pub mod parsing;
 
 pub type PrismModel = prism_model::Model<(), Identifier<SimpleSpan>, VariableReference, SimpleSpan>;
-pub type PrismProperty =
-    probabilistic_properties::Property<Expression<VariableReference, SimpleSpan>>;
+pub type PrismProperty = probabilistic_properties::Property<
+    Expression<VariableReference, SimpleSpan>,
+    Expression<VariableReference, SimpleSpan>,
+>;

@@ -5,22 +5,39 @@ use prism_model::{
     Expression, Identifier, Model, Update, VariableManager, VariableRange, VariableReference,
 };
 use probabilistic_models::{
-    Action, ActionCollection, AtomicPropositions, Builder, ContextBuilder, Distribution,
-    InitialStates, InitialStatesBuilder, MdpType, ModelTypes, ProbabilisticModel,
-    SingleInitialState, State, Successor, Valuation, ValuationBuilder,
+    Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, ContextBuilder,
+    Distribution, InitialStates, InitialStatesBuilder, MdpType, ModelTypes, NonTrackedPredecessors,
+    Predecessors, PredecessorsBuilder, ProbabilisticModel, SingleInitialState, State, Successor,
+    Valuation, ValuationBuilder, probabilistic_properties,
 };
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use probabilistic_models::DistributionBuilder;
+use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
+
 pub fn build_model<S: Clone>(
     model: &Model<(), Identifier<S>, VariableReference, S>,
     atomic_propositions: &[Expression<VariableReference, S>],
-    const_values: HashMap<String, ConstValue>,
+    const_values: &HashMap<String, ConstValue>,
 ) -> Result<ProbabilisticModel<MdpType>, ModelBuildingError> {
     ExplicitModelBuilder::<MdpType, DefaultModelBuilderTypes>::run(
         model,
         atomic_propositions,
+        const_values,
+    )
+}
+pub fn build_properties<
+    S: Clone,
+    I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
+>(
+    model: &Model<(), Identifier<S>, VariableReference, S>,
+    properties: I,
+    const_values: &HashMap<String, ConstValue>,
+) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
+    ExplicitModelBuilder::<MdpType, DefaultModelBuilderTypes>::build_property(
+        model,
+        properties,
         const_values,
     )
 }
@@ -42,7 +59,7 @@ impl ModelBuilderTypes for DefaultModelBuilderTypes {
 
 pub struct StateInProgress<M: ModelTypes> {
     pub valuation: M::Valuation,
-    pub actions: <M::ActionCollection as ActionCollection<M>>::Builder,
+    pub actions: <M::ActionCollection<M> as ActionCollection<M>>::Builder,
     pub atomic_propositions: M::AtomicPropositions,
 }
 pub struct ExplicitModelBuilder<M: ModelTypes, B: ModelBuilderTypes> {
@@ -57,15 +74,53 @@ pub struct ExplicitModelBuilder<M: ModelTypes, B: ModelBuilderTypes> {
     context: <M::Valuation as Valuation>::ContextType,
 }
 
-impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
+impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
+    ExplicitModelBuilder<M, B>
+{
+    pub fn build_property<
+        S: Clone,
+        I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
+    >(
+        model: &Model<(), Identifier<S>, VariableReference, S>,
+        properties: I,
+        const_values: &HashMap<String, ConstValue>,
+    ) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
+        let (valuation_map, consts) =
+            Self::prepare_valuation_map_and_consts(&model.variable_manager, const_values)?;
+        let const_value_source: ConstOnlyEvaluator<'_, '_, B::ExpressionEvaluator> =
+            ConstOnlyEvaluator {
+                valuation_map: &valuation_map,
+                const_values: &consts,
+                phantom_data: Default::default(),
+            };
+        let mut result = Vec::new();
+        for property in properties {
+            let constraint = property
+                .operator
+                .constraint
+                .map_probability_specifier_with_result(|p| {
+                    Ok(B::ExpressionEvaluator::create().evaluate_as_float(&p, &const_value_source))
+                })?;
+
+            result.push(Property {
+                operator: ProbabilityOperator {
+                    kind: property.operator.kind,
+                    constraint,
+                },
+                path: property.path,
+            })
+        }
+        Ok(result)
+    }
+
     pub fn run<S: Clone>(
         model: &Model<(), Identifier<S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
-        const_values: HashMap<String, ConstValue>,
+        const_values: &HashMap<String, ConstValue>,
     ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
         let start_time = std::time::Instant::now();
         let (valuation_map, consts) =
-            Self::prepare_valuation_map_and_consts(&model.variable_manager, &const_values)?;
+            Self::prepare_valuation_map_and_consts(&model.variable_manager, const_values)?;
         let variable_bounds =
             Self::prepare_variable_bounds(&model.variable_manager, &consts, &valuation_map)?;
         let variable_types = Self::prepare_variable_types(&model.variable_manager);
@@ -103,6 +158,8 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                 valuation: state_in_progress.valuation,
                 actions: state_in_progress.actions.finish(),
                 atomic_propositions: state_in_progress.atomic_propositions,
+                owner: <M::Owners as probabilistic_models::Owners>::default_owner(),
+                predecessors: <M::Predecessors as Predecessors>::Builder::create().finish(),
             };
             result.states.push(state);
         }
@@ -282,7 +339,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             Some(&index) => index,
             None => {
                 let index = self.states.len();
-                let action_builder: <M::ActionCollection as ActionCollection<M>>::Builder =
+                let action_builder: <M::ActionCollection<M> as ActionCollection<M>>::Builder =
                     M::ActionCollection::get_builder();
                 let atomic_propositions =
                     <M::AtomicPropositions>::get_empty(atomic_proposition_len);
@@ -386,7 +443,9 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             let n = satisfied_guards_indicies.len();
 
             if n == 0 {
-                panic!("Synchronised actions with zero associated modules are not yet supported (but they should be impossible to create anyways");
+                panic!(
+                    "Synchronised actions with zero associated modules are not yet supported (but they should be impossible to create anyways"
+                );
             }
 
             if all_satisfied {
@@ -615,7 +674,9 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     },
                     VariableRange::Float { .. } => match &variable.initial_value {
                         None => {
-                            panic!("Floats must have init expressions (I'm not sure whether this is PRISM-spec-compliant)")
+                            panic!(
+                                "Floats must have init expressions (I'm not sure whether this is PRISM-spec-compliant)"
+                            )
                         }
                         Some(initial) => {
                             let value = B::ExpressionEvaluator::create()

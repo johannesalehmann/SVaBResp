@@ -7,15 +7,23 @@ use prism_model::{
     Expression, Identifier, ModelType, ModuleManager, RewardsTarget, VariableAddError,
     VariableInfo, VariableManager,
 };
+use probabilistic_properties::ProbabilityOperator;
 
 pub type E<'a> = extra::Err<crate::PrismParserError<'a, Span, Token>>; // Rich<'a, Token, Span>
 
-pub fn property_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, probabilistic_properties::Property<Expression<Identifier<Span>, Span>>, E<'a>>
+pub fn property_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    probabilistic_properties::Property<
+        Expression<Identifier<Span>, Span>,
+        Expression<Identifier<Span>, Span>,
+    >,
+    E<'a>,
+>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
-    operator_parser()
+    property_operator_parser()
         .then_ignore(just(Token::LeftSqBracket))
         .then(path_parser())
         .then_ignore(just(Token::RightSqBracket))
@@ -24,26 +32,66 @@ where
             path: p,
         })
 }
-pub fn operator_parser<'a, 'b, I>() -> impl Parser<'a, I, probabilistic_properties::Operator, E<'a>>
+pub fn property_operator_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    probabilistic_properties::ProbabilityOperator<Expression<Identifier<Span>, Span>>,
+    E<'a>,
+>
+where
+    I: ValueInput<'a, Token = Token, Span = Span>,
+{
+    probability_kind_parser()
+        .then(probability_constraint_parser())
+        .map(
+            |(probability_kind, probability_constraint)| ProbabilityOperator {
+                kind: probability_kind,
+                constraint: probability_constraint,
+            },
+        )
+}
+pub fn probability_kind_parser<'a, 'b, I>()
+-> impl Parser<'a, I, probabilistic_properties::ProbabilityKind, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
     just(Token::PMax)
-        .then_ignore(just(Token::Equal))
-        .then_ignore(just(Token::Questionmark))
-        .map(|_| probabilistic_properties::Operator::ValueOfPMax)
-        .or(just(Token::PMin)
-            .then_ignore(just(Token::Equal))
-            .then_ignore(just(Token::Questionmark))
-            .map(|_| probabilistic_properties::Operator::ValueOfPMin))
-        .or(just(Token::P)
-            .then_ignore(just(Token::Equal))
-            .then_ignore(just(Token::Questionmark))
-            .map(|_| probabilistic_properties::Operator::ValueOfP))
+        .map(|_| probabilistic_properties::ProbabilityKind::PMax)
+        .or(just(Token::PMin).map(|_| probabilistic_properties::ProbabilityKind::PMin))
+        .or(just(Token::P).map(|_| probabilistic_properties::ProbabilityKind::P))
 }
 
-pub fn path_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, probabilistic_properties::Path<Expression<Identifier<Span>, Span>>, E<'a>>
+pub fn probability_constraint_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    probabilistic_properties::ProbabilityConstraint<Expression<Identifier<Span>, Span>>,
+    E<'a>,
+>
+where
+    I: ValueInput<'a, Token = Token, Span = Span>,
+{
+    just(Token::Equal)
+        .then_ignore(just(Token::Questionmark))
+        .map(|_| probabilistic_properties::ProbabilityConstraint::ValueOf)
+        .or(just(Token::Equal)
+            .ignore_then(expression_parser())
+            .map(|e| probabilistic_properties::ProbabilityConstraint::EqualTo(e)))
+        .or(just(Token::GreaterThan)
+            .ignore_then(expression_parser())
+            .map(|e| probabilistic_properties::ProbabilityConstraint::GreaterThan(e)))
+        .or(just(Token::GreaterOrEqual)
+            .ignore_then(expression_parser())
+            .map(|e| probabilistic_properties::ProbabilityConstraint::GreaterOrEqual(e)))
+        .or(just(Token::LessThan)
+            .ignore_then(expression_parser())
+            .map(|e| probabilistic_properties::ProbabilityConstraint::LessThan(e)))
+        .or(just(Token::LessOrEqual)
+            .ignore_then(expression_parser())
+            .map(|e| probabilistic_properties::ProbabilityConstraint::LessOrEqual(e)))
+}
+
+pub fn path_parser<'a, 'b, I>()
+-> impl Parser<'a, I, probabilistic_properties::Path<Expression<Identifier<Span>, Span>>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -52,8 +100,8 @@ where
         .map(|e| probabilistic_properties::Path::Eventually(e))
 }
 
-pub fn program_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Model<(), Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+pub fn program_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Model<(), Identifier<Span>, Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -298,8 +346,8 @@ where
         .labelled("model type")
 }
 
-fn const_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
+fn const_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -331,8 +379,8 @@ where
         .labelled("constant")
         .as_context()
 }
-fn variable_domain_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::VariableRange<Identifier<Span>, Span>, E<'a>>
+fn variable_domain_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::VariableRange<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -374,8 +422,8 @@ where
         .as_context()
 }
 
-fn formula_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Formula<Identifier<Span>, Span>, E<'a>>
+fn formula_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Formula<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -503,8 +551,8 @@ where
         .labelled("identifier")
 }
 
-fn identifier_parser_potentially_reserved<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Identifier<Span>, E<'a>>
+fn identifier_parser_potentially_reserved<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Identifier<Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -530,8 +578,8 @@ where
         .or(variable_declaration_parser().map(|v| ModuleElement::Variable(v)))
 }
 
-fn global_variable_declaration_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
+fn global_variable_declaration_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -556,8 +604,8 @@ where
         .as_context()
 }
 
-fn variable_declaration_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
+fn variable_declaration_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -575,8 +623,8 @@ where
         .as_context()
 }
 
-fn rewards_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Rewards<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+fn rewards_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Rewards<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -594,8 +642,8 @@ where
         .labelled("rewards structure")
         .as_context()
 }
-fn rewards_element_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::RewardsElement<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+fn rewards_element_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::RewardsElement<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -618,8 +666,8 @@ where
         .as_context()
 }
 
-fn init_constraint_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, (prism_model::Expression<Identifier<Span>, Span>, Span), E<'a>>
+fn init_constraint_parser<'a, 'b, I>()
+-> impl Parser<'a, I, (prism_model::Expression<Identifier<Span>, Span>, Span), E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -631,8 +679,8 @@ where
         .as_context()
 }
 
-fn command_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Command<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+fn command_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Command<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -670,8 +718,8 @@ where
         .as_context()
 }
 
-fn update_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Update<Identifier<Span>, Span>, E<'a>>
+fn update_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Update<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -698,8 +746,8 @@ fn vec_from_head_and_tail<T>(head: T, mut tail: Vec<T>) -> Vec<T> {
     new_vec
 }
 
-fn assignment_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Assignment<Identifier<Span>, Span>, E<'a>>
+fn assignment_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Assignment<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -716,8 +764,8 @@ where
         .as_context()
 }
 
-pub fn expression_parser<'a, 'b, I>(
-) -> impl Parser<'a, I, prism_model::Expression<Identifier<Span>, Span>, E<'a>>
+pub fn expression_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Expression<Identifier<Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {

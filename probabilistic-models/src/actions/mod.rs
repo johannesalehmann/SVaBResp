@@ -12,11 +12,13 @@ pub trait ActionCollection<M: ModelTypes>: Sized {
     where
         M: 'a,
         Self: 'a;
+    type IntoIter: Iterator<Item = Action<M>>;
     fn get_builder() -> Self::Builder;
     fn get_number_of_actions(&self) -> usize;
     fn get_action(&self, index: usize) -> &super::Action<M>;
 
     fn iter<'a>(&'a self) -> Self::Iter<'a>;
+    fn into_iter(self) -> Self::IntoIter;
 }
 
 pub trait Builder<A, M: ModelTypes> {

@@ -1,7 +1,7 @@
 [package]
 name = "tiny-pmc"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 prism-model = { path = "../prism-model" }
@@ -11,3 +11,4 @@ probabilistic-properties = { path = "../probabilistic-properties" }
 prism-model-builder = { path = "../prism-model-builder" }
 probabilistic-model-algorithms = { path = "../probabilistic-model-algorithms" }
 chumsky = "1.0.0-alpha.8"
+ariadne = "0.6.0"

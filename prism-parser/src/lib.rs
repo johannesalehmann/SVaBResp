@@ -21,7 +21,10 @@ pub struct ParseResults<'a, 'b> {
     pub properties: Vec<
         ParseResult<
             'b,
-            probabilistic_properties::Property<prism_model::Expression<VariableReference, Span>>,
+            probabilistic_properties::Property<
+                prism_model::Expression<VariableReference, Span>,
+                prism_model::Expression<VariableReference, Span>,
+            >,
         >,
     >,
 }

@@ -29,6 +29,8 @@ impl AtomicPropositions for BitFlagsAtomicPropositions {
         (self.values & 1 << index) != 0
     }
 }
+
+#[derive(Copy, Clone)]
 pub struct AtomicProposition {
     pub index: usize,
 }

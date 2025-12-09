@@ -1,3 +1,5 @@
+pub use probabilistic_properties;
+
 mod distributions;
 pub use distributions::*;
 
@@ -15,13 +17,20 @@ pub use atomic_propositions::*;
 mod initial_states;
 pub use initial_states::*;
 
+mod iter;
+pub use iter::*;
+
+mod predecessors;
+pub use predecessors::*;
+
 pub trait ModelTypes: Sized {
     type Valuation: Valuation + std::hash::Hash + Eq;
     type Distribution: Distribution;
     type Owners: Owners;
-    type ActionCollection: ActionCollection<Self>;
+    type ActionCollection<T: ModelTypes>: ActionCollection<T>;
     type AtomicPropositions: AtomicPropositions;
     type InitialStates: InitialStates;
+    type Predecessors: Predecessors;
 }
 
 pub struct ProbabilisticModel<M: ModelTypes> {
@@ -36,12 +45,39 @@ impl<M: ModelTypes> ProbabilisticModel<M> {
             initial_states,
         }
     }
+
+    pub fn into_iter(self) -> IteratedProbabilisticModel<M> {
+        IteratedProbabilisticModel::new(self)
+    }
+
+    pub fn get_states_with_ap(&self, ap: AtomicProposition) -> Vec<usize> {
+        let mut res = Vec::new();
+        for (index, state) in self.states.iter().enumerate() {
+            if state.atomic_propositions.get_value(ap.index) {
+                res.push(index);
+            }
+        }
+        res
+    }
+    pub fn get_states_with_aps(&self, aps: &[AtomicProposition]) -> Vec<usize> {
+        let mut res = Vec::new();
+        for (index, state) in self.states.iter().enumerate() {
+            for &ap in aps {
+                if state.atomic_propositions.get_value(ap.index) {
+                    res.push(index);
+                }
+            }
+        }
+        res
+    }
 }
 
 pub struct State<M: ModelTypes> {
     pub valuation: M::Valuation,
-    pub actions: M::ActionCollection,
+    pub actions: M::ActionCollection<M>,
     pub atomic_propositions: M::AtomicPropositions,
+    pub owner: M::Owners,
+    pub predecessors: M::Predecessors,
 }
 
 impl<M: ModelTypes> State<M> {
@@ -63,7 +99,7 @@ impl<M: ModelTypes> State<M> {
 
 pub struct StateSuccessorIterator<'a: 'b, 'b, M: ModelTypes + 'a + 'b> {
     action_index: usize,
-    action_iterator: <<M as ModelTypes>::ActionCollection as ActionCollection<M>>::Iter<'a>,
+    action_iterator: <<M as ModelTypes>::ActionCollection<M> as ActionCollection<M>>::Iter<'a>,
     transition_iterator: Option<<<M as ModelTypes>::Distribution as Distribution>::Iter<'b>>,
 }
 
@@ -110,9 +146,10 @@ impl ModelTypes for MdpType {
     type Valuation = ValuationVector;
     type Distribution = DistributionVector;
     type Owners = SinglePlayer;
-    type ActionCollection = ActionVector<Self>;
+    type ActionCollection<T: ModelTypes> = ActionVector<T>;
     type AtomicPropositions = BitFlagsAtomicPropositions;
     type InitialStates = SingleInitialState;
+    type Predecessors = NonTrackedPredecessors;
 }
 
 pub type Dtmc = ProbabilisticModel<DtmcType>;
@@ -121,9 +158,10 @@ impl ModelTypes for DtmcType {
     type Valuation = ValuationVector;
     type Distribution = DistributionVector;
     type Owners = SinglePlayer;
-    type ActionCollection = SingleAction<Self>;
+    type ActionCollection<T: ModelTypes> = SingleAction<T>;
     type AtomicPropositions = BitFlagsAtomicPropositions;
     type InitialStates = SingleInitialState;
+    type Predecessors = NonTrackedPredecessors;
 }
 
 pub type TransitionSystem = ProbabilisticModel<TransitionSystemType>;
@@ -132,7 +170,20 @@ impl ModelTypes for TransitionSystemType {
     type Valuation = ValuationVector;
     type Distribution = SingleStateDistribution;
     type Owners = SinglePlayer;
-    type ActionCollection = ActionVector<Self>;
+    type ActionCollection<T: ModelTypes> = ActionVector<T>;
     type AtomicPropositions = BitFlagsAtomicPropositions;
     type InitialStates = SingleInitialState;
+    type Predecessors = NonTrackedPredecessors;
+}
+
+pub type TwoPlayerStochasticGame = ProbabilisticModel<TwoPlayerStochasticGameType>;
+pub struct TwoPlayerStochasticGameType {}
+impl ModelTypes for TwoPlayerStochasticGameType {
+    type Valuation = ValuationVector;
+    type Distribution = DistributionVector;
+    type Owners = TwoPlayer;
+    type ActionCollection<T: ModelTypes> = ActionVector<T>;
+    type AtomicPropositions = BitFlagsAtomicPropositions;
+    type InitialStates = SingleInitialState;
+    type Predecessors = NonTrackedPredecessors;
 }

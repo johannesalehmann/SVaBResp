@@ -10,6 +10,7 @@ impl<M: ModelTypes> super::ActionCollection<M> for ActionVector<M> {
         = std::slice::Iter<'a, Action<M>>
     where
         M: 'a;
+    type IntoIter = std::vec::IntoIter<Action<M>>;
 
     fn get_builder() -> Self::Builder {
         Builder::new()
@@ -25,6 +26,10 @@ impl<M: ModelTypes> super::ActionCollection<M> for ActionVector<M> {
 
     fn iter(&self) -> Self::Iter<'_> {
         self.actions.iter()
+    }
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.actions.into_iter()
     }
 }
 
