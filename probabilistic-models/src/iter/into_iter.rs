@@ -43,7 +43,7 @@ impl<'a, M: ModelTypes> super::IterProbabilisticModel<M, IteratedAction<M>, Iter
 }
 
 pub struct IteratedState<M: ModelTypes> {
-    actions: <<M as ModelTypes>::ActionCollection<M> as ActionCollection<M>>::IntoIter,
+    actions: <<M as ModelTypes>::ActionCollection as ActionCollection<M::Distribution>>::IntoIter,
     valuation: Option<M::Valuation>,
     atomic_propositions: Option<M::AtomicPropositions>,
     owner: Option<M::Owners>,
@@ -90,7 +90,7 @@ pub struct IteratedAction<M: ModelTypes> {
 }
 
 impl<M: ModelTypes> IteratedAction<M> {
-    fn new(action: Action<M>) -> Self {
+    fn new(action: Action<M::Distribution>) -> Self {
         Self {
             distribution: action.successors,
             current_index: 0,

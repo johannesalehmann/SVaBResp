@@ -14,7 +14,7 @@ fn main() {
     let (model, properties) = parsed.unwrap();
     let property = properties.into_iter().nth(0).unwrap();
 
-    let coop_game = svabresp::state_based::prepare_from_prism(
+    let coop_game = svabresp::state_based::compute_for_prism(
         model,
         property,
         svabresp::state_based::grouping::IndividualGroupExtractionScheme::new(),

@@ -1,16 +1,16 @@
-use crate::{Action, ModelTypes};
+use crate::{Action, Distribution, ModelTypes};
 
-pub struct SingleAction<M: ModelTypes> {
-    action: Action<M>,
+pub struct SingleAction<D: Distribution> {
+    action: Action<D>,
 }
 
-impl<M: ModelTypes> super::ActionCollection<M> for SingleAction<M> {
-    type Builder = Builder<M>;
+impl<D: Distribution> super::ActionCollection<D> for SingleAction<D> {
+    type Builder = Builder<D>;
     type Iter<'a>
-        = std::iter::Once<&'a Action<M>>
+        = std::iter::Once<&'a Action<D>>
     where
-        M: 'a;
-    type IntoIter = std::iter::Once<Action<M>>;
+        D: 'a;
+    type IntoIter = std::iter::Once<Action<D>>;
 
     fn get_builder() -> Self::Builder {
         Builder::new()
@@ -20,7 +20,7 @@ impl<M: ModelTypes> super::ActionCollection<M> for SingleAction<M> {
         1
     }
 
-    fn get_action(&self, index: usize) -> &Action<M> {
+    fn get_action(&self, index: usize) -> &Action<D> {
         if index != 0 {
             panic!("Action index out of bounds");
         }
@@ -34,25 +34,25 @@ impl<M: ModelTypes> super::ActionCollection<M> for SingleAction<M> {
     }
 }
 
-pub struct Builder<M: ModelTypes> {
-    action: Option<Action<M>>,
+pub struct Builder<D: Distribution> {
+    action: Option<Action<D>>,
 }
 
-impl<M: ModelTypes> Builder<M> {
+impl<D: Distribution> Builder<D> {
     pub fn new() -> Self {
         Self { action: None }
     }
 }
 
-impl<M: ModelTypes> super::Builder<SingleAction<M>, M> for Builder<M> {
-    fn add_action(&mut self, action: Action<M>) {
+impl<D: Distribution> super::Builder<SingleAction<D>, D> for Builder<D> {
+    fn add_action(&mut self, action: Action<D>) {
         match &self.action {
             None => self.action = Some(action),
             Some(_) => panic!("Cannot add a second action to a state of this model type"),
         }
     }
 
-    fn finish(self) -> SingleAction<M> {
+    fn finish(self) -> SingleAction<D> {
         match self.action {
             Some(action) => SingleAction { action },
             None => panic!("Must add at least one action to each state in this model type"),

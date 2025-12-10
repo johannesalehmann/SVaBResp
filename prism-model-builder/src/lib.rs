@@ -4,24 +4,24 @@ use crate::expressions::{Evaluator, ValuationSource, VariableType};
 use prism_model::{
     Expression, Identifier, Model, Update, VariableManager, VariableRange, VariableReference,
 };
+use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
 use probabilistic_models::{
     Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, ContextBuilder,
     Distribution, InitialStates, InitialStatesBuilder, MdpType, ModelTypes, NonTrackedPredecessors,
     Predecessors, PredecessorsBuilder, ProbabilisticModel, SingleInitialState, State, Successor,
     Valuation, ValuationBuilder, probabilistic_properties,
 };
+use probabilistic_models::{DistributionBuilder, Predecessor};
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::str::ParseBoolError;
 
-use probabilistic_models::DistributionBuilder;
-use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
-
-pub fn build_model<S: Clone>(
+pub fn build_model<S: Clone, M: ModelTypes>(
     model: &Model<(), Identifier<S>, VariableReference, S>,
     atomic_propositions: &[Expression<VariableReference, S>],
     const_values: &HashMap<String, ConstValue>,
-) -> Result<ProbabilisticModel<MdpType>, ModelBuildingError> {
-    ExplicitModelBuilder::<MdpType, DefaultModelBuilderTypes>::run(
+) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
+    ExplicitModelBuilder::<M, DefaultModelBuilderTypes>::run(
         model,
         atomic_propositions,
         const_values,
@@ -61,6 +61,7 @@ pub struct StateInProgress<M: ModelTypes> {
     pub valuation: M::Valuation,
     pub actions: <M::ActionCollection<M> as ActionCollection<M>>::Builder,
     pub atomic_propositions: M::AtomicPropositions,
+    pub predecessors: <M::Predecessors as Predecessors>::Builder,
 }
 pub struct ExplicitModelBuilder<M: ModelTypes, B: ModelBuilderTypes> {
     phantom_data: PhantomData<B>,
@@ -74,9 +75,7 @@ pub struct ExplicitModelBuilder<M: ModelTypes, B: ModelBuilderTypes> {
     context: <M::Valuation as Valuation>::ContextType,
 }
 
-impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
-    ExplicitModelBuilder<M, B>
-{
+impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     pub fn build_property<
         S: Clone,
         I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
@@ -159,7 +158,7 @@ impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
                 actions: state_in_progress.actions.finish(),
                 atomic_propositions: state_in_progress.atomic_propositions,
                 owner: <M::Owners as probabilistic_models::Owners>::default_owner(),
-                predecessors: <M::Predecessors as Predecessors>::Builder::create().finish(),
+                predecessors: state_in_progress.predecessors.finish(),
             };
             result.states.push(state);
         }
@@ -328,13 +327,6 @@ impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
         atomic_proposition_len: usize,
     ) -> usize {
         let index = self.valuation_to_state.get(&valuation);
-        // let index = self
-        //     .states
-        //     .iter()
-        //     .enumerate()
-        //     .filter(|(_, v)| v.valuation == valuation)
-        //     .map(|(i, _)| i)
-        //     .next();
         match index {
             Some(&index) => index,
             None => {
@@ -343,11 +335,13 @@ impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
                     M::ActionCollection::get_builder();
                 let atomic_propositions =
                     <M::AtomicPropositions>::get_empty(atomic_proposition_len);
+                let predecessors = <M::Predecessors as Predecessors>::Builder::create();
                 self.valuation_to_state.insert(valuation.clone(), index);
                 self.states.push(StateInProgress {
                     valuation,
                     actions: action_builder,
                     atomic_propositions,
+                    predecessors,
                 });
                 self.open_states.push(index);
                 index
@@ -363,6 +357,8 @@ impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
         synchronised_actions: &SynchronisedActions,
     ) -> Result<(), ModelBuildingError> {
         self.evaluate_atomic_propositions(state, atomic_propositions);
+
+        let mut action_index = 0;
 
         for module_index in 0..model.modules.modules.len() {
             let module = &model.modules.modules[module_index];
@@ -402,12 +398,19 @@ impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
                         );
 
                         let index = self.get_or_add_state(new_valuation, atomic_propositions.len());
-                        distribution.add_successor(Successor { probability, index })
+                        distribution.add_successor(Successor { probability, index });
+
+                        self.states[index].predecessors.add(Predecessor {
+                            from: state,
+                            action_index,
+                            probability,
+                        });
                     }
 
                     self.states[state].actions.add_action(Action {
                         successors: distribution.finish(),
                     });
+                    action_index += 1;
                 }
             }
         }
@@ -507,6 +510,11 @@ impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
 
                         let index = self.get_or_add_state(new_valuation, atomic_propositions.len());
                         distribution.add_successor(Successor { probability, index });
+                        self.states[index].predecessors.add(Predecessor {
+                            from: state,
+                            action_index,
+                            probability,
+                        });
 
                         for i in (0..n).rev() {
                             if update_indices[i] + 1
@@ -531,6 +539,7 @@ impl<M: ModelTypes<Predecessors = NonTrackedPredecessors>, B: ModelBuilderTypes>
                     self.states[state].actions.add_action(Action {
                         successors: distribution.finish(),
                     });
+                    action_index += 1;
 
                     for i in (0..n).rev() {
                         if indices[i] < satisfied_guards_indicies[i].len() {

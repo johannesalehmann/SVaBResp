@@ -19,7 +19,7 @@ impl PredecessorsBuilder<NonTrackedPredecessors> for NonTrackedPredecessorsBuild
     }
 
     fn add(&mut self, predecessor: Predecessor) {
-        panic!("Cannot add a predecessor in a model that does not track predecessors")
+        // Just silently ignore these as this type does not track predecessors
     }
 
     fn finish(self) -> NonTrackedPredecessors {

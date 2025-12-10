@@ -10,6 +10,7 @@ impl Owners for SinglePlayer {
     }
 }
 
+#[derive(PartialEq)]
 pub enum TwoPlayer {
     PlayerOne,
     PlayerTwo,

@@ -1,8 +1,10 @@
 mod into_iter;
+mod map_distribution;
 mod map_owners;
 
 pub use into_iter::{IteratedAction, IteratedProbabilisticModel, IteratedState};
 
+use crate::iter::map_distribution::MappedDistributions;
 use crate::iter::map_owners::MappedOwners;
 use crate::{
     Action, ActionCollection, Builder, Distribution, DistributionBuilder, InitialStates,
@@ -39,8 +41,18 @@ pub trait IterState<M: ModelTypes, IA: IterAction<M>> {
     fn take_owner(&mut self) -> M::Owners;
     fn take_predecessors(&mut self) -> M::Predecessors;
 
-    fn collect(&mut self) -> State<M> {
-        let mut builder = <M::ActionCollection<M> as ActionCollection<M>>::get_builder();
+    fn collect<
+        M2: ModelTypes<
+                Valuation = M::Valuation,
+                Owners = M::Owners,
+                AtomicPropositions = M::AtomicPropositions,
+                Predecessors = M::Predecessors,
+            >,
+    >(
+        &mut self,
+    ) -> State<M2> {
+        let mut builder =
+            <M2::ActionCollection as ActionCollection<M2::Distribution>>::get_builder();
         while let Some(mut action) = self.next_action() {
             builder.add_action(action.collect());
         }
@@ -60,8 +72,17 @@ pub trait IterState<M: ModelTypes, IA: IterAction<M>> {
 
 pub trait IterAction<M: ModelTypes> {
     fn next_successor(&mut self) -> Option<Successor>;
-    fn collect(&mut self) -> Action<M> {
-        let mut builder = <M::Distribution as Distribution>::get_builder();
+    fn collect<
+        M2: ModelTypes<
+                Valuation = M::Valuation,
+                Owners = M::Owners,
+                AtomicPropositions = M::AtomicPropositions,
+                Predecessors = M::Predecessors,
+            >,
+    >(
+        &mut self,
+    ) -> Action<M2::Distribution> {
+        let mut builder = <M2::Distribution as Distribution>::get_builder();
         while let Some(successor) = self.next_successor() {
             builder.add_successor(successor);
         }
@@ -79,14 +100,13 @@ where
         self,
         map: F,
     ) -> MappedOwners<M::Owners, O2, F, M, IA, IS, Self>;
+    fn map_distributions<D2: crate::Distribution>(
+        self,
+    ) -> MappedDistributions<M::Distribution, D2, M, IA, IS, Self>;
 }
 
-impl<
-        M: ModelTypes,
-        IA: IterAction<M>,
-        IS: IterState<M, IA>,
-        IPM: IterProbabilisticModel<M, IA, IS>,
-    > IterFunctions<M, IA, IS> for IPM
+impl<M: ModelTypes, IA: IterAction<M>, IS: IterState<M, IA>, IPM: IterProbabilisticModel<M, IA, IS>>
+    IterFunctions<M, IA, IS> for IPM
 {
     fn map_owners<F: Fn(M::Owners) -> O2, O2: crate::Owners>(
         self,
@@ -94,6 +114,15 @@ impl<
     ) -> MappedOwners<M::Owners, O2, F, M, IA, IS, Self> {
         MappedOwners {
             map,
+            base: self,
+            _phantom_data: Default::default(),
+        }
+    }
+
+    fn map_distributions<D2: Distribution>(
+        self,
+    ) -> MappedDistributions<M::Distribution, D2, M, IA, IS, Self> {
+        MappedDistributions {
             base: self,
             _phantom_data: Default::default(),
         }

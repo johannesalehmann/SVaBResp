@@ -10,6 +10,7 @@ pub fn attractor<
     model: &ProbabilisticModel<M>,
     region: R1,
 ) -> R2 {
+    todo!("Attractor algorithm does not correctly support state ownership yet!");
     let mut open = Vec::new();
     let mut all = HashSet::new();
     let mut result = R2::create(model.states.len());

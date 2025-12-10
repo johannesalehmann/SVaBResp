@@ -1,16 +1,16 @@
-use crate::{Action, ModelTypes};
+use crate::{Action, Distribution, ModelTypes};
 
-pub struct ActionVector<M: ModelTypes> {
-    actions: Vec<Action<M>>,
+pub struct ActionVector<D: Distribution> {
+    actions: Vec<Action<D>>,
 }
 
-impl<M: ModelTypes> super::ActionCollection<M> for ActionVector<M> {
-    type Builder = Builder<M>;
+impl<D: Distribution> super::ActionCollection<D> for ActionVector<D> {
+    type Builder = Builder<D>;
     type Iter<'a>
-        = std::slice::Iter<'a, Action<M>>
+        = std::slice::Iter<'a, Action<D>>
     where
-        M: 'a;
-    type IntoIter = std::vec::IntoIter<Action<M>>;
+        D: 'a;
+    type IntoIter = std::vec::IntoIter<Action<D>>;
 
     fn get_builder() -> Self::Builder {
         Builder::new()
@@ -20,7 +20,7 @@ impl<M: ModelTypes> super::ActionCollection<M> for ActionVector<M> {
         self.actions.len()
     }
 
-    fn get_action(&self, index: usize) -> &Action<M> {
+    fn get_action(&self, index: usize) -> &Action<D> {
         &self.actions[index]
     }
 
@@ -33,11 +33,11 @@ impl<M: ModelTypes> super::ActionCollection<M> for ActionVector<M> {
     }
 }
 
-pub struct Builder<M: ModelTypes> {
-    actions: ActionVector<M>,
+pub struct Builder<D: Distribution> {
+    actions: ActionVector<D>,
 }
 
-impl<M: ModelTypes> Builder<M> {
+impl<D: Distribution> Builder<D> {
     pub fn new() -> Self {
         Self {
             actions: ActionVector {
@@ -47,12 +47,12 @@ impl<M: ModelTypes> Builder<M> {
     }
 }
 
-impl<M: ModelTypes> super::Builder<ActionVector<M>, M> for Builder<M> {
-    fn add_action(&mut self, action: Action<M>) {
+impl<D: Distribution> super::Builder<ActionVector<D>, D> for Builder<D> {
+    fn add_action(&mut self, action: Action<D>) {
         self.actions.actions.push(action)
     }
 
-    fn finish(self) -> ActionVector<M> {
+    fn finish(self) -> ActionVector<D> {
         self.actions
     }
 }

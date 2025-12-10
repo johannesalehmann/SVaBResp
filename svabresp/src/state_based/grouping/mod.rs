@@ -2,7 +2,12 @@ mod group_extraction;
 pub use group_extraction::*;
 
 pub trait StateGroups {
+    type Iter<'a>: Iterator<Item = usize>
+    where
+        Self: 'a;
+
     fn get_count(&self) -> usize;
+    fn get_states<'a>(&'a self, group: usize) -> Self::Iter<'a>;
 }
 
 pub struct VectorStateGroups {
@@ -50,7 +55,13 @@ impl VectorStateGroupBuilder {
 }
 
 impl StateGroups for VectorStateGroups {
+    type Iter<'a> = std::iter::Cloned<std::slice::Iter<'a, usize>>;
+
     fn get_count(&self) -> usize {
         self.groups.len()
+    }
+
+    fn get_states<'a>(&'a self, group: usize) -> Self::Iter<'a> {
+        self.groups[group].states.iter().cloned()
     }
 }

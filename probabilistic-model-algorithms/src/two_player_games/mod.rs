@@ -1,2 +1,2 @@
-mod non_probabilistic;
-mod probabilistic;
+pub mod non_probabilistic;
+pub mod probabilistic;

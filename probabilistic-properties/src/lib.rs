@@ -12,7 +12,7 @@ pub struct ProbabilityOperator<P: ProbabilitySpecifier> {
     pub constraint: ProbabilityConstraint<P>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ProbabilityKind {
     PMax,
     PMin,
