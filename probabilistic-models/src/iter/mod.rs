@@ -1,10 +1,9 @@
 mod into_iter;
-mod map_distribution;
-mod map_owners;
-
 pub use into_iter::{IteratedAction, IteratedProbabilisticModel, IteratedState};
 
-use crate::iter::map_owners::MappedOwners;
+mod map_owners;
+use map_owners::MappedOwners;
+
 use crate::{
     Action, ActionCollection, AtomicPropositions, Builder, Distribution, DistributionBuilder,
     InitialStates, InitialStatesBuilder, ModelTypes, Owners, Predecessors, PredecessorsBuilder,
@@ -109,7 +108,6 @@ pub trait IterFunctions<
         self,
         map: F,
     ) -> MappedOwners<V, O, O2, AP, P, F, IA, IS, Self>;
-    // fn map_distributions<D2: Distribution>(self) -> MappedDistributions<D, D2, M, IA, IS, Self>;
 }
 
 impl<
@@ -132,13 +130,4 @@ impl<
             _phantom_data: Default::default(),
         }
     }
-
-    // fn map_distributions<D2: Distribution>(
-    //     self,
-    // ) -> MappedDistributions<M::Distribution, D2, M, IA, IS, Self> {
-    //     MappedDistributions {
-    //         base: self,
-    //         _phantom_data: Default::default(),
-    //     }
-    // }
 }
