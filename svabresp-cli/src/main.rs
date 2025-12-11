@@ -14,11 +14,11 @@ fn main() {
     let (model, properties) = parsed.unwrap();
     let property = properties.into_iter().nth(0).unwrap();
 
-    let coop_game = svabresp::state_based::compute_for_prism(
-        model,
-        property,
-        svabresp::state_based::grouping::IndividualGroupExtractionScheme::new(),
-    );
+    // let coop_game = svabresp::state_based::compute_for_prism(
+    //     model,
+    //     property,
+    //     svabresp::state_based::grouping::IndividualGroupExtractionScheme::new(),
+    // );
 
     // TODO: Compute responsibility value here
 

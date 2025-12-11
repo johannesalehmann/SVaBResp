@@ -20,8 +20,15 @@ impl<M: ModelTypes> IteratedProbabilisticModel<M> {
     }
 }
 
-impl<'a, M: ModelTypes> super::IterProbabilisticModel<M, IteratedAction<M>, IteratedState<M>>
-    for IteratedProbabilisticModel<M>
+impl<'a, M: ModelTypes>
+    super::IterProbabilisticModel<
+        M::Valuation,
+        M::Owners,
+        M::AtomicPropositions,
+        M::Predecessors,
+        IteratedAction<M>,
+        IteratedState<M>,
+    > for IteratedProbabilisticModel<M>
 {
     fn next_initial_state(&mut self) -> Option<usize> {
         if self.current_initial_state_index < self.initial_states.count() {
@@ -62,7 +69,15 @@ impl<M: ModelTypes> IteratedState<M> {
     }
 }
 
-impl<M: ModelTypes> super::IterState<M, IteratedAction<M>> for IteratedState<M> {
+impl<M: ModelTypes>
+    super::IterState<
+        M::Valuation,
+        M::Owners,
+        M::AtomicPropositions,
+        M::Predecessors,
+        IteratedAction<M>,
+    > for IteratedState<M>
+{
     fn take_valuation(&mut self) -> M::Valuation {
         self.valuation.take().unwrap()
     }
@@ -98,7 +113,7 @@ impl<M: ModelTypes> IteratedAction<M> {
     }
 }
 
-impl<M: ModelTypes> super::IterAction<M> for IteratedAction<M> {
+impl<M: ModelTypes> super::IterAction for IteratedAction<M> {
     fn next_successor(&mut self) -> Option<Successor> {
         if self.current_index < self.distribution.number_of_successors() {
             let successor = self.distribution.get_successor(self.current_index);

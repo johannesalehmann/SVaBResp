@@ -59,7 +59,7 @@ impl ModelBuilderTypes for DefaultModelBuilderTypes {
 
 pub struct StateInProgress<M: ModelTypes> {
     pub valuation: M::Valuation,
-    pub actions: <M::ActionCollection<M> as ActionCollection<M>>::Builder,
+    pub actions: <M::ActionCollection as ActionCollection<M::Distribution>>::Builder,
     pub atomic_propositions: M::AtomicPropositions,
     pub predecessors: <M::Predecessors as Predecessors>::Builder,
 }
@@ -331,7 +331,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             Some(&index) => index,
             None => {
                 let index = self.states.len();
-                let action_builder: <M::ActionCollection<M> as ActionCollection<M>>::Builder =
+                let action_builder: <M::ActionCollection as ActionCollection<M::Distribution>>::Builder =
                     M::ActionCollection::get_builder();
                 let atomic_propositions =
                     <M::AtomicPropositions>::get_empty(atomic_proposition_len);

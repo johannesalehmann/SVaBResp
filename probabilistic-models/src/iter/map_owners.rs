@@ -1,50 +1,53 @@
 use super::{IterAction, IterProbabilisticModel, IterState, ModelTypes};
-use crate::{Owners, Predecessors, Successor};
+use crate::{
+    ActionCollection, AtomicPropositions, Distribution, InitialStates, Owners, Predecessors,
+    Successor, Valuation,
+};
 use std::marker::PhantomData;
 
 pub struct MappedOwners<
-    O1: Owners,
+    V: Valuation,
+    O: Owners,
     O2: Owners,
-    Map: Fn(O1) -> O2,
-    M1: ModelTypes<Owners = O1>,
-    IA1: IterAction<M1>,
-    IS1: IterState<M1, IA1>,
-    Base: IterProbabilisticModel<M1, IA1, IS1>,
+    AP: AtomicPropositions,
+    P: Predecessors,
+    Map: Fn(O) -> O2 + Clone,
+    BaseIterAction: IterAction,
+    BaseIterState: IterState<V, O, AP, P, BaseIterAction>,
+    Base: IterProbabilisticModel<V, O, AP, P, BaseIterAction, BaseIterState>,
 > {
     pub(crate) map: Map,
     pub(crate) base: Base,
-    pub(crate) _phantom_data: PhantomData<(O1, O2, M1, IA1, IS1)>,
+    pub(crate) _phantom_data: PhantomData<(V, O, O2, AP, P, BaseIterAction, BaseIterState)>,
 }
 
 impl<
-    O1: Owners,
+    V: Valuation,
+    O: Owners,
     O2: Owners,
-    Map: Fn(O1) -> O2 + Clone,
-    M1: ModelTypes<Owners = O1>,
-    M2: ModelTypes<
-            Owners = O2,
-            Distribution = M1::Distribution,
-            AtomicPropositions = M1::AtomicPropositions,
-            Valuation = M1::Valuation,
-            ActionCollection = M1::ActionCollection,
-            InitialStates = M1::InitialStates,
-            Predecessors = M1::Predecessors,
-        >,
-    IA1: IterAction<M1>,
-    IS1: IterState<M1, IA1>,
-    Base: IterProbabilisticModel<M1, IA1, IS1>,
+    AP: AtomicPropositions,
+    P: Predecessors,
+    Map: Fn(O) -> O2 + Clone,
+    BaseIterAction: IterAction,
+    BaseIterState: IterState<V, O, AP, P, BaseIterAction>,
+    Base: IterProbabilisticModel<V, O, AP, P, BaseIterAction, BaseIterState>,
 >
     IterProbabilisticModel<
-        M2,
-        MappedOwnersAction<O1, O2, Map, M1, IA1>,
-        MappedOwnersState<O1, O2, Map, M1, IA1, IS1>,
-    > for MappedOwners<O1, O2, Map, M1, IA1, IS1, Base>
+        V,
+        O2,
+        AP,
+        P,
+        BaseIterAction,
+        MappedOwnersState<V, O, O2, AP, P, Map, BaseIterAction, BaseIterState>,
+    > for MappedOwners<V, O, O2, AP, P, Map, BaseIterAction, BaseIterState, Base>
 {
     fn next_initial_state(&mut self) -> Option<usize> {
         self.base.next_initial_state()
     }
 
-    fn next_state(&mut self) -> Option<MappedOwnersState<O1, O2, Map, M1, IA1, IS1>> {
+    fn next_state(
+        &mut self,
+    ) -> Option<MappedOwnersState<V, O, O2, AP, P, Map, BaseIterAction, BaseIterState>> {
         if let Some(next) = self.base.next_state() {
             Some(MappedOwnersState {
                 function: self.map.clone(),
@@ -58,94 +61,48 @@ impl<
 }
 
 pub struct MappedOwnersState<
-    O1: Owners,
+    V: Valuation,
+    O: Owners,
     O2: Owners,
-    Map: Fn(O1) -> O2 + Clone,
-    M1: ModelTypes<Owners = O1>,
-    IA1: IterAction<M1>,
-    BaseIterState: IterState<M1, IA1>,
+    AP: AtomicPropositions,
+    P: Predecessors,
+    Map: Fn(O) -> O2,
+    BaseIterAction: IterAction,
+    BaseIterState: IterState<V, O, AP, P, BaseIterAction>,
 > {
     function: Map,
     base: BaseIterState,
-    _phantom_data: PhantomData<(O1, O2, M1, IA1)>,
+    _phantom_data: PhantomData<(V, O, O2, AP, P, BaseIterAction)>,
 }
 impl<
-    O1: Owners,
+    V: Valuation,
+    O: Owners,
     O2: Owners,
-    Map: Fn(O1) -> O2 + Clone,
-    M1: ModelTypes<Owners = O1>,
-    M2: ModelTypes<
-            Owners = O2,
-            Distribution = M1::Distribution,
-            AtomicPropositions = M1::AtomicPropositions,
-            Valuation = M1::Valuation,
-            ActionCollection = M1::ActionCollection,
-            InitialStates = M1::InitialStates,
-            Predecessors = M1::Predecessors,
-        >,
-    IA1: IterAction<M1>,
-    IS1: IterState<M1, IA1>,
-> IterState<M2, MappedOwnersAction<O1, O2, Map, M1, IA1>>
-    for MappedOwnersState<O1, O2, Map, M1, IA1, IS1>
+    AP: AtomicPropositions,
+    P: Predecessors,
+    Map: Fn(O) -> O2,
+    BaseIterAction: IterAction,
+    BaseIterState: IterState<V, O, AP, P, BaseIterAction>,
+> IterState<V, O2, AP, P, BaseIterAction>
+    for MappedOwnersState<V, O, O2, AP, P, Map, BaseIterAction, BaseIterState>
 {
-    fn take_valuation(&mut self) -> M2::Valuation {
+    fn take_valuation(&mut self) -> V {
         self.base.take_valuation()
     }
 
-    fn next_action(&mut self) -> Option<MappedOwnersAction<O1, O2, Map, M1, IA1>> {
-        if let Some(base) = self.base.next_action() {
-            Some(MappedOwnersAction {
-                map: self.function.clone(),
-                base,
-                _phantom_data: Default::default(),
-            })
-        } else {
-            None
-        }
+    fn next_action(&mut self) -> Option<BaseIterAction> {
+        self.base.next_action()
     }
 
-    fn take_atomic_propositions(&mut self) -> M2::AtomicPropositions {
+    fn take_atomic_propositions(&mut self) -> AP {
         self.base.take_atomic_propositions()
     }
 
-    fn take_owner(&mut self) -> M2::Owners {
+    fn take_owner(&mut self) -> O2 {
         (self.function)(self.base.take_owner())
     }
 
-    fn take_predecessors(&mut self) -> M2::Predecessors {
+    fn take_predecessors(&mut self) -> P {
         self.base.take_predecessors()
-    }
-}
-
-pub struct MappedOwnersAction<
-    O1: Owners,
-    O2: Owners,
-    Map: Fn(O1) -> O2 + Clone,
-    M1: ModelTypes<Owners = O1>,
-    Base: IterAction<M1>,
-> {
-    map: Map,
-    base: Base,
-    _phantom_data: PhantomData<(O1, O2, M1)>,
-}
-
-impl<
-    O1: Owners,
-    O2: Owners,
-    Map: Fn(O1) -> O2 + Clone,
-    M1: ModelTypes<Owners = O1>,
-    M2: ModelTypes<
-            Owners = O2,
-            Distribution = M1::Distribution,
-            AtomicPropositions = M1::AtomicPropositions,
-            Valuation = M1::Valuation,
-            ActionCollection = M1::ActionCollection,
-            InitialStates = M1::InitialStates,
-        >,
-    Base: IterAction<M1>,
-> IterAction<M2> for MappedOwnersAction<O1, O2, Map, M1, Base>
-{
-    fn next_successor(&mut self) -> Option<Successor> {
-        self.base.next_successor()
     }
 }

@@ -1,7 +1,7 @@
 mod valuation_vector;
 pub use valuation_vector::ValuationVector;
 
-pub trait Valuation: Sized + PartialEq + Clone {
+pub trait Valuation: Sized + PartialEq + Clone + std::hash::Hash + Eq {
     type ContextType;
     type ContextBuilderType: ContextBuilder<Self::ContextType>;
 

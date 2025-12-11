@@ -47,7 +47,6 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
     let mut game: probabilistic_models::TwoPlayerNonstochasticGame<VectorPredecessors> = model
         .into_iter()
         .map_owners(|_| TwoPlayer::PlayerTwo)
-        .map_distributions::<SingleStateDistribution>()
         .collect();
 
     let grouping = grouping_scheme.create_groups(&mut game, &mut property);

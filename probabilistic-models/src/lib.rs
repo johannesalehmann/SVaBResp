@@ -25,7 +25,7 @@ mod predecessors;
 pub use predecessors::*;
 
 pub trait ModelTypes: Sized {
-    type Valuation: Valuation + std::hash::Hash + Eq;
+    type Valuation: Valuation;
     type Distribution: Distribution;
     type Owners: Owners;
     type ActionCollection: ActionCollection<Self::Distribution>;
