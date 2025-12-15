@@ -447,7 +447,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
 
             if n == 0 {
                 panic!(
-                    "Synchronised actions with zero associated modules are not yet supported (but they should be impossible to create anyways"
+                    "Synchronised actions with zero associated modules are not yet supported (but they should be impossible to create anyways)"
                 );
             }
 
@@ -542,11 +542,12 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     action_index += 1;
 
                     for i in (0..n).rev() {
-                        if indices[i] < satisfied_guards_indicies[i].len() {
+                        if indices[i] + 1 < satisfied_guards_indicies[i].len() {
                             indices[i] += 1;
                             for j in i + 1..n {
                                 indices[j] = 0;
                             }
+                            break;
                         } else {
                             if i == 0 {
                                 indices[0] += 1;
