@@ -1,3 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["prism-model", "prism-model-builder", "prism-parser", "probabilistic-model-algorithms", "probabilistic-models", "probabilistic-properties", "svabresp", "svabresp-cli", "tiny-pmc", "tiny-pmc-cli"]
+
+[profile.release]
+lto = "fat"
+codegen-units = 1

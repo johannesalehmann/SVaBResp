@@ -5,14 +5,13 @@ use probabilistic_models::{
 
 mod game;
 pub mod grouping;
-mod preparation;
 
-use crate::shapley::ShapleyAlgorithm;
+use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm};
 use crate::{PrismModel, PrismProperty};
 
 use grouping::GroupExtractionScheme;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
-    AlgorithmCollection, ReachabilityAlgorithmCollection, SafetyAlgorithmCollection,
+    AlgorithmCollection, GameAndSolverExternalOwners, ReachabilityAlgorithmCollection,
 };
 
 pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
@@ -51,14 +50,12 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
 
     let grouping = grouping_scheme.create_groups(&mut game, &mut property);
 
-    if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
-        shapley.compute_simple(&game::StateBasedResponsibilityGame::new(
-            game, grouping, solver,
-        ))
-    } else if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
-        shapley.compute_simple(&game::StateBasedResponsibilityGame::new(
-            game, grouping, solver,
-        ))
+    if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
+        let solvable_game = GameAndSolverExternalOwners::new(game, solver);
+        let coop_game = game::StateBasedResponsibilityGame::new(solvable_game, grouping);
+        let mut cached_coop_game = MinimalCoalitionCache::create(coop_game);
+
+        shapley.compute_simple(&mut cached_coop_game)
     } else {
         panic!("Unsupported property type");
     }

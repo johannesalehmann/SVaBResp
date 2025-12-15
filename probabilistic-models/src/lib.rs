@@ -60,6 +60,7 @@ impl<M: ModelTypes> ProbabilisticModel<M> {
         }
         res
     }
+
     pub fn get_states_with_aps(&self, aps: &[AtomicProposition]) -> Vec<usize> {
         let mut res = Vec::new();
         for (index, state) in self.states.iter().enumerate() {
@@ -78,7 +79,7 @@ pub struct State<M: ModelTypes> {
     pub actions: M::ActionCollection,
     pub atomic_propositions: M::AtomicPropositions,
     pub owner: M::Owners,
-    pub predecessors: M::Predecessors,
+    pub predecessors: M::Predecessors, // TODO: Rename to "incoming transitions" to highlight that a state may be contained multiple times
 }
 
 impl<M: ModelTypes> State<M> {

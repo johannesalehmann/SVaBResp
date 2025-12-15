@@ -1,50 +1,24 @@
-use crate::shapley::{CoalitionSpecifier, CooperativeGame, SimpleCooperativeGame};
+use crate::shapley::{CoalitionSpecifier, MonotoneCooperativeGame, SimpleCooperativeGame};
 use crate::state_based::grouping::StateGroups;
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::AlgorithmCollection;
-use probabilistic_models::TwoPlayer::PlayerTwo;
-use probabilistic_models::{
-    AtomicProposition, IterFunctions, ModelTypes, ProbabilisticModel, SingleStateDistribution,
-    TwoPlayer, VectorPredecessors,
+use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
+    AlgorithmCollection, ChangeableOwners, SolvableGame,
 };
-use probabilistic_properties::Property;
-use std::marker::PhantomData;
+use probabilistic_models::{
+    ModelTypes, ProbabilisticModel, SingleStateDistribution, TwoPlayer, VectorPredecessors,
+};
 
-pub struct StateBasedResponsibilityGame<
-    M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>,
-    G: StateGroups,
-    A: AlgorithmCollection,
-> {
-    game: ProbabilisticModel<M>,
+pub struct StateBasedResponsibilityGame<G: StateGroups, A: SolvableGame> {
+    solvable: A,
     grouping: G,
-    algorithm_collection: A,
 }
 
-impl<
-    'a,
-    M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>,
-    G: StateGroups,
-    A: AlgorithmCollection,
-> StateBasedResponsibilityGame<M, G, A>
-{
-    pub fn new(game: ProbabilisticModel<M>, grouping: G, algorithm_collection: A) -> Self {
-        Self {
-            game,
-            grouping,
-            algorithm_collection,
-        }
+impl<'a, G: StateGroups, A: SolvableGame> StateBasedResponsibilityGame<G, A> {
+    pub fn new(solvable: A, grouping: G) -> Self {
+        Self { solvable, grouping }
     }
 }
 
-impl<
-    M: ModelTypes<
-            Distribution = SingleStateDistribution,
-            Owners = TwoPlayer,
-            Predecessors = VectorPredecessors,
-        >,
-    G: StateGroups,
-    A: AlgorithmCollection,
-> SimpleCooperativeGame for StateBasedResponsibilityGame<M, G, A>
-{
+impl<G: StateGroups, A: SolvableGame> SimpleCooperativeGame for StateBasedResponsibilityGame<G, A> {
     fn get_player_count(&self) -> usize {
         self.grouping.get_count()
     }
@@ -53,21 +27,20 @@ impl<
         for i in 0..self.grouping.get_count() {
             if coalition.is_in_coalition(i) {
                 for state in self.grouping.get_states(i) {
-                    self.game.states[state].owner = TwoPlayer::PlayerOne;
+                    self.solvable.set_owner(state, TwoPlayer::PlayerOne);
                 }
-            }
-        }
-
-        let winning = self.algorithm_collection.compute_winning_player(&self.game);
-
-        for i in 0..self.grouping.get_count() {
-            if coalition.is_in_coalition(i) {
+            } else {
                 for state in self.grouping.get_states(i) {
-                    self.game.states[state].owner = TwoPlayer::PlayerTwo;
+                    self.solvable.set_owner(state, TwoPlayer::PlayerTwo);
                 }
             }
         }
 
-        winning == TwoPlayer::PlayerOne
+        self.solvable.get_winner() == TwoPlayer::PlayerOne
     }
+}
+
+impl<G: StateGroups, A: SolvableGame> MonotoneCooperativeGame
+    for StateBasedResponsibilityGame<G, A>
+{
 }

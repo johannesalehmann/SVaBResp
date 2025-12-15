@@ -1,4 +1,4 @@
-mod shapley;
+pub mod shapley;
 pub mod state_based;
 
 use crate::shapley::CooperativeGame;

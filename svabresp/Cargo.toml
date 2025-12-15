@@ -10,4 +10,7 @@ probabilistic-model-algorithms = { path = "../probabilistic-model-algorithms" }
 probabilistic-properties = { path = "../probabilistic-properties" }
 tiny-pmc = { path = "../tiny-pmc" }
 prism-model-builder = { path = "../prism-model-builder" }
+num-bigint = "0.4.6"
 chumsky = "1.0.0-alpha.8"
+num-rational = "0.4.2"
+num-traits = "0.2.19"
