@@ -1,7 +1,9 @@
+use svabresp::num_rational::BigRational;
+use svabresp::num_traits::Zero;
 use svabresp::shapley::BruteForceAlgorithm;
 
 fn main() {
-    let file_name = "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dining_philosophers/dining_philosophers.prism"; //"svabresp-cli/examples/test.prism";
+    let file_name = "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism"; //"svabresp-cli/examples/test.prism";
     let file = std::fs::read_to_string(file_name).expect("Failed to read input model");
 
     let parsed = tiny_pmc::parsing::parse_prism_and_print_errors(
@@ -26,7 +28,10 @@ fn main() {
     );
 
     println!("Responsibility values:");
+    let mut sum = BigRational::zero();
     for (index, value) in responsibility.states.iter().enumerate() {
         println!("  {}: {}", index, value.value);
+        sum += &value.value;
     }
+    println!("Total: {}", sum);
 }
