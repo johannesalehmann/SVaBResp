@@ -34,8 +34,14 @@ pub fn attractor_contains_state<
     model: &ProbabilisticModel<M>,
     region: R1,
     state: usize,
+    attracted_player: TwoPlayer,
 ) -> bool {
-    super::attractor_internal(model, region, StateIncludedCondition::new(state))
+    super::attractor_internal(
+        model,
+        region,
+        StateIncludedCondition::new(state),
+        attracted_player,
+    )
 }
 
 pub fn attractor_contains_state_with_buffer<

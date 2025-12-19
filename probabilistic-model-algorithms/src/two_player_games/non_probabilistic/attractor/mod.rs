@@ -27,9 +27,10 @@ fn attractor_internal<
     model: &ProbabilisticModel<M>,
     region: R1,
     condition: C,
+    attracted_player: TwoPlayer,
 ) -> C::Output {
     let mut buffer = AttractorBuffer::create(&model);
-    buffer.reset_owner_counts(model);
+    buffer.reset_owner_counts(model, attracted_player);
     attractor_internal_with_buffer(model, region, condition, &mut buffer)
 }
 

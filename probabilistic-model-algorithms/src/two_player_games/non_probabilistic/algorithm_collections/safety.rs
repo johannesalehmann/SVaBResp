@@ -1,6 +1,6 @@
 use super::super::attractor;
 use super::AlgorithmCollection;
-use crate::regions::{StateRegion, VectorStateRegion};
+use crate::regions::{InvertedStateRegion, StateRegion, VectorStateRegion};
 use probabilistic_models::probabilistic_properties::{
     Path, ProbabilityConstraint, ProbabilityKind, ProbabilityOperator, Property,
 };
@@ -8,13 +8,13 @@ use probabilistic_models::{
     AtomicProposition, InitialStates, ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors,
 };
 
-pub struct ReachabilityAlgorithmCollection {
-    target_states: AtomicProposition,
+pub struct SafetyAlgorithmCollection {
+    good_states: AtomicProposition,
 }
 
-impl AlgorithmCollection for ReachabilityAlgorithmCollection {
-    type WinningRegionType = VectorStateRegion;
-    type ModelContext = ReachabilityAlgorithmContext;
+impl AlgorithmCollection for SafetyAlgorithmCollection {
+    type WinningRegionType = InvertedStateRegion<VectorStateRegion>;
+    type ModelContext = SafetyAlgorithmContext;
 
     fn create_model_context<
         M: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
@@ -24,8 +24,13 @@ impl AlgorithmCollection for ReachabilityAlgorithmCollection {
     ) -> Self::ModelContext {
         assert_eq!(model.initial_states.count(), 1);
         let initial_state = model.initial_states.get(0);
-        ReachabilityAlgorithmContext {
-            target_states: model.get_states_with_ap(self.target_states),
+        let bad_states = model.get_states_without_ap(self.good_states);
+        println!("Bad states:");
+        for state in &bad_states {
+            println!("  {state}")
+        }
+        SafetyAlgorithmContext {
+            bad_states,
             buffer: attractor::AttractorBuffer::create(model),
             initial_state,
         }
@@ -38,10 +43,10 @@ impl AlgorithmCollection for ReachabilityAlgorithmCollection {
                     kind: ProbabilityKind::P,
                     constraint: ProbabilityConstraint::EqualTo(1.0),
                 },
-            path: Path::Eventually(ap),
+            path: Path::Generally(ap),
         } = property
         {
-            Some(Self { target_states: *ap })
+            Some(Self { good_states: *ap })
         } else {
             None
         }
@@ -67,12 +72,12 @@ impl AlgorithmCollection for ReachabilityAlgorithmCollection {
     ) -> TwoPlayer {
         match attractor::attractor_contains_state_with_buffer(
             model,
-            context.target_states.iter().cloned(),
+            context.bad_states.iter().cloned(),
             state,
             &mut context.buffer,
         ) {
-            true => TwoPlayer::PlayerOne,
-            false => TwoPlayer::PlayerTwo,
+            false => TwoPlayer::PlayerOne,
+            true => TwoPlayer::PlayerTwo,
         }
     }
     fn winning_region_with_context<
@@ -82,34 +87,35 @@ impl AlgorithmCollection for ReachabilityAlgorithmCollection {
         model: &ProbabilisticModel<M>,
         context: &mut Self::ModelContext,
     ) -> Self::WinningRegionType {
-        attractor::attractor_with_buffer(
+        attractor::attractor_with_buffer::<_, _, VectorStateRegion>(
             model,
-            context.target_states.iter().cloned(),
+            context.bad_states.iter().cloned(),
             &mut context.buffer,
         )
+        .inverted()
     }
 }
 
-pub struct ReachabilityAlgorithmContext {
-    target_states: Vec<usize>,
+pub struct SafetyAlgorithmContext {
+    bad_states: Vec<usize>,
     buffer: attractor::AttractorBuffer,
     initial_state: usize,
 }
 
-impl super::ChangeableOwners for ReachabilityAlgorithmContext {
+impl super::ChangeableOwners for SafetyAlgorithmContext {
     fn set_owner(&mut self, index: usize, owner: TwoPlayer) {
         match owner {
-            TwoPlayer::PlayerOne => self.buffer.reset_reaching_player(index),
-            TwoPlayer::PlayerTwo => self.buffer.reset_avoiding_player(index),
+            TwoPlayer::PlayerOne => self.buffer.reset_avoiding_player(index),
+            TwoPlayer::PlayerTwo => self.buffer.reset_reaching_player(index),
         }
     }
 }
 
-impl super::AdaptableOwners for ReachabilityAlgorithmContext {
+impl super::AdaptableOwners for SafetyAlgorithmContext {
     fn adapt_to_owners<M: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>>(
         &mut self,
         model: &ProbabilisticModel<M>,
     ) {
-        self.buffer.reset_owner_counts(model, TwoPlayer::PlayerOne);
+        self.buffer.reset_owner_counts(model, TwoPlayer::PlayerTwo);
     }
 }

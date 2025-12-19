@@ -151,7 +151,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         }
         let initial_states = initial_states_builder.finish();
 
-        let mut result = ProbabilisticModel::new(initial_states);
+        let mut result = ProbabilisticModel::new(initial_states, builder.context);
         for state_in_progress in builder.states.into_iter() {
             let state = State {
                 valuation: state_in_progress.valuation,
@@ -306,14 +306,20 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                 match &var.range {
                     VariableRange::BoundedInt { .. } => {
                         if let Some((min, max)) = variable_bounds.bounds[*var_index] {
-                            context_builder.register_bounded_int(min, max);
+                            context_builder.register_bounded_int(var.name.name.clone(), min, max);
                         } else {
                             panic!("Variable bounds and valuation map are inconsistent");
                         }
                     }
-                    VariableRange::UnboundedInt { .. } => context_builder.register_unbounded_int(),
-                    VariableRange::Boolean { .. } => context_builder.register_bool(),
-                    VariableRange::Float { .. } => context_builder.register_float(),
+                    VariableRange::UnboundedInt { .. } => {
+                        context_builder.register_unbounded_int(var.name.name.clone())
+                    }
+                    VariableRange::Boolean { .. } => {
+                        context_builder.register_bool(var.name.name.clone())
+                    }
+                    VariableRange::Float { .. } => {
+                        context_builder.register_float(var.name.name.clone())
+                    }
                 }
             }
         }

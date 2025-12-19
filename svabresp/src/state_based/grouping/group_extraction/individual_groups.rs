@@ -1,5 +1,5 @@
 use probabilistic_models::{
-    ActionCollection, AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer,
+    ActionCollection, AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation,
 };
 use probabilistic_properties::Property;
 
@@ -24,11 +24,11 @@ impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
         // TODO: Determine states from which the property can both be fulfilled and refuted. Only those states may have positive responsibility
 
         for i in 0..game.states.len() {
-            println!("State {}", i);
-            if game.states[i].actions.get_number_of_actions() > 1 {
-                println!("  added");
+            let state = &game.states[i];
+            if state.actions.get_number_of_actions() > 1 {
+                let label = format!("{}", state.valuation.displayable(&game.valuation_context));
                 builder.add_state(i);
-                builder.finish_group();
+                builder.finish_group(label);
             }
         }
 

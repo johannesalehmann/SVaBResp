@@ -18,10 +18,10 @@ impl Count {
         }
     }
 
-    fn reset_player_1(&mut self) {
+    fn reset_reaching_player(&mut self) {
         self.current = 1;
     }
-    fn reset_player_2(&mut self) {
+    fn reset_avoiding_player(&mut self) {
         self.current = self.default;
     }
 }
@@ -49,20 +49,23 @@ impl AttractorBuffer {
     >(
         &mut self,
         model: &ProbabilisticModel<M>,
+        reaching_player: TwoPlayer,
     ) {
         for (index, state) in model.states.iter().enumerate() {
-            match state.owner {
-                TwoPlayer::PlayerOne => self.reset_player_1(index),
-                TwoPlayer::PlayerTwo => self.reset_player_2(index),
+            if state.owner == reaching_player {
+                self.reset_reaching_player(index)
+            } else {
+                self.reset_avoiding_player(index)
             }
         }
     }
 
-    pub fn reset_player_1(&mut self, index: usize) {
-        self.counts[index].reset_player_1()
+    pub fn reset_reaching_player(&mut self, index: usize) {
+        self.counts[index].reset_reaching_player()
     }
-    pub fn reset_player_2(&mut self, index: usize) {
-        self.counts[index].reset_player_2()
+
+    pub fn reset_avoiding_player(&mut self, index: usize) {
+        self.counts[index].reset_avoiding_player()
     }
 
     pub fn get_value(&self, index: usize) -> u32 {

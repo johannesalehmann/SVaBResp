@@ -37,13 +37,18 @@ pub trait ModelTypes: Sized {
 pub struct ProbabilisticModel<M: ModelTypes> {
     pub states: Vec<State<M>>,
     pub initial_states: M::InitialStates,
+    pub valuation_context: <M::Valuation as Valuation>::ContextType,
 }
 
 impl<M: ModelTypes> ProbabilisticModel<M> {
-    pub fn new(initial_states: M::InitialStates) -> Self {
+    pub fn new(
+        initial_states: M::InitialStates,
+        valuation_context: <M::Valuation as Valuation>::ContextType,
+    ) -> Self {
         Self {
             states: Vec::new(),
             initial_states,
+            valuation_context,
         }
     }
 
@@ -55,6 +60,16 @@ impl<M: ModelTypes> ProbabilisticModel<M> {
         let mut res = Vec::new();
         for (index, state) in self.states.iter().enumerate() {
             if state.atomic_propositions.get_value(ap.index) {
+                res.push(index);
+            }
+        }
+        res
+    }
+
+    pub fn get_states_without_ap(&self, ap: AtomicProposition) -> Vec<usize> {
+        let mut res = Vec::new();
+        for (index, state) in self.states.iter().enumerate() {
+            if !state.atomic_propositions.get_value(ap.index) {
                 res.push(index);
             }
         }

@@ -34,11 +34,13 @@ pub fn attractor<
 >(
     model: &ProbabilisticModel<M>,
     region: R1,
+    attracted_player: TwoPlayer,
 ) -> R2 {
     super::attractor_internal(
         model,
         region,
         FullRegionAttractorCondition::new(model.states.len()),
+        attracted_player,
     )
 }
 

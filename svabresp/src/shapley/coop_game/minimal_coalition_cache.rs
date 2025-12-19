@@ -1,14 +1,18 @@
+use crate::shapley::coop_game::PlayerDescriptions;
 use crate::shapley::{
     CoalitionSpecifier, CooperativeGame, MonotoneCooperativeGame, SimpleCooperativeGame,
 };
 
-pub struct MinimalCoalitionCache {
+pub struct MinimalCoalitionCache<P: PlayerDescriptions> {
+    player_descriptions: P,
     player_count: usize,
     minimal_coalitions: Vec<u64>,
 }
 
-impl MinimalCoalitionCache {
-    pub fn create<C: SimpleCooperativeGame + MonotoneCooperativeGame>(mut coop_game: C) -> Self {
+impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {
+    pub fn create<C: SimpleCooperativeGame<PlayerDescriptions = P> + MonotoneCooperativeGame>(
+        mut coop_game: C,
+    ) -> Self {
         let mut minimal_coalitions = Vec::new();
 
         let max_coalition = 1u64 << coop_game.get_player_count();
@@ -17,7 +21,7 @@ impl MinimalCoalitionCache {
         let mut skipped_counter = 0;
 
         for size in 0..=coop_game.get_player_count() as u32 {
-            println!("Size {}/{}", size, coop_game.get_player_count());
+            print!("Size {}/{}", size, coop_game.get_player_count());
             for coalition in 0..max_coalition {
                 if coalition.count_ones() == size {
                     let mut subset_winning = false;
@@ -40,7 +44,7 @@ impl MinimalCoalitionCache {
                 }
             }
             println!(
-                "Solved {} games (skipped {})",
+                " (solved {} games, skipped {})",
                 game_counter, skipped_counter
             );
             game_counter = 0;
@@ -51,10 +55,14 @@ impl MinimalCoalitionCache {
             "Minimal coalition cache contains {} coalitions",
             minimal_coalitions.len()
         );
+        for c in &minimal_coalitions {
+            println!("  {:b}", c);
+        }
 
         Self {
             player_count: coop_game.get_player_count(),
             minimal_coalitions,
+            player_descriptions: coop_game.into_player_descriptions(),
         }
     }
 
@@ -63,9 +71,23 @@ impl MinimalCoalitionCache {
     }
 }
 
-impl SimpleCooperativeGame for MinimalCoalitionCache {
+impl<P: PlayerDescriptions> SimpleCooperativeGame for MinimalCoalitionCache<P> {
+    type PlayerDescriptions = P;
+
     fn get_player_count(&self) -> usize {
         self.player_count
+    }
+
+    fn player_descriptions(&self) -> &Self::PlayerDescriptions {
+        &self.player_descriptions
+    }
+
+    fn player_descriptions_mut(&mut self) -> &mut Self::PlayerDescriptions {
+        &mut self.player_descriptions
+    }
+
+    fn into_player_descriptions(self) -> Self::PlayerDescriptions {
+        self.player_descriptions
     }
 
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool {
@@ -78,4 +100,4 @@ impl SimpleCooperativeGame for MinimalCoalitionCache {
     }
 }
 
-impl MonotoneCooperativeGame for MinimalCoalitionCache {}
+impl<P: PlayerDescriptions> MonotoneCooperativeGame for MinimalCoalitionCache<P> {}

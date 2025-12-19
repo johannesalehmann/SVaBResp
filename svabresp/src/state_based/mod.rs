@@ -12,6 +12,7 @@ use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
     AlgorithmCollection, GameAndSolverExternalOwners, ReachabilityAlgorithmCollection,
+    SafetyAlgorithmCollection,
 };
 
 pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
@@ -19,7 +20,7 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
     mut prism_property: PrismProperty,
     mut grouping_scheme: G,
     shapley: &mut S,
-) -> S::Output {
+) -> S::Output<String> {
     let constants = std::collections::HashMap::new();
 
     grouping_scheme.transform_prism(&mut prism_model, &mut prism_property);
@@ -55,7 +56,13 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
         let coop_game = game::StateBasedResponsibilityGame::new(solvable_game, grouping);
         let mut cached_coop_game = MinimalCoalitionCache::create(coop_game);
 
-        shapley.compute_simple(&mut cached_coop_game)
+        shapley.compute_simple(cached_coop_game)
+    } else if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
+        let solvable_game = GameAndSolverExternalOwners::new(game, solver);
+        let coop_game = game::StateBasedResponsibilityGame::new(solvable_game, grouping);
+        let mut cached_coop_game = MinimalCoalitionCache::create(coop_game);
+
+        shapley.compute_simple(cached_coop_game)
     } else {
         panic!("Unsupported property type");
     }

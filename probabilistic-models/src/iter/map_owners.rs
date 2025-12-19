@@ -58,6 +58,10 @@ impl<
             None
         }
     }
+
+    fn take_valuation_context(&mut self) -> V::ContextType {
+        self.base.take_valuation_context()
+    }
 }
 
 pub struct MappedOwnersState<

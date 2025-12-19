@@ -84,7 +84,7 @@ impl ProbabilitySpecifier for f64 {}
 #[derive(Clone)]
 pub enum Path<S: StateSpecifier> {
     Eventually(S),
-    Never(S),
+    Generally(S),
     InfinitelyOften(S),
 }
 
@@ -94,7 +94,7 @@ impl<S: StateSpecifier> Path<S> {
     pub fn map_state_specifier<T: StateSpecifier, F: Fn(S) -> T>(self, f: F) -> Path<T> {
         match self {
             Path::Eventually(s) => Path::Eventually(f(s)),
-            Path::Never(s) => Path::Never(f(s)),
+            Path::Generally(s) => Path::Generally(f(s)),
             Path::InfinitelyOften(s) => Path::InfinitelyOften(f(s)),
         }
     }
@@ -157,8 +157,8 @@ impl<S: std::fmt::Debug + StateSpecifier> std::fmt::Debug for Path<S> {
             Path::Eventually(e) => {
                 write!(f, "F {:?}", e)
             }
-            Path::Never(e) => {
-                write!(f, "G !({:?})", e)
+            Path::Generally(e) => {
+                write!(f, "G {:?}", e)
             }
             Path::InfinitelyOften(e) => {
                 write!(f, "G F {:?}", e)

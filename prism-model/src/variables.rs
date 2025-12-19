@@ -92,7 +92,7 @@ impl<S: Clone> VariableManager<Identifier<S>, S> {
                     return Err(MissingVariableRenaming {
                         variable_name: variable.name.clone(),
                         original_definition: variable.span.clone(),
-                    })
+                    });
                 }
                 Some(renaming) => {
                     let new_var = VariableInfo {
@@ -365,6 +365,12 @@ impl VariableReference {
 }
 
 impl Display for VariableReference {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "var_{}", self.index)
+    }
+}
+
+impl std::fmt::Debug for VariableReference {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "var_{}", self.index)
     }

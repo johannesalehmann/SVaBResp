@@ -33,7 +33,9 @@ pub enum Token {
     P,
     PMax,
     PMin,
+
     Finally,
+    Generally,
 
     Identifier(String),
 
@@ -117,6 +119,7 @@ impl Display for Token {
             Token::PMin => write!(f, "PMin"),
             Token::P => write!(f, "P"),
             Token::Finally => write!(f, "F"),
+            Token::Generally => write!(f, "G"),
             Token::Identifier(_) => write!(f, "[Identifier]"),
             Token::LeftSqBracket => write!(f, "["),
             Token::RightSqBracket => write!(f, "]"),
@@ -154,8 +157,8 @@ impl Display for Token {
     }
 }
 
-fn lexer<'a>(
-) -> impl Parser<'a, &'a str, Vec<Spanned<Token>>, extra::Err<PrismParserError<'a, Span, char>>> {
+fn lexer<'a>()
+-> impl Parser<'a, &'a str, Vec<Spanned<Token>>, extra::Err<PrismParserError<'a, Span, char>>> {
     let float = text::int(10)
         .then(just('.').then(text::digits(10)))
         .to_slice()
@@ -232,6 +235,7 @@ fn lexer<'a>(
         "P" => Token::P,
 
         "F" => Token::Finally,
+        "G" => Token::Generally,
 
         "true" => Token::True,
         "false" => Token::False,

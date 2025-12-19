@@ -97,7 +97,10 @@ where
 {
     just(Token::Finally)
         .ignore_then(expression_parser())
-        .map(|e| probabilistic_properties::Path::Eventually(e))
+        .map(probabilistic_properties::Path::Eventually)
+        .or(just(Token::Generally)
+            .ignore_then(expression_parser())
+            .map(probabilistic_properties::Path::Generally))
 }
 
 pub fn program_parser<'a, 'b, I>()

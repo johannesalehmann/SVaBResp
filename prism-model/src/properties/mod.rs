@@ -114,7 +114,7 @@ impl<S: Clone> SubstitutablePath<S> for Path<Expression<Identifier<S>, S>> {
     fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
         match self {
             Path::Eventually(e) => e.substitute_labels(default_span, labels),
-            Path::Never(e) => e.substitute_labels(default_span, labels),
+            Path::Generally(e) => e.substitute_labels(default_span, labels),
             Path::InfinitelyOften(e) => e.substitute_labels(default_span, labels),
         }
     }
@@ -125,7 +125,7 @@ impl<S: Clone> SubstitutablePath<S> for Path<Expression<Identifier<S>, S>> {
     ) -> Result<(), CyclicDependency<S>> {
         match self {
             Path::Eventually(e) => e.substitute_formulas(default_span, formulas),
-            Path::Never(e) => e.substitute_formulas(default_span, formulas),
+            Path::Generally(e) => e.substitute_formulas(default_span, formulas),
             Path::InfinitelyOften(e) => e.substitute_formulas(default_span, formulas),
         }
     }
@@ -138,11 +138,11 @@ impl<S: Clone> SubstitutablePath<S> for Path<Expression<Identifier<S>, S>> {
             Path::Eventually(e) => {
                 Path::Eventually(e.replace_identifiers_by_variable_indices(variable_manager)?)
             }
-            Path::Never(e) => {
-                Path::Eventually(e.replace_identifiers_by_variable_indices(variable_manager)?)
+            Path::Generally(e) => {
+                Path::Generally(e.replace_identifiers_by_variable_indices(variable_manager)?)
             }
             Path::InfinitelyOften(e) => {
-                Path::Eventually(e.replace_identifiers_by_variable_indices(variable_manager)?)
+                Path::InfinitelyOften(e.replace_identifiers_by_variable_indices(variable_manager)?)
             }
         })
     }

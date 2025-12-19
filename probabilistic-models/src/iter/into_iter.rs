@@ -1,6 +1,6 @@
 use crate::{
     Action, ActionCollection, Distribution, InitialStates, ModelTypes, ProbabilisticModel, State,
-    Successor,
+    Successor, Valuation,
 };
 use std::collections::VecDeque;
 
@@ -8,6 +8,7 @@ pub struct IteratedProbabilisticModel<M: ModelTypes> {
     initial_states: M::InitialStates,
     current_initial_state_index: usize,
     states: VecDeque<State<M>>,
+    valuation_context: Option<<M::Valuation as Valuation>::ContextType>,
 }
 
 impl<M: ModelTypes> IteratedProbabilisticModel<M> {
@@ -16,6 +17,7 @@ impl<M: ModelTypes> IteratedProbabilisticModel<M> {
             initial_states: model.initial_states,
             current_initial_state_index: 0,
             states: VecDeque::from(model.states),
+            valuation_context: Some(model.valuation_context),
         }
     }
 }
@@ -46,6 +48,10 @@ impl<'a, M: ModelTypes>
         } else {
             None
         }
+    }
+
+    fn take_valuation_context(&mut self) -> <M::Valuation as Valuation>::ContextType {
+        self.valuation_context.take().unwrap()
     }
 }
 

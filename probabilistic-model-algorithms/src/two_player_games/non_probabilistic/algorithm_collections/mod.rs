@@ -1,6 +1,9 @@
 mod reachability;
 pub use reachability::{ReachabilityAlgorithmCollection, ReachabilityAlgorithmContext};
 
+mod safety;
+pub use safety::{SafetyAlgorithmCollection, SafetyAlgorithmContext};
+
 use crate::regions::StateRegion;
 use probabilistic_models::{AtomicProposition, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 

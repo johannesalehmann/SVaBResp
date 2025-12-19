@@ -8,6 +8,7 @@ pub trait StateGroups {
 
     fn get_count(&self) -> usize;
     fn get_states<'a>(&'a self, group: usize) -> Self::Iter<'a>;
+    fn get_label(&self, group: usize) -> String;
 }
 
 pub struct VectorStateGroups {
@@ -22,6 +23,7 @@ impl VectorStateGroups {
 
 pub struct VectorStateGroup {
     states: Vec<usize>,
+    label: String,
 }
 
 pub struct VectorStateGroupBuilder {
@@ -41,13 +43,15 @@ impl VectorStateGroupBuilder {
         self.group_in_progress.push(state);
     }
 
-    pub fn finish_group(&mut self) {
+    pub fn finish_group(&mut self, label: String) {
         let states = std::mem::replace(&mut self.group_in_progress, Vec::new());
-        self.groups.push(VectorStateGroup { states })
+        self.groups.push(VectorStateGroup { states, label })
     }
 
     pub fn finish(mut self) -> VectorStateGroups {
-        self.finish_group();
+        if self.group_in_progress.len() > 0 {
+            panic!("Must finish group before finishing vector state group");
+        }
         VectorStateGroups {
             groups: self.groups,
         }
@@ -63,5 +67,9 @@ impl StateGroups for VectorStateGroups {
 
     fn get_states<'a>(&'a self, group: usize) -> Self::Iter<'a> {
         self.groups[group].states.iter().cloned()
+    }
+
+    fn get_label(&self, group: usize) -> String {
+        self.groups[group].label.clone()
     }
 }

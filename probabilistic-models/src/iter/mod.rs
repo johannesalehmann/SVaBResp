@@ -21,6 +21,7 @@ pub trait IterProbabilisticModel<
 {
     fn next_initial_state(&mut self) -> Option<usize>;
     fn next_state(&mut self) -> Option<IS>;
+    fn take_valuation_context(&mut self) -> V::ContextType;
 
     fn collect<
         M: ModelTypes<Valuation = V, Owners = O, AtomicPropositions = AP, Predecessors = P>,
@@ -37,9 +38,13 @@ pub trait IterProbabilisticModel<
         while let Some(mut state) = self.next_state() {
             states.push(state.collect())
         }
+
+        let valuation_context = self.take_valuation_context();
+
         ProbabilisticModel {
             states,
             initial_states,
+            valuation_context,
         }
     }
 }

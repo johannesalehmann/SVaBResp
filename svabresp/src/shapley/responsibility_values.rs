@@ -1,3 +1,4 @@
+use crate::shapley::PlayerDescriptions;
 use num_bigint::{BigInt, Sign};
 use num_rational::BigRational;
 use num_traits::{FromPrimitive, Zero};
@@ -19,18 +20,15 @@ impl CriticalPairCounter {
         CriticalPairCounter { states }
     }
 
-    pub fn to_responsibility_values(self, weights: Vec<BigRational>) -> ResponsibilityValues {
+    pub fn to_responsibility_values<P: PlayerDescriptions>(
+        self,
+        weights: Vec<BigRational>,
+        player_infos: P,
+    ) -> ResponsibilityValues<P::PlayerType> {
         let mut states = Vec::with_capacity(self.states.len());
 
-        for state in self.states {
-            let mut value = BigRational::zero();
-            for (n, &count) in state.counts.iter().enumerate() {
-                value += &weights[n] * BigRational::from_usize(count).unwrap();
-            }
-            states.push(ResponsibilityValue {
-                value,
-                details: state,
-            })
+        for (state, player_info) in self.states.into_iter().zip(player_infos.into_iterator()) {
+            states.push(state.to_responsibility_value(player_info, &weights));
         }
 
         ResponsibilityValues { states }
@@ -46,7 +44,11 @@ pub struct CriticalPairCounterState {
 }
 
 impl CriticalPairCounterState {
-    pub fn to_responsibility_value(self, weights: Vec<BigRational>) -> ResponsibilityValue {
+    pub fn to_responsibility_value<P>(
+        self,
+        player_info: P,
+        weights: &Vec<BigRational>,
+    ) -> ResponsibilityValue<P> {
         let mut value = BigRational::zero();
 
         for (weight, &count) in weights.iter().zip(self.counts.iter()) {
@@ -54,17 +56,19 @@ impl CriticalPairCounterState {
         }
 
         ResponsibilityValue {
+            player_info,
             value,
             details: self,
         }
     }
 }
 
-pub struct ResponsibilityValues {
-    pub states: Vec<ResponsibilityValue>,
+pub struct ResponsibilityValues<P> {
+    pub states: Vec<ResponsibilityValue<P>>,
 }
 
-pub struct ResponsibilityValue {
+pub struct ResponsibilityValue<P> {
+    pub player_info: P,
     pub value: BigRational,
     pub details: CriticalPairCounterState,
 }

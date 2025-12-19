@@ -1,5 +1,5 @@
 use crate::shapley::responsibility_values::{CriticalPairCounter, ResponsibilityValues};
-use crate::shapley::{CooperativeGame, SimpleCooperativeGame};
+use crate::shapley::{CooperativeGame, PlayerDescriptions, SimpleCooperativeGame};
 
 pub struct BruteForceAlgorithm {}
 
@@ -10,13 +10,19 @@ impl BruteForceAlgorithm {
 }
 
 impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
-    type Output = ResponsibilityValues;
+    type Output<PD> = ResponsibilityValues<PD>;
 
-    fn compute<G: CooperativeGame>(&mut self, game: &mut G) -> Self::Output {
+    fn compute<G: CooperativeGame>(
+        &mut self,
+        mut game: G,
+    ) -> Self::Output<<G::PlayerDescriptions as PlayerDescriptions>::PlayerType> {
         panic!("The brute force algorithm does not yet support non-simple cooperative games")
     }
 
-    fn compute_simple<G: SimpleCooperativeGame>(&mut self, game: &mut G) -> Self::Output {
+    fn compute_simple<G: SimpleCooperativeGame>(
+        &mut self,
+        mut game: G,
+    ) -> Self::Output<<G::PlayerDescriptions as PlayerDescriptions>::PlayerType> {
         let n = game.get_player_count();
         println!("Computing responsibility for n={} groups", n);
         if n >= 64 {
@@ -51,6 +57,6 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
         }
 
         let weights = super::super::auxiliary::compute_weights(n);
-        counts.to_responsibility_values(weights)
+        counts.to_responsibility_values(weights, game.into_player_descriptions())
     }
 }

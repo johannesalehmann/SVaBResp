@@ -1,3 +1,4 @@
+use crate::VariableType;
 use std::hash::Hasher;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -94,9 +95,38 @@ impl super::Valuation for ValuationVector {
     fn set_float(&mut self, index: usize, value: f64) {
         self.values[index] = Value::Float(value);
     }
+
+    fn format(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        context: &Self::ContextType,
+    ) -> Result<(), std::fmt::Error> {
+        write!(f, "(")?;
+        let mut first = true;
+        for (index, variable) in context.details.iter().enumerate() {
+            if !first {
+                write!(f, ", ")?;
+            }
+            first = false;
+            write!(f, "{}=", variable.name)?;
+            match variable.variable_type {
+                VariableType::BoundedInt => write!(f, "{}", self.evaluate_bounded_int(index))?,
+                VariableType::UnboundedInt => write!(f, "{}", self.evaluate_unbounded_int(index))?,
+                VariableType::Bool => write!(f, "{}", self.evaluate_bool(index))?,
+                VariableType::Float => write!(f, "{}", self.evaluate_float(index))?,
+            }
+        }
+        write!(f, ")")
+    }
 }
 pub struct Context {
     number_of_variables: usize,
+    details: Vec<VariableInfo>,
+}
+
+pub struct VariableInfo {
+    name: String,
+    variable_type: super::VariableType,
 }
 
 pub struct ContextBuilder {
@@ -108,26 +138,43 @@ impl ContextBuilder {
         Self {
             context: Context {
                 number_of_variables: 0,
+                details: Vec::new(),
             },
         }
     }
 }
 
 impl super::ContextBuilder<Context> for ContextBuilder {
-    fn register_bounded_int(&mut self, _min: i64, _max: i64) {
+    fn register_bounded_int(&mut self, name: String, _min: i64, _max: i64) {
         self.context.number_of_variables += 1;
+        self.context.details.push(VariableInfo {
+            name,
+            variable_type: VariableType::BoundedInt,
+        });
     }
 
-    fn register_bool(&mut self) {
+    fn register_bool(&mut self, name: String) {
         self.context.number_of_variables += 1;
+        self.context.details.push(VariableInfo {
+            name,
+            variable_type: VariableType::Bool,
+        });
     }
 
-    fn register_unbounded_int(&mut self) {
+    fn register_unbounded_int(&mut self, name: String) {
         self.context.number_of_variables += 1;
+        self.context.details.push(VariableInfo {
+            name,
+            variable_type: VariableType::UnboundedInt,
+        });
     }
 
-    fn register_float(&mut self) {
+    fn register_float(&mut self, name: String) {
         self.context.number_of_variables += 1;
+        self.context.details.push(VariableInfo {
+            name,
+            variable_type: VariableType::Float,
+        });
     }
 
     fn finish(self) -> Context {

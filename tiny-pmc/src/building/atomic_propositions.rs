@@ -18,8 +18,8 @@ pub fn prism_objectives_to_atomic_propositions<P: ProbabilitySpecifier>(
                 )),
                 e,
             ),
-            Path::Never(e) => (
-                Path::Never(probabilistic_models::AtomicProposition::new(
+            Path::Generally(e) => (
+                Path::Generally(probabilistic_models::AtomicProposition::new(
                     atomic_proposition.len(),
                 )),
                 e,
