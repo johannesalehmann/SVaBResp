@@ -3,15 +3,15 @@ use svabresp::num_traits::{ToPrimitive, Zero};
 use svabresp::shapley::BruteForceAlgorithm;
 
 fn main() {
-    let file_name = "svabresp-cli/examples/small.prism"; // "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
-    // let file_name = "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
+    // let file_name = "svabresp-cli/examples/small.prism"; // "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
+    let file_name = "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
     let file = std::fs::read_to_string(file_name).expect("Failed to read input model");
 
     let parsed = tiny_pmc::parsing::parse_prism_and_print_errors(
         Some("small.prism"),
         &file[..],
-        &["P=1 [G !\"obj\"]"],
-        // &["P=1 [G !\"sbar\"]"],
+        // &["P=1 [G !\"obj\"]"],
+        &["P=1 [G !\"sbar\"]"],
     );
 
     if parsed.is_none() {
@@ -37,7 +37,7 @@ fn main() {
             "  {}: {} ({})",
             value.player_info,
             value.value,
-            value.value.to_f32().unwrap()
+            value.value.to_f64().unwrap()
         );
         sum += &value.value;
     }

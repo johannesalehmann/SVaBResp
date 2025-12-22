@@ -4,7 +4,6 @@ label "obj" = loc=6;
 
 module main
     loc: [1..6];
-    temp: [0..5];
 
     [] (loc=1) -> (loc'=2);
     [] (loc=1) -> (loc'=3);
@@ -21,4 +20,5 @@ module main
     [] (loc=5) -> (loc'=5);
 
     [] (loc=6) -> (loc'=6);
+    [] (loc=6) -> (loc'=5);
 endmodule

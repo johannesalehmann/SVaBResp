@@ -25,6 +25,14 @@ impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
 
         for i in 0..game.states.len() {
             let state = &game.states[i];
+            if state.actions.get_number_of_actions() == 1 {
+                builder.add_state(i);
+            }
+        }
+        builder.finish_group("Dummy states".to_string());
+
+        for i in 0..game.states.len() {
+            let state = &game.states[i];
             if state.actions.get_number_of_actions() > 1 {
                 let label = format!("{}", state.valuation.displayable(&game.valuation_context));
                 builder.add_state(i);
