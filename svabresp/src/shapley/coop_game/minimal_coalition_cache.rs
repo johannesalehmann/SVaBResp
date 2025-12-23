@@ -2,6 +2,7 @@ use crate::shapley::coop_game::PlayerDescriptions;
 use crate::shapley::{
     CoalitionSpecifier, CooperativeGame, MonotoneCooperativeGame, SimpleCooperativeGame,
 };
+use std::io::Write;
 
 pub struct MinimalCoalitionCache<P: PlayerDescriptions> {
     player_descriptions: P,
@@ -11,6 +12,34 @@ pub struct MinimalCoalitionCache<P: PlayerDescriptions> {
 
 // TODO: Remove PlayerType=String restriction (only used for debugging)
 impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
+    pub fn large_losing_coalitions<
+        C: SimpleCooperativeGame<PlayerDescriptions = P> + MonotoneCooperativeGame,
+    >(
+        coop_game: &mut C,
+        n: usize,
+    ) -> Vec<u64> {
+        let full_coalition = (1u64 << coop_game.get_player_count()) - 1;
+
+        let mut losing_coalitions = Vec::new();
+        for size in 0..=n {
+            for coalition in SizedCoalitionIterator::new(size, coop_game.get_player_count()) {
+                let coalition = full_coalition ^ coalition;
+                let mut superset_losing = false;
+                for &other_coalition in &losing_coalitions {
+                    if Self::subset_of(coalition, other_coalition) {
+                        superset_losing = true;
+                        break;
+                    }
+                }
+
+                if !superset_losing && !coop_game.is_winning(coalition) {
+                    losing_coalitions.push(coalition)
+                }
+            }
+        }
+        println!("Found {} large losing coalitions", losing_coalitions.len());
+        losing_coalitions
+    }
     pub fn create<C: SimpleCooperativeGame<PlayerDescriptions = P> + MonotoneCooperativeGame>(
         mut coop_game: C,
     ) -> Self {
@@ -21,59 +50,44 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
         let mut game_counter = 0;
         let mut skipped_counter = 0;
 
-        for size in 0..=coop_game.get_player_count() as u32 {
-            print!("Size {}/{}", size, coop_game.get_player_count());
-            for coalition in 0..max_coalition {
-                if coalition.count_ones() == size {
-                    let mut subset_winning = false;
-                    for &other_coalition in &minimal_coalitions {
-                        if Self::subset_of(other_coalition, coalition) {
-                            subset_winning = true;
-                            break;
-                        }
-                    }
+        let large_losing_coalitions = Self::large_losing_coalitions(&mut coop_game, 4);
 
-                    if subset_winning {
-                        skipped_counter += 1;
-                    } else {
-                        game_counter += 1;
-                    }
-
-                    if !subset_winning && coop_game.is_winning(coalition) {
-                        minimal_coalitions.push(coalition)
-                    }
+        std::io::stdout().flush().unwrap();
+        for coalition in 0..max_coalition {
+            if coalition % 10_000_000 == 0 && coalition > 0 {
+                println!(
+                    "{}/{} ({:.2}%)  (solved {} games, skipped {})",
+                    coalition,
+                    max_coalition,
+                    (coalition as f64 / max_coalition as f64) * 100.0,
+                    game_counter,
+                    skipped_counter
+                )
+            }
+            let mut subset_winning = false;
+            for &other_coalition in &minimal_coalitions {
+                if Self::subset_of(other_coalition, coalition) {
+                    subset_winning = true;
+                    break;
                 }
             }
-            println!(
-                " (solved {} games, skipped {})",
-                game_counter, skipped_counter
-            );
-            game_counter = 0;
-            skipped_counter = 0;
-        }
-
-        println!(
-            "Minimal coalition cache contains {} coalitions",
-            minimal_coalitions.len()
-        );
-        for c in &minimal_coalitions {
-            print!("  {:b}", c);
-            print!(": ");
-            let mut first = true;
-            for i in 0..coop_game.get_player_count() {
-                if c & 1 << i != 0 {
-                    if !first {
-                        print!(", ");
-                    }
-                    first = false;
-
-                    print!(
-                        "{}",
-                        coop_game.player_descriptions().get_player_description(i)
-                    );
+            let mut superset_losing = false;
+            for &other_coalition in &large_losing_coalitions {
+                if Self::subset_of(coalition, other_coalition) {
+                    superset_losing = true;
+                    break;
                 }
             }
-            println!();
+
+            if subset_winning || superset_losing {
+                skipped_counter += 1;
+            } else {
+                game_counter += 1;
+            }
+
+            if !subset_winning && !superset_losing && coop_game.is_winning(coalition) {
+                minimal_coalitions.push(coalition)
+            }
         }
 
         Self {
@@ -120,3 +134,59 @@ impl<P: PlayerDescriptions<PlayerType = String>> SimpleCooperativeGame
 }
 
 impl<P: PlayerDescriptions> MonotoneCooperativeGame for MinimalCoalitionCache<P> {}
+
+struct SizedCoalitionIterator {
+    ones: Vec<usize>,
+    n: usize,
+    done: bool,
+}
+
+impl SizedCoalitionIterator {
+    pub fn new(count: usize, n: usize) -> Self {
+        let mut ones = Vec::with_capacity(count);
+        for i in 0..count {
+            ones.push(i);
+        }
+        Self {
+            ones,
+            n,
+            done: false,
+        }
+    }
+}
+
+impl Iterator for SizedCoalitionIterator {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            None
+        } else {
+            let mut res = 0;
+
+            for one in &self.ones {
+                res = res | 1u64 << one;
+            }
+
+            let mut incremented = false;
+            for i in 0..self.ones.len() {
+                if (i + 1 == self.ones.len() && self.ones[i] + 1 < self.n)
+                    || (i + 1 < self.ones.len() && self.ones[i] + 1 < self.ones[i + 1])
+                {
+                    self.ones[i] += 1;
+                    for j in 0..i {
+                        self.ones[j] = j;
+                    }
+                    incremented = true;
+                    break;
+                }
+            }
+
+            if !incremented {
+                self.done = true;
+            }
+
+            Some(res)
+        }
+    }
+}

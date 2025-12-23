@@ -36,11 +36,6 @@ impl AttractorBuffer {
     ) -> Self {
         let mut counts = Vec::with_capacity(model.states.len());
         for state in &model.states {
-            println!(
-                "State {}: {}",
-                state.valuation.displayable(&model.valuation_context),
-                state.actions.get_number_of_actions()
-            );
             counts.push(Count::with_default(
                 state.actions.get_number_of_actions() as u32
             ))

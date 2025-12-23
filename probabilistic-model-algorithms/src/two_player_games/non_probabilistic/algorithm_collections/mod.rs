@@ -4,7 +4,8 @@ pub use reachability::{ReachabilityAlgorithmCollection, ReachabilityAlgorithmCon
 mod safety;
 pub use safety::{SafetyAlgorithmCollection, SafetyAlgorithmContext};
 
-use crate::regions::StateRegion;
+use crate::regions::{BoxedStateRegion, StateRegion};
+use probabilistic_models::probabilistic_properties::Property;
 use probabilistic_models::{AtomicProposition, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 
 pub trait AlgorithmCollection: Sized {
@@ -89,4 +90,56 @@ pub trait AdaptableOwners {
         &mut self,
         model: &probabilistic_models::ProbabilisticModel<M>,
     );
+}
+
+pub fn is_winning<
+    M: probabilistic_models::ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
+>(
+    model: &probabilistic_models::ProbabilisticModel<M>,
+    property: &Property<AtomicProposition, f64>,
+) -> TwoPlayer {
+    if let Some(mut safety) = SafetyAlgorithmCollection::create_if_compatible(property) {
+        safety.winning(model)
+    } else if let Some(mut reachability) =
+        ReachabilityAlgorithmCollection::create_if_compatible(property)
+    {
+        reachability.winning(model)
+    } else {
+        panic!("Unsupported property type")
+    }
+}
+
+pub fn winning_from_state<
+    M: probabilistic_models::ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
+>(
+    model: &probabilistic_models::ProbabilisticModel<M>,
+    property: &Property<AtomicProposition, f64>,
+    state: usize,
+) -> TwoPlayer {
+    if let Some(mut safety) = SafetyAlgorithmCollection::create_if_compatible(property) {
+        safety.winning_from_state(model, state)
+    } else if let Some(mut reachability) =
+        ReachabilityAlgorithmCollection::create_if_compatible(property)
+    {
+        reachability.winning_from_state(model, state)
+    } else {
+        panic!("Unsupported property type")
+    }
+}
+
+pub fn winning_region<
+    M: probabilistic_models::ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
+>(
+    model: &probabilistic_models::ProbabilisticModel<M>,
+    property: &Property<AtomicProposition, f64>,
+) -> BoxedStateRegion {
+    if let Some(mut safety) = SafetyAlgorithmCollection::create_if_compatible(property) {
+        safety.winning_region(model).into()
+    } else if let Some(mut reachability) =
+        ReachabilityAlgorithmCollection::create_if_compatible(property)
+    {
+        reachability.winning_region(model).into()
+    } else {
+        panic!("Unsupported property type")
+    }
 }

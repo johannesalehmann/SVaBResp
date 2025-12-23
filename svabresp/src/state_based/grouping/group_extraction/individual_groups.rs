@@ -1,5 +1,7 @@
+use probabilistic_model_algorithms::two_player_games::non_probabilistic::winning_region;
 use probabilistic_models::{
     ActionCollection, AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation,
+    VectorPredecessors,
 };
 use probabilistic_properties::Property;
 
@@ -14,31 +16,28 @@ impl IndividualGroupExtractionScheme {
 impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
     type GroupType = crate::state_based::grouping::VectorStateGroups;
 
-    fn create_groups<M: ModelTypes<Owners = TwoPlayer>>(
+    fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
         &mut self,
         game: &mut ProbabilisticModel<M>,
-        property: &mut Property<AtomicProposition, f64>,
+        property: &Property<AtomicProposition, f64>,
     ) -> Self::GroupType {
         let mut builder = Self::GroupType::get_builder();
 
-        // TODO: Determine states from which the property can both be fulfilled and refuted. Only those states may have positive responsibility
+        let relevant_states = super::RelevantStates::compute(game, property);
 
         for i in 0..game.states.len() {
             let state = &game.states[i];
-            if state.actions.get_number_of_actions() == 1 {
-                builder.add_state(i);
-            }
-        }
-        builder.finish_group("Dummy states".to_string());
-
-        for i in 0..game.states.len() {
-            let state = &game.states[i];
-            if state.actions.get_number_of_actions() > 1 {
+            if relevant_states.is_relevant(i) {
                 let label = format!("{}", state.valuation.displayable(&game.valuation_context));
                 builder.add_state(i);
                 builder.finish_group(label);
             }
         }
+
+        builder.create_group_from_vec(
+            relevant_states.into_dummy_states(),
+            "dummy states".to_string(),
+        );
 
         builder.finish()
     }

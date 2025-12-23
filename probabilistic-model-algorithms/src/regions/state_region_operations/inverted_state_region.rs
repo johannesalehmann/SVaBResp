@@ -23,8 +23,8 @@ impl<'a, R: StateRegion> StateRegion for InvertedStateRegion<R> {
         self.base.get_size()
     }
 
-    fn is_set(&self, index: usize) -> bool {
-        !self.base.is_set(index)
+    fn contains(&self, index: usize) -> bool {
+        !self.base.contains(index)
     }
 }
 

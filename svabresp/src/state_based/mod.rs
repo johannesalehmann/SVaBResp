@@ -49,7 +49,7 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
         .map_owners(|_| TwoPlayer::PlayerTwo)
         .collect();
 
-    let grouping = grouping_scheme.create_groups(&mut game, &mut property);
+    let grouping = grouping_scheme.create_groups(&mut game, &property);
 
     if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);

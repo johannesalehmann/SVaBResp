@@ -16,7 +16,7 @@ pub trait MutableStateRegion: StateRegion {
 pub trait StateRegion: Sized {
     fn get_size(&self) -> usize;
 
-    fn is_set(&self, index: usize) -> bool;
+    fn contains(&self, index: usize) -> bool;
 
     fn inverted(self) -> InvertedStateRegion<Self> {
         InvertedStateRegion::new(self)
@@ -24,3 +24,39 @@ pub trait StateRegion: Sized {
 }
 
 pub trait OrderedStateRegion: IntoIterator<Item = usize> {}
+
+trait BoxableStateRegion {
+    fn get_size(&self) -> usize;
+
+    fn contains(&self, index: usize) -> bool;
+}
+
+impl<R: StateRegion> BoxableStateRegion for R {
+    fn get_size(&self) -> usize {
+        StateRegion::get_size(self)
+    }
+
+    fn contains(&self, index: usize) -> bool {
+        StateRegion::contains(self, index)
+    }
+}
+
+pub struct BoxedStateRegion {
+    inner: Box<dyn BoxableStateRegion>,
+}
+impl BoxedStateRegion {
+    pub fn get_size(&self) -> usize {
+        self.inner.get_size()
+    }
+    pub fn contains(&self, index: usize) -> bool {
+        self.inner.contains(index)
+    }
+}
+
+impl<R: StateRegion + 'static> From<R> for BoxedStateRegion {
+    fn from(value: R) -> Self {
+        BoxedStateRegion {
+            inner: Box::new(value),
+        }
+    }
+}

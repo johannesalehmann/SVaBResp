@@ -3,12 +3,15 @@ use svabresp::num_traits::{ToPrimitive, Zero};
 use svabresp::shapley::BruteForceAlgorithm;
 
 fn main() {
+    let mut start_time = std::time::Instant::now();
     // let file_name = "svabresp-cli/examples/small.prism"; // "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
-    let file_name = "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
+    // let file_name = "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
+    let file_name =
+        "/Users/johannes/Documents/code/SVaBResp/tiny-pmc-cli/src/tests/files/pacman.v2.prism";
     let file = std::fs::read_to_string(file_name).expect("Failed to read input model");
 
     let parsed = tiny_pmc::parsing::parse_prism_and_print_errors(
-        Some("small.prism"),
+        Some("pacman.v2.prism"),
         &file[..],
         // &["P=1 [G !\"obj\"]"],
         &["P=1 [G !\"sbar\"]"],
@@ -42,4 +45,5 @@ fn main() {
         sum += &value.value;
     }
     println!("Total: {}", sum);
+    println!("Finished in {:?}", start_time.elapsed());
 }

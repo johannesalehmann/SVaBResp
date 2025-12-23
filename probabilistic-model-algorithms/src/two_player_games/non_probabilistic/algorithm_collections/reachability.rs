@@ -24,9 +24,12 @@ impl AlgorithmCollection for ReachabilityAlgorithmCollection {
     ) -> Self::ModelContext {
         assert_eq!(model.initial_states.count(), 1);
         let initial_state = model.initial_states.get(0);
+        let target_states = model.get_states_with_ap(self.target_states);
+        let mut buffer = attractor::AttractorBuffer::create(model);
+        buffer.reset_owner_counts(model, TwoPlayer::PlayerOne);
         ReachabilityAlgorithmContext {
-            target_states: model.get_states_with_ap(self.target_states),
-            buffer: attractor::AttractorBuffer::create(model),
+            target_states,
+            buffer,
             initial_state,
         }
     }

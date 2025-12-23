@@ -43,6 +43,13 @@ impl VectorStateGroupBuilder {
         self.group_in_progress.push(state);
     }
 
+    pub fn create_group_from_vec(&mut self, states: Vec<usize>, label: String) {
+        if self.group_in_progress.len() > 0 {
+            panic!("must finish previous group before creating a state group from a vector");
+        }
+        self.groups.push(VectorStateGroup { states, label })
+    }
+
     pub fn finish_group(&mut self, label: String) {
         let states = std::mem::replace(&mut self.group_in_progress, Vec::new());
         self.groups.push(VectorStateGroup { states, label })

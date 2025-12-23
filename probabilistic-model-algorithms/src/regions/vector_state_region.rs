@@ -32,7 +32,7 @@ impl StateRegion for VectorStateRegion {
         self.size
     }
 
-    fn is_set(&self, index: usize) -> bool {
+    fn contains(&self, index: usize) -> bool {
         self.states.iter().any(|i| *i == index)
     }
 }
@@ -67,8 +67,8 @@ impl StateRegion for OrderedVectorStateRegion {
         self.base.size
     }
 
-    fn is_set(&self, index: usize) -> bool {
-        self.base.is_set(index)
+    fn contains(&self, index: usize) -> bool {
+        self.base.contains(index)
     }
 }
 

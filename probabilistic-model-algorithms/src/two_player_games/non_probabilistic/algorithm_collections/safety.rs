@@ -25,13 +25,11 @@ impl AlgorithmCollection for SafetyAlgorithmCollection {
         assert_eq!(model.initial_states.count(), 1);
         let initial_state = model.initial_states.get(0);
         let bad_states = model.get_states_without_ap(self.good_states);
-        println!("Bad states:");
-        for state in &bad_states {
-            println!("  {state}")
-        }
+        let mut buffer = attractor::AttractorBuffer::create(model);
+        buffer.reset_owner_counts(model, TwoPlayer::PlayerTwo);
         SafetyAlgorithmContext {
             bad_states,
-            buffer: attractor::AttractorBuffer::create(model),
+            buffer,
             initial_state,
         }
     }

@@ -33,7 +33,7 @@ impl StateRegion for FlagStateRegion {
         self.flags.len()
     }
 
-    fn is_set(&self, index: usize) -> bool {
+    fn contains(&self, index: usize) -> bool {
         self.flags[index]
     }
 }
