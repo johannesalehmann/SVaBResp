@@ -5,6 +5,8 @@ pub use num_traits;
 pub mod shapley;
 pub mod state_based;
 
+pub use prism_model_builder::ConstValue;
+
 use crate::shapley::CooperativeGame;
 use chumsky::span::SimpleSpan;
 use prism_model::{Expression, Identifier, VariableReference};

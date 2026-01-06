@@ -14,7 +14,8 @@ fn main() {
         Some("pacman.v2.prism"),
         &file[..],
         // &["P=1 [G !\"obj\"]"],
-        &["P=1 [G !\"sbar\"]"],
+        // &["P=1 [G !\"sbar\"]"],
+        &["PMin=? [F \"Crash\"]"],
     );
 
     if parsed.is_none() {
@@ -24,6 +25,9 @@ fn main() {
     let property = properties.into_iter().nth(0).unwrap();
     println!("{:?}", property);
 
+    let mut constants = std::collections::HashMap::new();
+    constants.insert("MAXSTEPS".to_string(), svabresp::ConstValue::Int(5));
+
     let mut shapley = BruteForceAlgorithm::new();
 
     let responsibility = svabresp::state_based::compute_for_prism(
@@ -31,6 +35,7 @@ fn main() {
         property,
         svabresp::state_based::grouping::IndividualGroupExtractionScheme::new(),
         &mut shapley,
+        constants,
     );
 
     println!("Responsibility values:");

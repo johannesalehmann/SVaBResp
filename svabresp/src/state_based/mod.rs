@@ -10,6 +10,7 @@ use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm};
 use crate::{PrismModel, PrismProperty};
 
 use grouping::GroupExtractionScheme;
+use prism_model_builder::ConstValue;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
     AlgorithmCollection, GameAndSolverExternalOwners, ReachabilityAlgorithmCollection,
     SafetyAlgorithmCollection,
@@ -20,9 +21,8 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
     mut prism_property: PrismProperty,
     mut grouping_scheme: G,
     shapley: &mut S,
+    constants: std::collections::HashMap<String, ConstValue>,
 ) -> S::Output<String> {
-    let constants = std::collections::HashMap::new();
-
     grouping_scheme.transform_prism(&mut prism_model, &mut prism_property);
 
     let mut atomic_propositions = Vec::new();
