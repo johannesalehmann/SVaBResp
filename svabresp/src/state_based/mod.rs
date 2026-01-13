@@ -11,10 +11,7 @@ use crate::{PrismModel, PrismProperty};
 
 use grouping::GroupExtractionScheme;
 use prism_model_builder::ConstValue;
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
-    AlgorithmCollection, GameAndSolverExternalOwners, ReachabilityAlgorithmCollection,
-    SafetyAlgorithmCollection,
-};
+use probabilistic_model_algorithms::two_player_games::non_probabilistic::{AlgorithmCollection, ChangeableOwners, GameAndSolverExternalOwners, ReachabilityAlgorithmCollection, SafetyAlgorithmCollection};
 
 pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
     mut prism_model: PrismModel,

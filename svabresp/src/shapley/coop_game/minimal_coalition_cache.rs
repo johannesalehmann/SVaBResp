@@ -86,6 +86,7 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
             }
 
             if !subset_winning && !superset_losing && coop_game.is_winning(coalition) {
+                println!("Minimal coalition: {:b}", coalition);
                 minimal_coalitions.push(coalition)
             }
         }

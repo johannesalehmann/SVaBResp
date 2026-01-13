@@ -2,6 +2,7 @@ use prism_model_builder::ConstValue;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
+#[derive(Debug)]
 pub enum ConstParsingError {
     InvalidValue { name: String, value: String },
     InvalidAssigment { assignment: String },
@@ -25,6 +26,10 @@ pub fn parse_const_assignments(
     assignments: &str,
 ) -> Result<HashMap<String, ConstValue>, ConstParsingError> {
     let mut result = HashMap::new();
+
+    if assignments.trim().is_empty() {
+        return Ok(result);
+    }
 
     for assignment in assignments.split(";") {
         if let Some((lhs, rhs)) = assignment.split_once("=") {

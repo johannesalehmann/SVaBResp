@@ -5,6 +5,7 @@ use prism_model::{Expression, VariableReference};
 use prism_model_builder::ModelBuildingError;
 use probabilistic_models::AtomicProposition;
 use probabilistic_properties::{Path, ProbabilityOperator};
+use tiny_pmc::parsing::ConstParsingError;
 use tiny_pmc::PrismProperty;
 
 mod input;
@@ -26,8 +27,8 @@ fn checker() -> Result<(), ModelCheckerError> {
 
     let arguments = arg_parsing::Arguments::parse();
     let source = read_model_file(&arguments.model)?;
-    let constants = input::constants::parse_const_assignments(&arguments.constants)?;
-
+    let constants = tiny_pmc::parsing::parse_const_assignments(&arguments.constants)?;
+    
     let parsed_model_and_objectives = tiny_pmc::parsing::parse_prism_and_print_errors(
         Some(&arguments.model),
         &source,

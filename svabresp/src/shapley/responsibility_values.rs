@@ -31,7 +31,7 @@ impl CriticalPairCounter {
             states.push(state.to_responsibility_value(player_info, &weights));
         }
 
-        ResponsibilityValues { states }
+        ResponsibilityValues { player: states }
     }
 
     pub fn increment(&mut self, state: usize, size: usize) {
@@ -64,7 +64,7 @@ impl CriticalPairCounterState {
 }
 
 pub struct ResponsibilityValues<P> {
-    pub states: Vec<ResponsibilityValue<P>>,
+    pub player: Vec<ResponsibilityValue<P>>,
 }
 
 pub struct ResponsibilityValue<P> {

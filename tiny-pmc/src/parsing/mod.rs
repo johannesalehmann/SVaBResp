@@ -8,6 +8,9 @@ use prism_model::{InvalidName, ModuleExpansionError};
 use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
 
+mod constants;
+pub use constants::{parse_const_assignments, ConstParsingError};
+
 pub enum ErrorSource {
     Model,
     Property(usize),

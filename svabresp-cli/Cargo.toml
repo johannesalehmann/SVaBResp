@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 svabresp = { path = "../svabresp" }
 tiny-pmc = { path = "../tiny-pmc" }
+clap = "4.5.54"

@@ -10,6 +10,7 @@ pub use coop_game::{
 };
 
 mod responsibility_values;
+pub use responsibility_values::{ResponsibilityValues, ResponsibilityValue};
 
 pub trait ShapleyAlgorithm {
     type Output<PD>;
