@@ -1,7 +1,13 @@
 use crate::shapley::ShapleyAlgorithm;
 use crate::state_based::grouping::GroupExtractionScheme;
+use crate::{PrismModel, PrismProperty};
 
-pub struct ResponsibilityTask<M: ModelAndPropertySource, C: CounterexampleSource, A: ShapleyAlgorithm, G: GroupExtractionScheme> {
+pub struct ResponsibilityTask<
+    M: ModelAndPropertySource,
+    C: CounterexampleSource,
+    A: ShapleyAlgorithm,
+    G: GroupExtractionScheme,
+> {
     pub model_description: M,
     pub constants: String,
     pub coop_game_type: CoopGameType<C>,
@@ -9,12 +15,20 @@ pub struct ResponsibilityTask<M: ModelAndPropertySource, C: CounterexampleSource
     pub grouping_scheme: G,
 }
 
-impl<M: ModelAndPropertySource, C: CounterexampleSource, A: ShapleyAlgorithm, G: GroupExtractionScheme> ResponsibilityTask<M, C, A, G> {
+impl<
+    M: ModelAndPropertySource,
+    C: CounterexampleSource,
+    A: ShapleyAlgorithm,
+    G: GroupExtractionScheme,
+> ResponsibilityTask<M, C, A, G>
+{
     pub fn run(mut self) -> A::Output<String> {
         let (mut prism_model, mut property) = self.model_description.get_model_and_property();
-        let constants = tiny_pmc::parsing::parse_const_assignments(&self.constants).expect("Failed to parse constants");
+        let constants = tiny_pmc::parsing::parse_const_assignments(&self.constants)
+            .expect("Failed to parse constants");
 
-        self.grouping_scheme.transform_prism(&mut prism_model, &mut property);
+        self.grouping_scheme
+            .transform_prism(&mut prism_model, &mut property);
 
         let responsibility = crate::state_based::compute_for_prism(
             prism_model,
@@ -38,23 +52,59 @@ pub struct ModelFromFile {
 }
 
 impl ModelFromFile {
-    pub fn new(path: String, property: String) -> Self {
-        Self {path, property}
+    pub fn new<S1: Into<String>, S2: Into<String>>(path: S1, property: S2) -> Self {
+        Self {
+            path: path.into(),
+            property: property.into(),
+        }
     }
 }
 
 impl ModelAndPropertySource for ModelFromFile {
-    fn get_model_and_property(self) ->  (super::PrismModel, super::PrismProperty) {
+    fn get_model_and_property(self) -> (super::PrismModel, super::PrismProperty) {
         let file = std::fs::read_to_string(&self.path).expect("Failed to read input model");
 
+        let model_from_string = ModelFromString {
+            name: self.path,
+            model: file,
+            property: self.property,
+        };
+
+        model_from_string.get_model_and_property()
+    }
+}
+
+pub struct ModelFromString {
+    name: String,
+    model: String,
+    property: String,
+}
+
+impl ModelFromString {
+    pub fn new<S1: Into<String>, S2: Into<String>, S3: Into<String>>(
+        name: S1,
+        model: S2,
+        property: S3,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            model: model.into(),
+            property: property.into(),
+        }
+    }
+}
+
+impl ModelAndPropertySource for ModelFromString {
+    fn get_model_and_property(self) -> (PrismModel, PrismProperty) {
         let (model, properties) = tiny_pmc::parsing::parse_prism_and_print_errors(
-            Some(self.path.as_str()),
-            &file[..],
+            Some(self.name.as_str()),
+            self.model.as_str(),
             &[self.property.as_str()],
-        ).expect("Failed to parse prism model or property");
+        )
+        .expect("Failed to parse prism model or property");
 
         assert_eq!(properties.len(), 1);
-        let property =properties.into_iter().nth(0).unwrap();
+        let property = properties.into_iter().nth(0).unwrap();
 
         (model, property)
     }
@@ -64,23 +114,19 @@ pub enum CoopGameType<C: CounterexampleSource> {
     Forward,
     Backward {
         counterexample: C,
-        kind: BackwardResponsibilityKind
-    }
+        kind: BackwardResponsibilityKind,
+    },
 }
 
-pub trait CounterexampleSource {
-
-}
+pub trait CounterexampleSource {}
 
 pub struct CounterexampleFile {
-    file_name: String
+    file_name: String,
 }
 
-impl CounterexampleSource for CounterexampleFile {
-
-}
+impl CounterexampleSource for CounterexampleFile {}
 
 pub enum BackwardResponsibilityKind {
     Optimistic,
-    Pessimistic
+    Pessimistic,
 }

@@ -31,7 +31,7 @@ impl CriticalPairCounter {
             states.push(state.to_responsibility_value(player_info, &weights));
         }
 
-        ResponsibilityValues { player: states }
+        ResponsibilityValues { players: states }
     }
 
     pub fn increment(&mut self, state: usize, size: usize) {
@@ -64,7 +64,21 @@ impl CriticalPairCounterState {
 }
 
 pub struct ResponsibilityValues<P> {
-    pub player: Vec<ResponsibilityValue<P>>,
+    pub players: Vec<ResponsibilityValue<P>>,
+}
+
+impl<P> ResponsibilityValues<P>
+where
+    for<'a> &'a P: PartialEq,
+{
+    pub fn get(&self, index: &P) -> Option<&ResponsibilityValue<P>> {
+        for (i, value) in self.players.iter().enumerate() {
+            if &value.player_info == index {
+                return Some(&self.players[i]);
+            }
+        }
+        None
+    }
 }
 
 pub struct ResponsibilityValue<P> {

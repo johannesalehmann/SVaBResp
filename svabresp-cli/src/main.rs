@@ -1,12 +1,15 @@
+#[cfg(test)]
+mod tests;
+
 use svabresp::num_rational::BigRational;
 use svabresp::num_traits::{ToPrimitive, Zero};
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgorithm};
 
-
-use clap::{arg, command, value_parser, Arg, ArgAction, Command};
-use svabresp::{CoopGameType, CounterexampleFile, ModelAndPropertySource, ModelFromFile, ResponsibilityTask};
-use svabresp::num_traits::real::Real;
+use clap::{Arg, Command, arg};
 use svabresp::state_based::grouping::{GroupExtractionScheme, IndividualGroupExtractionScheme};
+use svabresp::{
+    CoopGameType, CounterexampleFile, ModelAndPropertySource, ModelFromFile, ResponsibilityTask,
+};
 
 struct Cli {
     model: String,
@@ -19,21 +22,21 @@ struct Cli {
 
 enum AlgorithmKind {
     BruteForce,
-    Stochastic
+    Stochastic,
 }
 
 enum GroupingKind {
     Individual,
-    Labels{labels: Vec<String>},
+    Labels { labels: Vec<String> },
     Modules,
     Actions,
-    Variables {variables: Vec<String>}
+    Variables { variables: Vec<String> },
 }
 
 enum OutputKind {
     HumanReadable,
     Parsable,
-    Silent
+    Silent,
 }
 
 impl Cli {
@@ -47,23 +50,29 @@ impl Cli {
             .arg(Arg::new("property").required(true).help("Property to be checked, given in PRISM property language"))
             .get_matches();
 
-        let model =matches.get_one::<String>("model").expect("Model name must be specified").clone();
-        let property =matches.get_one::<String>("property").expect("Model name must be specified").clone();
+        let model = matches
+            .get_one::<String>("model")
+            .expect("Model name must be specified")
+            .clone();
+        let property = matches
+            .get_one::<String>("property")
+            .expect("Model name must be specified")
+            .clone();
         let algorithm = match matches.get_one::<String>("algorithm").unwrap().as_str() {
             "brute-force" => AlgorithmKind::BruteForce,
-            a => panic!("Unknown algorithm `{}`", a)
+            a => panic!("Unknown algorithm `{}`", a),
         };
         let grouping = match matches.get_one::<String>("grouping").unwrap().as_str() {
             "individual" => GroupingKind::Individual,
-            a => panic!("Unknown grouping scheme `{}`", a)
+            a => panic!("Unknown grouping scheme `{}`", a),
         };
         let output = match matches.get_one::<String>("output").unwrap().as_str() {
             "human-readable" => OutputKind::HumanReadable,
-            a => panic!("Unknown output kind `{}`", a)
+            a => panic!("Unknown output kind `{}`", a),
         };
         let constants = match matches.get_one::<String>("constants") {
             Some(c) => c.clone(),
-            None => "".to_string()
+            None => "".to_string(),
         };
 
         Cli {
@@ -90,43 +99,70 @@ fn execute_cli(cli: Cli) {
 
 fn execute_with_model_description<M: ModelAndPropertySource>(cli: Cli, model_description: M) {
     match cli.grouping {
-        GroupingKind::Individual => {
-            execute_with_grouping_scheme(cli, model_description, IndividualGroupExtractionScheme::new())
+        GroupingKind::Individual => execute_with_grouping_scheme(
+            cli,
+            model_description,
+            IndividualGroupExtractionScheme::new(),
+        ),
+        GroupingKind::Labels { .. } => {
+            unimplemented!()
         }
-        GroupingKind::Labels { .. } => {unimplemented!()}
-        GroupingKind::Modules => {unimplemented!()}
-        GroupingKind::Actions => {unimplemented!()}
-        GroupingKind::Variables { .. } => {unimplemented!()}
+        GroupingKind::Modules => {
+            unimplemented!()
+        }
+        GroupingKind::Actions => {
+            unimplemented!()
+        }
+        GroupingKind::Variables { .. } => {
+            unimplemented!()
+        }
     }
-
-
 }
 
-fn execute_with_grouping_scheme<M: ModelAndPropertySource, G: GroupExtractionScheme>(cli: Cli, model_description: M, grouping_scheme: G) {
+fn execute_with_grouping_scheme<M: ModelAndPropertySource, G: GroupExtractionScheme>(
+    cli: Cli,
+    model_description: M,
+    grouping_scheme: G,
+) {
     match cli.algorithm {
-        AlgorithmKind::BruteForce => { execute_with_algorithm(cli, model_description, grouping_scheme, BruteForceAlgorithm::new(), ResponsibilityValuesPrinter {})  }
-        AlgorithmKind::Stochastic => {panic!("Stochastic algorithm not implemented in cli yet")}
+        AlgorithmKind::BruteForce => execute_with_algorithm(
+            cli,
+            model_description,
+            grouping_scheme,
+            BruteForceAlgorithm::new(),
+            ResponsibilityValuesPrinter {},
+        ),
+        AlgorithmKind::Stochastic => {
+            panic!("Stochastic algorithm not implemented in cli yet")
+        }
     }
 }
 
-fn execute_with_algorithm<M: ModelAndPropertySource, G: GroupExtractionScheme, A: ShapleyAlgorithm, P: OutputPrinter<A::Output<String>>>(cli: Cli, model_description: M, grouping_scheme: G, algorithm: A, printer: P) {
+fn execute_with_algorithm<
+    M: ModelAndPropertySource,
+    G: GroupExtractionScheme,
+    A: ShapleyAlgorithm,
+    P: OutputPrinter<A::Output<String>>,
+>(
+    cli: Cli,
+    model_description: M,
+    grouping_scheme: G,
+    algorithm: A,
+    printer: P,
+) {
     let task = ResponsibilityTask {
         model_description,
         constants: cli.constants,
         coop_game_type: CoopGameType::<CounterexampleFile>::Forward, // TODO: Make this configurable
         algorithm,
-        grouping_scheme
+        grouping_scheme,
     };
 
     let output = task.run();
 
     match cli.output {
-        OutputKind::HumanReadable => {
-            printer.print_human_readable(output)
-        }
-        OutputKind::Parsable => {
-            printer.print_parsable(output)
-        }
+        OutputKind::HumanReadable => printer.print_human_readable(output),
+        OutputKind::Parsable => printer.print_parsable(output),
         OutputKind::Silent => {
             // psst!
         }
@@ -138,29 +174,44 @@ trait OutputPrinter<T> {
     fn print_parsable(self, output: T);
 }
 
-struct ResponsibilityValuesPrinter {
-}
+struct ResponsibilityValuesPrinter {}
 
-impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD>> for ResponsibilityValuesPrinter {
+impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD>>
+    for ResponsibilityValuesPrinter
+{
     fn print_human_readable(self, output: ResponsibilityValues<PD>) {
         println!("Responsibility values:");
-        for player in output.player {
-            println!(" {}: {} ({})", player.player_info, player.value.to_f64().map(|f| format!("{:.6}", f)).unwrap_or_else(|| "err".to_string()), player.value);
+        for player in output.players {
+            println!(
+                " {}: {} ({})",
+                player.player_info,
+                player
+                    .value
+                    .to_f64()
+                    .map(|f| format!("{:.6}", f))
+                    .unwrap_or_else(|| "err".to_string()),
+                player.value
+            );
         }
     }
 
     fn print_parsable(self, output: ResponsibilityValues<PD>) {
-        for player in output.player {
-            println!("{}:{}", player.player_info, player.value.to_f64().map(|f| f.to_string()).unwrap_or_else(|| "err".to_string()));
+        for player in output.players {
+            println!(
+                "{}:{}",
+                player.player_info,
+                player
+                    .value
+                    .to_f64()
+                    .map(|f| f.to_string())
+                    .unwrap_or_else(|| "err".to_string())
+            );
         }
     }
 }
 
-
-
-fn old_main(){
-
-let mut start_time = std::time::Instant::now();
+fn old_main() {
+    let mut start_time = std::time::Instant::now();
     // let file_name = "svabresp-cli/examples/small.prism"; // "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
     // let file_name = "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
     let file_name =
@@ -197,7 +248,7 @@ let mut start_time = std::time::Instant::now();
 
     println!("Responsibility values:");
     let mut sum = BigRational::zero();
-    for (index, value) in responsibility.player.iter().enumerate() {
+    for (index, value) in responsibility.players.iter().enumerate() {
         println!(
             "  {}: {} ({})",
             value.player_info,
