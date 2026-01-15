@@ -1,0 +1,29 @@
+mdp
+
+label "obj" = loc=6;
+
+label "l1" = loc=1 | loc=3;
+label "l2" = loc=1 | loc=2;
+label "l3" = loc=5 | loc=6;
+label "dummy" = false;
+
+module main
+    loc: [1..6];
+
+    [] (loc=1) -> (loc'=2);
+    [] (loc=1) -> (loc'=3);
+
+    [] (loc=2) -> (loc'=3);
+    [] (loc=2) -> (loc'=4);
+
+    [] (loc=3) -> (loc'=4);
+    [] (loc=3) -> (loc'=5);
+
+    [] (loc=4) -> (loc'=5);
+    [] (loc=4) -> (loc'=6);
+
+    [] (loc=5) -> (loc'=5);
+
+    [] (loc=6) -> (loc'=6);
+    [] (loc=6) -> (loc'=5);
+endmodule

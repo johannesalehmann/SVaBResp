@@ -24,6 +24,15 @@ impl<V, S: Clone> LabelManager<V, S> {
         self.labels.get(index)
     }
 
+    pub fn get_index(&self, name: &str) -> Option<usize> {
+        for (i, label) in self.labels.iter().enumerate() {
+            if label.name.name == name {
+                return Some(i);
+            }
+        }
+        None
+    }
+
     pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> LabelManager<V, S2> {
         LabelManager {
             labels: self.labels.into_iter().map(|l| l.map_span(map)).collect(),

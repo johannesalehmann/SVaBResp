@@ -25,6 +25,9 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
     grouping_scheme.transform_prism(&mut prism_model, &mut prism_property);
 
     let mut atomic_propositions = Vec::new();
+    for label in &prism_model.labels.labels {
+        atomic_propositions.push(label.condition.clone());
+    }
     let properties = tiny_pmc::building::prism_objectives_to_atomic_propositions(
         &mut atomic_propositions,
         vec![prism_property],

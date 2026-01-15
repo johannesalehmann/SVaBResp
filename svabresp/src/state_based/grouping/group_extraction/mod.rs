@@ -10,9 +10,14 @@ mod individual_groups;
 pub use individual_groups::IndividualGroupExtractionScheme;
 
 mod module_groups;
+
 mod value_groups;
 
+mod label_groups;
+pub use label_groups::LabelGroupExtractionScheme;
+
 mod relevant_states;
+
 pub use relevant_states::RelevantStates;
 
 pub trait GroupExtractionScheme {
