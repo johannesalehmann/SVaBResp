@@ -1,0 +1,14 @@
+mdp
+
+label "obj" = z=false;
+
+module main
+    x: [-2..2];
+    y: [12..17];
+    z: bool init true;
+    w: [4..5];
+
+    [] (x<2) -> (x'=x+1);
+    [] (y=12 & w=4 & x=2) -> (z'=false);
+    [] (w<5) -> (w'=w+1);
+endmodule

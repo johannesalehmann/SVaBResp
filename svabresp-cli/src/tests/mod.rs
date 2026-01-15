@@ -2,7 +2,7 @@ use std::str::FromStr;
 use svabresp::num_rational::BigRational;
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues};
 use svabresp::state_based::grouping::{
-    IndividualGroupExtractionScheme, LabelGroupExtractionScheme,
+    IndividualGroupExtractionScheme, LabelGroupExtractionScheme, ValueGroupExtractionScheme,
 };
 use svabresp::{CounterexampleFile, ModelFromString, ResponsibilityTask};
 
@@ -53,9 +53,40 @@ fn labelled_groups() {
     assert_res("no labels", "7/12", &result);
 }
 
+#[test]
+fn value_groups() {
+    let task = ResponsibilityTask {
+        model_description: ModelFromString::new(
+            "value-groups.prism",
+            include_str!("files/value-groups.prism"),
+            "P=1 [F \"obj\"]",
+        ),
+        constants: "".to_string(),
+        coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
+        algorithm: BruteForceAlgorithm::new(),
+        grouping_scheme: ValueGroupExtractionScheme::new(vec![
+            "x".to_string(),
+            "z".to_string(),
+            "w".to_string(),
+        ]),
+    };
+    let result = task.run();
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
+
+    assert_res("(x=-2, z=true, w=4)", "1/5", &result);
+    assert_res("(x=1, z=true, w=4)", "1/5", &result);
+    assert_res("(x=2, z=false, w=4)", "0/1", &result);
+    assert_res("(x=0, z=true, w=5)", "0/1", &result);
+}
+
 fn assert_res(name: &str, value: &str, result: &ResponsibilityValues<String>) {
     assert_eq!(
-        result.get(&(name.to_string())).unwrap().value,
+        result
+            .get(&(name.to_string()))
+            .unwrap_or_else(|| panic!("No responsibility value entry for `{}`", name))
+            .value,
         BigRational::from_str(value).unwrap()
     );
 }

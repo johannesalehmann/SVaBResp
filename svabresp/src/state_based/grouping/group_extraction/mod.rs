@@ -12,6 +12,7 @@ pub use individual_groups::IndividualGroupExtractionScheme;
 mod module_groups;
 
 mod value_groups;
+pub use value_groups::ValueGroupExtractionScheme;
 
 mod label_groups;
 pub use label_groups::LabelGroupExtractionScheme;

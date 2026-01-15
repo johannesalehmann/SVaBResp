@@ -37,6 +37,14 @@ impl<V, S: Clone> VariableManager<V, S> {
         }
         None
     }
+    pub fn get_reference_by_str(&self, name: &str) -> Option<VariableReference> {
+        for (index, var) in self.variables.iter().enumerate() {
+            if &var.name.name == name {
+                return Some(VariableReference::new(index));
+            }
+        }
+        None
+    }
 
     pub fn get(&self, reference: &VariableReference) -> Option<&VariableInfo<V, S>> {
         self.variables.get(reference.index)
