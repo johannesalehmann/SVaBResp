@@ -98,7 +98,7 @@ impl<V, S: Clone> Update<V, S> {
             span,
         }
     }
-    pub fn with_assignemnts(
+    pub fn with_assignments(
         probability: Expression<V, S>,
         assignments: Vec<Assignment<V, S>>,
         span: S,

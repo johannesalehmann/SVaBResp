@@ -10,6 +10,7 @@ mod individual_groups;
 pub use individual_groups::IndividualGroupExtractionScheme;
 
 mod module_groups;
+pub use module_groups::ModuleExtractionScheme;
 
 mod value_groups;
 pub use value_groups::ValueGroupExtractionScheme;

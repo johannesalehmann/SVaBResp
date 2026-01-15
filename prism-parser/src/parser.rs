@@ -737,7 +737,7 @@ where
                 .collect::<Vec<_>>()),
         )
         .map_with(|(probability, assignments), e| {
-            prism_model::Update::with_assignemnts(probability, assignments, e.span())
+            prism_model::Update::with_assignments(probability, assignments, e.span())
         })
         .labelled("update")
         .as_context()

@@ -1,0 +1,24 @@
+mdp
+
+label "obj" = x=5 | z=5;
+
+module mA
+    x: [0..10] init 0;
+
+    [] x < 10 -> (x'=x+1);
+    [] x < 9 -> (x'=x+2);
+endmodule
+
+module mB
+    //y: [0..10] init 0;
+
+    // [] y < 10 -> (y'=y+1);
+    [step] true -> true; // (y'=y+2);
+endmodule
+
+module mC
+    z: [0..10] init 0;
+
+    [] z < 8 -> (z'=z+3);
+    [step] z < 7 -> (z'=z+4);
+endmodule

@@ -159,9 +159,9 @@ impl<V, S: Clone> VariableInfo<V, S> {
     pub fn new(
         name: Identifier<S>,
         range: VariableRange<V, S>,
-        span: S,
         is_constant: bool,
         scope: Option<usize>,
+        span: S,
     ) -> Self {
         Self {
             name,

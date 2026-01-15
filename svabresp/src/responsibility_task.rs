@@ -23,12 +23,9 @@ impl<
 > ResponsibilityTask<M, C, A, G>
 {
     pub fn run(mut self) -> A::Output<String> {
-        let (mut prism_model, mut property) = self.model_description.get_model_and_property();
+        let (prism_model, property) = self.model_description.get_model_and_property();
         let constants = tiny_pmc::parsing::parse_const_assignments(&self.constants)
             .expect("Failed to parse constants");
-
-        self.grouping_scheme
-            .transform_prism(&mut prism_model, &mut property);
 
         let responsibility = crate::state_based::compute_for_prism(
             prism_model,
