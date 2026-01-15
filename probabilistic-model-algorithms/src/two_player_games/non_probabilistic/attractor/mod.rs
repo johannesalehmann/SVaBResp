@@ -7,10 +7,7 @@ pub use full_region::{attractor, attractor_with_buffer};
 mod state_included;
 pub use state_included::{attractor_contains_state, attractor_contains_state_with_buffer};
 
-use crate::regions::MutableStateRegion;
-use probabilistic_models::{
-    ActionCollection, Predecessors, ProbabilisticModel, TwoPlayer, VectorPredecessors,
-};
+use probabilistic_models::{Predecessors, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 
 trait AttractorCondition {
     type Output;

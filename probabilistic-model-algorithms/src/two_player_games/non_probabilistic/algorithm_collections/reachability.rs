@@ -1,6 +1,6 @@
 use super::super::attractor;
 use super::AlgorithmCollection;
-use crate::regions::{StateRegion, VectorStateRegion};
+use crate::regions::VectorStateRegion;
 use probabilistic_models::probabilistic_properties::{
     Path, ProbabilityConstraint, ProbabilityKind, ProbabilityOperator, Property,
 };

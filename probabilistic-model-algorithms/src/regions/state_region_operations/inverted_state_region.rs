@@ -13,7 +13,7 @@ impl<'a, R: StateRegion + 'a> InvertedStateRegion<R>
 where
     &'a R: OrderedStateRegion,
 {
-    fn iter(&'a self) -> <&'a Self as IntoIterator>::IntoIter {
+    pub fn iter(&'a self) -> <&'a Self as IntoIterator>::IntoIter {
         (&self).into_iter()
     }
 }

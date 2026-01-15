@@ -64,7 +64,7 @@ pub struct IteratedState<M: ModelTypes> {
 }
 impl<M: ModelTypes> IteratedState<M> {
     fn new(state: State<M>) -> Self {
-        let mut actions = state.actions.into_iter();
+        let actions = state.actions.into_iter();
         Self {
             actions,
             valuation: Some(state.valuation),

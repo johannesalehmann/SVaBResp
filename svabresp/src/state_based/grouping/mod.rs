@@ -55,7 +55,7 @@ impl VectorStateGroupBuilder {
         self.groups.push(VectorStateGroup { states, label })
     }
 
-    pub fn finish(mut self) -> VectorStateGroups {
+    pub fn finish(self) -> VectorStateGroups {
         if self.group_in_progress.len() > 0 {
             panic!("Must finish group before finishing vector state group");
         }

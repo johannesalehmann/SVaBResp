@@ -1,5 +1,4 @@
 use crate::shapley::PlayerDescriptions;
-use num_bigint::{BigInt, Sign};
 use num_rational::BigRational;
 use num_traits::{FromPrimitive, Zero};
 use std::ops::Mul;
@@ -12,7 +11,7 @@ impl CriticalPairCounter {
     pub fn new(state_count: usize) -> Self {
         let mut states = Vec::with_capacity(state_count);
 
-        for i in 0..state_count {
+        for _ in 0..state_count {
             let counts = vec![0; state_count + 1];
             states.push(CriticalPairCounterState { counts });
         }

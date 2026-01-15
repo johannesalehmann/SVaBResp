@@ -140,7 +140,8 @@ fn execute_with_model_description<M: ModelAndPropertySource>(cli: Cli, model_des
             model_description,
             IndividualGroupExtractionScheme::new(),
         ),
-        GroupingKind::Labels { .. } => {
+        GroupingKind::Labels { labels } => {
+            let _ = labels;
             unimplemented!()
         }
         GroupingKind::Modules => {
@@ -149,7 +150,8 @@ fn execute_with_model_description<M: ModelAndPropertySource>(cli: Cli, model_des
         GroupingKind::Actions => {
             unimplemented!()
         }
-        GroupingKind::Variables { .. } => {
+        GroupingKind::Variables { variables } => {
+            let _ = variables;
             unimplemented!()
         }
     }

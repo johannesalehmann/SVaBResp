@@ -4,7 +4,7 @@ pub use action_vector::ActionVector;
 mod single_action;
 pub use single_action::SingleAction;
 
-use crate::{Action, Distribution, ModelTypes};
+use crate::{Action, Distribution};
 
 pub trait ActionCollection<D: Distribution>: Sized {
     type Builder: Builder<Self, D>;

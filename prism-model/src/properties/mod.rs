@@ -3,28 +3,9 @@ use crate::{
     CyclicDependency, Expression, FormulaManager, Identifier, LabelManager, VariableManager,
     VariableReference,
 };
-use std::fmt::Formatter;
 
-// #[derive(Clone)]
-// pub struct Property<V, S: Clone> {
-//     pub operator: Operator,
-//     pub path: Path<V, S>,
-// }
-//
-// #[derive(Clone)]
-// pub enum Operator {
-//     ValueOfPMax,
-//     ValueOfPMin,
-//     ValueOfP,
-// }
-//
-// #[derive(Clone)]
-// pub enum Path<V, S: Clone> {
-//     Eventually(Expression<V, S>),
-// }
 use probabilistic_properties::{
-    Path, ProbabilityConstraint, ProbabilityOperator, ProbabilitySpecifier, Property,
-    StateSpecifier,
+    Path, ProbabilityOperator, ProbabilitySpecifier, Property, StateSpecifier,
 };
 impl<V, S: Clone> StateSpecifier for Expression<V, S> {}
 impl<V, S: Clone> ProbabilitySpecifier for Expression<V, S> {}

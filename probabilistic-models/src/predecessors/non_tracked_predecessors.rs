@@ -19,6 +19,7 @@ impl PredecessorsBuilder<NonTrackedPredecessors> for NonTrackedPredecessorsBuild
     }
 
     fn add(&mut self, predecessor: Predecessor) {
+        let _ = predecessor;
         // Just silently ignore these as this type does not track predecessors
     }
 

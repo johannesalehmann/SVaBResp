@@ -5,7 +5,7 @@ pub struct VectorStateRegion {
     size: usize,
 }
 impl VectorStateRegion {
-    fn iter(&self) -> <&VectorStateRegion as IntoIterator>::IntoIter {
+    pub fn iter(&self) -> <&VectorStateRegion as IntoIterator>::IntoIter {
         (&self).into_iter()
     }
 }
@@ -57,7 +57,7 @@ pub struct OrderedVectorStateRegion {
     base: VectorStateRegion,
 }
 impl OrderedVectorStateRegion {
-    fn iter(&self) -> <&OrderedVectorStateRegion as IntoIterator>::IntoIter {
+    pub fn iter(&self) -> <&OrderedVectorStateRegion as IntoIterator>::IntoIter {
         (&self).into_iter()
     }
 }

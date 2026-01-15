@@ -1,6 +1,5 @@
 use probabilistic_models::{
-    IterFunctions, IterProbabilisticModel, MdpType, SingleStateDistribution, TwoPlayer,
-    VectorPredecessors,
+    IterFunctions, IterProbabilisticModel, MdpType, TwoPlayer, VectorPredecessors,
 };
 
 mod game;
@@ -11,7 +10,10 @@ use crate::{PrismModel, PrismProperty};
 
 use grouping::GroupExtractionScheme;
 use prism_model_builder::ConstValue;
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::{AlgorithmCollection, ChangeableOwners, GameAndSolverExternalOwners, ReachabilityAlgorithmCollection, SafetyAlgorithmCollection};
+use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
+    AlgorithmCollection, GameAndSolverExternalOwners, ReachabilityAlgorithmCollection,
+    SafetyAlgorithmCollection,
+};
 
 pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
     mut prism_model: PrismModel,
@@ -32,7 +34,7 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
             .unwrap();
 
     assert_eq!(properties.len(), 1);
-    let mut property = properties.into_iter().nth(0).unwrap();
+    let property = properties.into_iter().nth(0).unwrap();
 
     let model = prism_model_builder::build_model::<_, MdpType<VectorPredecessors>>(
         &prism_model,

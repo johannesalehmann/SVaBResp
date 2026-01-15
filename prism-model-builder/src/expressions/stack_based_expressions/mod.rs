@@ -12,14 +12,14 @@ pub struct StackBasedExpression<V> {
     operations: Vec<Operation<V>>,
 }
 
+#[allow(unused)]
 impl StackBasedExpression<VariableReference> {
     pub fn from_expression<S: Clone>(
         expression: Expression<VariableReference, S>,
         variable_manager: VariableManager<VariableReference, S>,
     ) -> Self {
-        let mut operations = Vec::new();
-
-        Self { operations }
+        let _ = (expression, variable_manager);
+        unimplemented!();
     }
 
     fn process_expression<S: Clone>(

@@ -1,7 +1,5 @@
 use crate::shapley::coop_game::PlayerDescriptions;
-use crate::shapley::{
-    CoalitionSpecifier, CooperativeGame, MonotoneCooperativeGame, SimpleCooperativeGame,
-};
+use crate::shapley::{CoalitionSpecifier, MonotoneCooperativeGame, SimpleCooperativeGame};
 use std::io::Write;
 
 pub struct MinimalCoalitionCache<P: PlayerDescriptions> {

@@ -1,5 +1,4 @@
 use crate::{Predecessor, Predecessors, PredecessorsBuilder};
-use std::array::IntoIter;
 
 pub struct VectorPredecessors {
     predecessors: Vec<Predecessor>,

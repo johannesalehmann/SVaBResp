@@ -1,4 +1,4 @@
-use crate::{Action, Distribution, ModelTypes};
+use crate::{Action, Distribution};
 
 pub struct SingleAction<D: Distribution> {
     action: Action<D>,

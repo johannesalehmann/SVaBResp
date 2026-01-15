@@ -1,5 +1,5 @@
 use probabilistic_models::{
-    ActionCollection, ProbabilisticModel, TwoPlayer, Valuation, VectorPredecessors,
+    ActionCollection, ProbabilisticModel, TwoPlayer, VectorPredecessors,
 };
 
 pub struct AttractorBuffer {

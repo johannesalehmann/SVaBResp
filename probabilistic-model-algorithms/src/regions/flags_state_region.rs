@@ -5,7 +5,7 @@ pub struct FlagStateRegion {
 }
 
 impl FlagStateRegion {
-    fn iter(&self) -> <&FlagStateRegion as IntoIterator>::IntoIter {
+    pub fn iter(&self) -> <&FlagStateRegion as IntoIterator>::IntoIter {
         (&self).into_iter()
     }
 }

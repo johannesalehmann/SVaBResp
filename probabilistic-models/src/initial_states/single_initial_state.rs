@@ -1,4 +1,3 @@
-use crate::Successor;
 use super::{InitialStates, InitialStatesBuilder};
 
 pub struct SingleInitialState {
@@ -8,12 +7,12 @@ pub struct SingleInitialState {
 impl InitialStates for SingleInitialState {
     type Builder = SingleInitialStateBuilder;
     type Iter<'a>
-    = std::iter::Once<&'a usize>
+        = std::iter::Once<&'a usize>
     where
         Self: 'a;
 
     fn get_builder() -> Self::Builder {
-        SingleInitialStateBuilder {state: None}
+        SingleInitialStateBuilder { state: None }
     }
 
     fn count(&self) -> usize {
@@ -24,7 +23,10 @@ impl InitialStates for SingleInitialState {
         if index == 0 {
             self.initial_state
         } else {
-            panic!("Initial state index {} out of range (number of initial states: {})", index, 1);
+            panic!(
+                "Initial state index {} out of range (number of initial states: {})",
+                index, 1
+            );
         }
     }
 
@@ -38,7 +40,9 @@ pub struct SingleInitialStateBuilder {
 }
 
 impl SingleInitialStateBuilder {
-    pub fn new() -> Self { Self { state: None } }
+    pub fn new() -> Self {
+        Self { state: None }
+    }
 }
 
 impl InitialStatesBuilder<SingleInitialState> for SingleInitialStateBuilder {
@@ -53,7 +57,7 @@ impl InitialStatesBuilder<SingleInitialState> for SingleInitialStateBuilder {
     fn finish(self) -> SingleInitialState {
         if let Some(index) = self.state {
             SingleInitialState {
-                initial_state: index
+                initial_state: index,
             }
         } else {
             panic!("Model type requires at least one initial state");

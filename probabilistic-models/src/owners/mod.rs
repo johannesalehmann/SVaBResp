@@ -1,5 +1,3 @@
-use crate::TwoPlayer::PlayerTwo;
-
 pub trait Owners {
     fn default_owner() -> Self;
 }

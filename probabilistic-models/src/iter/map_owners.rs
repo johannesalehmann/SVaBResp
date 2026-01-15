@@ -1,9 +1,5 @@
-use super::{IterAction, IterProbabilisticModel, IterState, ModelTypes};
-use crate::{
-    ActionCollection, AtomicPropositions, Distribution, InitialStates, Owners, Predecessors,
-    Successor, Valuation,
-};
-use std::marker::PhantomData;
+use super::{IterAction, IterProbabilisticModel, IterState};
+use crate::{AtomicPropositions, Owners, Predecessors, Valuation};
 
 pub struct MappedOwners<
     V: Valuation,
@@ -18,7 +14,8 @@ pub struct MappedOwners<
 > {
     pub(crate) map: Map,
     pub(crate) base: Base,
-    pub(crate) _phantom_data: PhantomData<(V, O, O2, AP, P, BaseIterAction, BaseIterState)>,
+    pub(crate) _phantom_data:
+        std::marker::PhantomData<(V, O, O2, AP, P, BaseIterAction, BaseIterState)>,
 }
 
 impl<
@@ -76,7 +73,7 @@ pub struct MappedOwnersState<
 > {
     function: Map,
     base: BaseIterState,
-    _phantom_data: PhantomData<(V, O, O2, AP, P, BaseIterAction)>,
+    _phantom_data: std::marker::PhantomData<(V, O, O2, AP, P, BaseIterAction)>,
 }
 impl<
     V: Valuation,

@@ -80,7 +80,7 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
                     .zip(property_errors.iter_mut())
                     .for_each(|(p_option, errs)| {
                         if let Some(p) = p_option {
-                            use prism_model::{SubstitutablePath, SubstitutableProperty};
+                            use prism_model::SubstitutableProperty;
                             p.substitute_labels(SimpleSpan::new(0, 1), &output.labels);
                             let substitution =
                                 p.substitute_formulas(SimpleSpan::new(0, 1), &output.formulas);

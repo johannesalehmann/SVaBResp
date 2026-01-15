@@ -1,4 +1,3 @@
-use crate::PrismProperty;
 use chumsky::prelude::SimpleSpan;
 use prism_model::{Expression, VariableReference};
 use probabilistic_properties::{Path, ProbabilitySpecifier};

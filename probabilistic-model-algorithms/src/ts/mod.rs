@@ -1,7 +1,7 @@
 use probabilistic_models::{
-    AtomicPropositions, Distribution, InitialStates, ProbabilisticModel, SingleStateDistribution,
+    AtomicPropositions, InitialStates, ProbabilisticModel, SingleStateDistribution,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub fn is_reachable<M: probabilistic_models::ModelTypes<Distribution = SingleStateDistribution>>(
     model: &ProbabilisticModel<M>,
@@ -74,8 +74,8 @@ pub enum ReachableResult {
 }
 
 pub struct Path {
-    states: Vec<usize>,
-    actions: Vec<usize>,
+    pub states: Vec<usize>,
+    pub actions: Vec<usize>,
 }
 
 enum Predecessor {

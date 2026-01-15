@@ -1,7 +1,5 @@
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::winning_region;
 use probabilistic_models::{
-    ActionCollection, AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation,
-    VectorPredecessors,
+    AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation, VectorPredecessors,
 };
 use probabilistic_properties::Property;
 

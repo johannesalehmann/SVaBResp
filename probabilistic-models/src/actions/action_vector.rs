@@ -1,4 +1,4 @@
-use crate::{Action, Distribution, ModelTypes};
+use crate::{Action, Distribution};
 
 pub struct ActionVector<D: Distribution> {
     actions: Vec<Action<D>>,

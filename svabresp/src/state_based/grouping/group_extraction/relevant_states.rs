@@ -1,11 +1,9 @@
-use chumsky::container::Seq;
-use probabilistic_model_algorithms::regions::BoxedStateRegion;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::winning_region;
 use probabilistic_models::{
     ActionCollection, AtomicProposition, ModelTypes, TwoPlayer, VectorPredecessors,
 };
 use probabilistic_properties::Property;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 pub struct RelevantStates {
     relevant_states: HashSet<usize>,

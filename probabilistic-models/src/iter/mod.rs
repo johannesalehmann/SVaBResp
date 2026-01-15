@@ -6,8 +6,8 @@ use map_owners::MappedOwners;
 
 use crate::{
     Action, ActionCollection, AtomicPropositions, Builder, Distribution, DistributionBuilder,
-    InitialStates, InitialStatesBuilder, ModelTypes, Owners, Predecessors, PredecessorsBuilder,
-    ProbabilisticModel, State, Successor, Valuation,
+    InitialStates, InitialStatesBuilder, ModelTypes, Owners, Predecessors, ProbabilisticModel,
+    State, Successor, Valuation,
 };
 
 pub trait IterProbabilisticModel<

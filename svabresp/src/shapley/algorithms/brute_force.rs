@@ -16,6 +16,7 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
         &mut self,
         mut game: G,
     ) -> Self::Output<<G::PlayerDescriptions as PlayerDescriptions>::PlayerType> {
+        let _ = &mut game;
         panic!("The brute force algorithm does not yet support non-simple cooperative games")
     }
 

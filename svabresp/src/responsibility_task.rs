@@ -121,6 +121,7 @@ pub enum CoopGameType<C: CounterexampleSource> {
 pub trait CounterexampleSource {}
 
 pub struct CounterexampleFile {
+    #[allow(unused)]
     file_name: String,
 }
 

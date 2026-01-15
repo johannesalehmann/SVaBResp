@@ -7,14 +7,13 @@ use prism_model::{
 use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
 use probabilistic_models::{
     Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, ContextBuilder,
-    Distribution, InitialStates, InitialStatesBuilder, MdpType, ModelTypes, NonTrackedPredecessors,
-    Predecessors, PredecessorsBuilder, ProbabilisticModel, SingleInitialState, State, Successor,
-    Valuation, ValuationBuilder, probabilistic_properties,
+    Distribution, InitialStates, InitialStatesBuilder, MdpType, ModelTypes,
+    Predecessors, PredecessorsBuilder, ProbabilisticModel, State, Successor,
+    Valuation, ValuationBuilder,
 };
 use probabilistic_models::{DistributionBuilder, Predecessor};
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::str::ParseBoolError;
 
 pub fn build_model<S: Clone, M: ModelTypes>(
     model: &Model<(), Identifier<S>, VariableReference, S>,
