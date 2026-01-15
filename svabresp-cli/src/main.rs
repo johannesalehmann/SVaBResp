@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use svabresp::num_rational::BigRational;
-use svabresp::num_traits::{ToPrimitive, Zero};
+use svabresp::num_traits::ToPrimitive;
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgorithm};
 
 use clap::{Arg, Command, arg};
@@ -23,6 +22,7 @@ struct Cli {
 enum AlgorithmKind {
     BruteForce,
     Stochastic,
+    Refinement,
 }
 
 enum GroupingKind {
@@ -43,7 +43,7 @@ impl Cli {
     pub fn from_arguments() -> Self {
         let matches =         Command::new("svabresp").about("Computes responsibility values")
             .arg(arg!(-a --algorithm <ALGORITHM> "The algorithm that is used to compute the responsibility values. Legal values are `brute-force`, `stochastic`, `refinement`. The default is `brute-force`").default_value("brute-force"))
-            .arg(arg!(-g --grouping <GROUPING> "The scheme that is used to group states. Legal values are `individual`, `labels [space-separated list of label names]`, `modules`, `actions`, `variables [space-separated list of variable names]`. The default is `individual`").default_value("individual"))
+            .arg(arg!(-g --grouping <GROUPING> "The scheme that is used to group states. Legal values are `individual`, `labels([space-separated list of label names])`, `modules`, `actions`, `variables([space-separated list of variable names])`. The default is `individual`").default_value("individual"))
             .arg(arg!(-o --output <OUTPUT> "How the output should be presented. Legal values are `human-readable`, `parsable` (simple format that can be processed by other tools) and `silent` (no output). The default is `human-readable`").default_value("human-readable"))
             .arg(arg!(-c --constants <CONSTANTS> "Values for the undefined constants in the model").required(false))
             .arg(Arg::new("model").required(true).help("File name of the PRISM model file"))
@@ -60,15 +60,37 @@ impl Cli {
             .clone();
         let algorithm = match matches.get_one::<String>("algorithm").unwrap().as_str() {
             "brute-force" => AlgorithmKind::BruteForce,
+            "stochastic" => AlgorithmKind::Stochastic,
+            "refinement" => AlgorithmKind::Refinement,
             a => panic!("Unknown algorithm `{}`", a),
         };
         let grouping = match matches.get_one::<String>("grouping").unwrap().as_str() {
             "individual" => GroupingKind::Individual,
-            a => panic!("Unknown grouping scheme `{}`", a),
+            g if g.starts_with("labels") => {
+                let labels = Self::parse_space_separated_names(
+                    &g["labels".len()..],
+                    "--grouping labels must include a parenthesised list of label names, e.g. --grouping labels(foo bar)",
+                );
+
+                GroupingKind::Labels { labels }
+            }
+            "modules" => GroupingKind::Modules,
+            "actions" => GroupingKind::Actions,
+            g if g.starts_with("variables") => {
+                let variables = Self::parse_space_separated_names(
+                    &g["labels".len()..],
+                    "--grouping variables must include a parenthesised list of variable names, e.g. --grouping variables(x y timer)",
+                );
+
+                GroupingKind::Variables { variables }
+            }
+            g => panic!("Unknown grouping scheme `{}`", g),
         };
         let output = match matches.get_one::<String>("output").unwrap().as_str() {
             "human-readable" => OutputKind::HumanReadable,
-            a => panic!("Unknown output kind `{}`", a),
+            "parsable" => OutputKind::Parsable,
+            "silent" => OutputKind::Silent,
+            o => panic!("Unknown output kind `{}`", o),
         };
         let constants = match matches.get_one::<String>("constants") {
             Some(c) => c.clone(),
@@ -83,6 +105,20 @@ impl Cli {
             grouping,
             output,
         }
+    }
+
+    fn parse_space_separated_names(a: &str, error_no_parentheses: &str) -> Vec<String> {
+        let names = a.trim();
+        if !names.starts_with("(") || names.ends_with(")") {
+            panic!("{}", error_no_parentheses);
+        }
+        let names = &names[1..names.len() - 1];
+        let names = names
+            .split(' ')
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+        names
     }
 }
 
@@ -134,6 +170,9 @@ fn execute_with_grouping_scheme<M: ModelAndPropertySource, G: GroupExtractionSch
         ),
         AlgorithmKind::Stochastic => {
             panic!("Stochastic algorithm not implemented in cli yet")
+        }
+        AlgorithmKind::Refinement => {
+            panic!("Refinement algorithm not implemented in cli yet")
         }
     }
 }
@@ -208,55 +247,4 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD>>
             );
         }
     }
-}
-
-fn old_main() {
-    let mut start_time = std::time::Instant::now();
-    // let file_name = "svabresp-cli/examples/small.prism"; // "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
-    // let file_name = "/Users/johannes/repo/Work/BW-Responsibility/code/experiments/dresden_misrouted_train/dresden_railways.prism";
-    let file_name =
-        "/Users/johannes/Documents/code/SVaBResp/tiny-pmc-cli/src/tests/files/pacman.v2.prism";
-    let file = std::fs::read_to_string(file_name).expect("Failed to read input model");
-
-    let parsed = tiny_pmc::parsing::parse_prism_and_print_errors(
-        Some("pacman.v2.prism"),
-        &file[..],
-        // &["P=1 [G !\"obj\"]"],
-        // &["P=1 [G !\"sbar\"]"],
-        &["PMin=? [F \"Crash\"]"],
-    );
-
-    if parsed.is_none() {
-        return;
-    }
-    let (model, properties) = parsed.unwrap();
-    let property = properties.into_iter().nth(0).unwrap();
-    println!("{:?}", property);
-
-    let mut constants = std::collections::HashMap::new();
-    constants.insert("MAXSTEPS".to_string(), svabresp::ConstValue::Int(5));
-
-    let mut shapley = BruteForceAlgorithm::new();
-
-    let responsibility = svabresp::state_based::compute_for_prism(
-        model,
-        property,
-        svabresp::state_based::grouping::IndividualGroupExtractionScheme::new(),
-        &mut shapley,
-        constants,
-    );
-
-    println!("Responsibility values:");
-    let mut sum = BigRational::zero();
-    for (index, value) in responsibility.players.iter().enumerate() {
-        println!(
-            "  {}: {} ({})",
-            value.player_info,
-            value.value,
-            value.value.to_f64().unwrap()
-        );
-        sum += &value.value;
-    }
-    println!("Total: {}", sum);
-    println!("Finished in {:?}", start_time.elapsed());
 }
