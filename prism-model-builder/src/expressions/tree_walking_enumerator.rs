@@ -24,7 +24,9 @@ impl TreeWalkingEvaluator {
                 VariableType::Float => Value::Float(valuations.get_float(*id)),
             },
             Expression::Label(_, _) => {
-                panic!("Cannot evaluate expression containing label. They must only occur in objectives")
+                panic!(
+                    "Cannot evaluate expression containing label. They must only occur in objectives"
+                )
             }
             Expression::Function(name, params, _) => {
                 self.evaluate_function(name, params, valuations)
@@ -40,9 +42,9 @@ impl TreeWalkingEvaluator {
                 }
             }
             Expression::Multiplication(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, i64::mul, f64::mul)
+                self.binary_operation_int_float(lhs, rhs, valuations, i64::mul, f64::mul)
             }
-            Expression::Division(lhs, rhs, _) => self.binary_operation(
+            Expression::Division(lhs, rhs, _) => self.binary_operation_int_float(
                 lhs,
                 rhs,
                 valuations,
@@ -50,29 +52,39 @@ impl TreeWalkingEvaluator {
                 f64::div,
             ),
             Expression::Addition(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, i64::add, f64::add)
+                self.binary_operation_int_float(lhs, rhs, valuations, i64::add, f64::add)
             }
             Expression::Subtraction(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, i64::sub, f64::sub)
+                self.binary_operation_int_float(lhs, rhs, valuations, i64::sub, f64::sub)
             }
             Expression::LessThan(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, |l, r| l < r, |l, r| l < r)
+                self.binary_operation_int_float(lhs, rhs, valuations, |l, r| l < r, |l, r| l < r)
             }
             Expression::LessOrEqual(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, |l, r| l <= r, |l, r| l <= r)
+                self.binary_operation_int_float(lhs, rhs, valuations, |l, r| l <= r, |l, r| l <= r)
             }
             Expression::GreaterThan(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, |l, r| l > r, |l, r| l > r)
+                self.binary_operation_int_float(lhs, rhs, valuations, |l, r| l > r, |l, r| l > r)
             }
             Expression::GreaterOrEqual(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, |l, r| l >= r, |l, r| l >= r)
+                self.binary_operation_int_float(lhs, rhs, valuations, |l, r| l >= r, |l, r| l >= r)
             }
-            Expression::Equals(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, |l, r| l == r, |l, r| l == r)
-            }
-            Expression::NotEquals(lhs, rhs, _) => {
-                self.binary_operation(lhs, rhs, valuations, |l, r| l != r, |l, r| l != r)
-            }
+            Expression::Equals(lhs, rhs, _) => self.binary_operation_int_float_bool(
+                lhs,
+                rhs,
+                valuations,
+                |l, r| l == r,
+                |l, r| l == r,
+                |l, r| l == r,
+            ),
+            Expression::NotEquals(lhs, rhs, _) => self.binary_operation_int_float_bool(
+                lhs,
+                rhs,
+                valuations,
+                |l, r| l != r,
+                |l, r| l != r,
+                |l, r| l != r,
+            ),
             Expression::Negation(inner, _) => {
                 let inner = self.evaluate(inner, valuations);
                 if inner.is_bool() {
@@ -82,16 +94,16 @@ impl TreeWalkingEvaluator {
                 }
             }
             Expression::Conjunction(lhs, rhs, _) => {
-                self.binary_boolean_operation(lhs, rhs, valuations, |l, r| l && r)
+                self.binary_operation_bool(lhs, rhs, valuations, |l, r| l && r)
             }
             Expression::Disjunction(lhs, rhs, _) => {
-                self.binary_boolean_operation(lhs, rhs, valuations, |l, r| l || r)
+                self.binary_operation_bool(lhs, rhs, valuations, |l, r| l || r)
             }
             Expression::IfAndOnlyIf(lhs, rhs, _) => {
-                self.binary_boolean_operation(lhs, rhs, valuations, |l, r| l == r)
+                self.binary_operation_bool(lhs, rhs, valuations, |l, r| l == r)
             }
             Expression::Implies(lhs, rhs, _) => {
-                self.binary_boolean_operation(lhs, rhs, valuations, |l, r| !l || r)
+                self.binary_operation_bool(lhs, rhs, valuations, |l, r| !l || r)
             }
             Expression::Ternary(condition, lhs, rhs, _) => {
                 let condition = self.evaluate(condition, valuations);
@@ -212,7 +224,7 @@ impl TreeWalkingEvaluator {
         Value::Int(op(inner_value) as i64)
     }
 
-    fn binary_operation<
+    fn binary_operation_int_float<
         V: ValuationSource,
         S: Clone,
         IOut: Into<Value>,
@@ -231,12 +243,45 @@ impl TreeWalkingEvaluator {
         let rhs = self.evaluate(rhs, valuations);
         if lhs.is_int() && rhs.is_int() {
             i_op(lhs.as_int(), rhs.as_int()).into()
-        } else {
+        } else if lhs.is_float() && rhs.is_float() {
             f_op(lhs.as_float(), rhs.as_float()).into().into()
+        } else {
+            panic!("Incorrect types");
         }
     }
 
-    fn binary_boolean_operation<
+    fn binary_operation_int_float_bool<
+        V: ValuationSource,
+        S: Clone,
+        IOut: Into<Value>,
+        FOut: Into<Value>,
+        BOut: Into<Value>,
+        FI: Fn(i64, i64) -> IOut,
+        FF: Fn(f64, f64) -> FOut,
+        FB: Fn(bool, bool) -> BOut,
+    >(
+        &self,
+        lhs: &Expression<VariableReference, S>,
+        rhs: &Expression<VariableReference, S>,
+        valuations: &V,
+        i_op: FI,
+        f_op: FF,
+        b_op: FB,
+    ) -> Value {
+        let lhs = self.evaluate(lhs, valuations);
+        let rhs = self.evaluate(rhs, valuations);
+        if lhs.is_int() && rhs.is_int() {
+            i_op(lhs.as_int(), rhs.as_int()).into()
+        } else if lhs.is_float() && rhs.is_float() {
+            f_op(lhs.as_float(), rhs.as_float()).into().into()
+        } else if lhs.is_bool() && rhs.is_bool() {
+            b_op(lhs.as_bool(), rhs.as_bool()).into().into()
+        } else {
+            panic!("Incorrect types");
+        }
+    }
+
+    fn binary_operation_bool<
         V: ValuationSource,
         S: Clone,
         TB: Into<Value>,
