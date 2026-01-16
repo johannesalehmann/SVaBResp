@@ -2,8 +2,8 @@ use std::str::FromStr;
 use svabresp::num_rational::BigRational;
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues};
 use svabresp::state_based::grouping::{
-    IndividualGroupExtractionScheme, LabelGroupExtractionScheme, ModuleExtractionScheme,
-    ValueGroupExtractionScheme,
+    ActionGroupExtractionScheme, IndividualGroupExtractionScheme, LabelGroupExtractionScheme,
+    ModuleExtractionScheme, ValueGroupExtractionScheme,
 };
 use svabresp::{CounterexampleFile, ModelFromString, ResponsibilityTask};
 
@@ -93,9 +93,6 @@ fn module_groups() {
         grouping_scheme: ModuleExtractionScheme::new(),
     };
     let result = task.run();
-    for res in result.players.iter() {
-        println!("{}: {}", res.player_info, res.value);
-    }
 
     assert_res("scheduler", "0", &result);
     assert_res("Window", "0", &result);
@@ -105,6 +102,29 @@ fn module_groups() {
     assert_res("install_window", "0", &result);
     assert_res("julia_throws", "0", &result);
     assert_res("ada_throws", "0", &result);
+}
+
+#[test]
+fn action_groups() {
+    let task = ResponsibilityTask {
+        model_description: ModelFromString::new(
+            "action-groups.prism",
+            include_str!("files/action-groups.prism"),
+            "P=1 [G !\"obj\"]",
+        ),
+        constants: "".to_string(),
+        coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
+        algorithm: BruteForceAlgorithm::new(),
+        grouping_scheme: ActionGroupExtractionScheme::new(),
+    };
+    let result = task.run();
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
+
+    assert_res("button1", "1/2", &result);
+    assert_res("button2", "0", &result);
+    assert_res("button3", "1/2", &result);
 }
 
 fn assert_res(name: &str, value: &str, result: &ResponsibilityValues<String>) {

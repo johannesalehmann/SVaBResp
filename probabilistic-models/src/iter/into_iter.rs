@@ -9,6 +9,8 @@ pub struct IteratedProbabilisticModel<M: ModelTypes> {
     current_initial_state_index: usize,
     states: VecDeque<State<M>>,
     valuation_context: Option<<M::Valuation as Valuation>::ContextType>,
+    actions: Option<Vec<String>>,
+    atomic_proposition_count: usize,
 }
 
 impl<M: ModelTypes> IteratedProbabilisticModel<M> {
@@ -18,6 +20,8 @@ impl<M: ModelTypes> IteratedProbabilisticModel<M> {
             current_initial_state_index: 0,
             states: VecDeque::from(model.states),
             valuation_context: Some(model.valuation_context),
+            actions: Some(model.action_names),
+            atomic_proposition_count: model.atomic_proposition_count,
         }
     }
 }
@@ -52,6 +56,14 @@ impl<'a, M: ModelTypes>
 
     fn take_valuation_context(&mut self) -> <M::Valuation as Valuation>::ContextType {
         self.valuation_context.take().unwrap()
+    }
+
+    fn take_actions(&mut self) -> Vec<String> {
+        self.actions.take().unwrap()
+    }
+
+    fn take_atomic_proposition_count(&mut self) -> usize {
+        self.atomic_proposition_count
     }
 }
 
@@ -108,6 +120,7 @@ impl<M: ModelTypes>
 pub struct IteratedAction<M: ModelTypes> {
     distribution: M::Distribution,
     current_index: usize,
+    action_name_index: usize,
 }
 
 impl<M: ModelTypes> IteratedAction<M> {
@@ -115,6 +128,7 @@ impl<M: ModelTypes> IteratedAction<M> {
         Self {
             distribution: action.successors,
             current_index: 0,
+            action_name_index: action.action_name_index,
         }
     }
 }
@@ -128,5 +142,9 @@ impl<M: ModelTypes> super::IterAction for IteratedAction<M> {
         } else {
             None
         }
+    }
+
+    fn get_action_index(&mut self) -> usize {
+        self.action_name_index
     }
 }

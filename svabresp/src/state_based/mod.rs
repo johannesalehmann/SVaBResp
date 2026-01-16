@@ -55,13 +55,23 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
 
     if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
-        let coop_game = game::StateBasedResponsibilityGame::new(solvable_game, grouping);
+        let coop_game = game::StateBasedResponsibilityGame::new(
+            solvable_game,
+            grouping.groups,
+            grouping.always_helping,
+            grouping.always_adversarial,
+        );
         let cached_coop_game = MinimalCoalitionCache::create(coop_game);
 
         shapley.compute_simple(cached_coop_game)
     } else if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
-        let coop_game = game::StateBasedResponsibilityGame::new(solvable_game, grouping);
+        let coop_game = game::StateBasedResponsibilityGame::new(
+            solvable_game,
+            grouping.groups,
+            grouping.always_helping,
+            grouping.always_adversarial,
+        );
         let cached_coop_game = MinimalCoalitionCache::create(coop_game);
 
         shapley.compute_simple(cached_coop_game)

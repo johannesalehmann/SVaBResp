@@ -38,9 +38,12 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
 
         let start = std::time::Instant::now();
         for base_coalition in 0..coalition_count {
-            if base_coalition % 20_000_000 == 0 {
+            if base_coalition % 20_000_000 == 0
+                && base_coalition > 0
+                && start.elapsed().as_secs_f32() > 2.0
+            {
                 println!(
-                    "{}k/{}k ({} states per second)",
+                    "{}k/{}k ({} games per second)",
                     base_coalition / 1000,
                     coalition_count / 1000,
                     base_coalition as f32 / start.elapsed().as_secs_f32()

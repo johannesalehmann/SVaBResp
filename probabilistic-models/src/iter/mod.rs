@@ -22,6 +22,8 @@ pub trait IterProbabilisticModel<
     fn next_initial_state(&mut self) -> Option<usize>;
     fn next_state(&mut self) -> Option<IS>;
     fn take_valuation_context(&mut self) -> V::ContextType;
+    fn take_actions(&mut self) -> Vec<String>;
+    fn take_atomic_proposition_count(&mut self) -> usize;
 
     fn collect<
         M: ModelTypes<Valuation = V, Owners = O, AtomicPropositions = AP, Predecessors = P>,
@@ -41,10 +43,16 @@ pub trait IterProbabilisticModel<
 
         let valuation_context = self.take_valuation_context();
 
+        let actions = self.take_actions();
+
+        let atomic_proposition_count = self.take_atomic_proposition_count();
+
         ProbabilisticModel {
             states,
             initial_states,
             valuation_context,
+            action_names: actions,
+            atomic_proposition_count,
         }
     }
 }
@@ -88,6 +96,7 @@ pub trait IterState<
 
 pub trait IterAction {
     fn next_successor(&mut self) -> Option<Successor>;
+    fn get_action_index(&mut self) -> usize;
     fn collect<D: Distribution>(&mut self) -> Action<D> {
         let mut builder = D::get_builder();
         while let Some(successor) = self.next_successor() {
@@ -95,6 +104,7 @@ pub trait IterAction {
         }
         Action {
             successors: builder.finish(),
+            action_name_index: self.get_action_index(),
         }
     }
 }

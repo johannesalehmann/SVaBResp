@@ -38,17 +38,22 @@ pub struct ProbabilisticModel<M: ModelTypes> {
     pub states: Vec<State<M>>,
     pub initial_states: M::InitialStates,
     pub valuation_context: <M::Valuation as Valuation>::ContextType,
+    pub atomic_proposition_count: usize,
+    pub action_names: Vec<String>,
 }
 
 impl<M: ModelTypes> ProbabilisticModel<M> {
     pub fn new(
         initial_states: M::InitialStates,
         valuation_context: <M::Valuation as Valuation>::ContextType,
+        atomic_proposition_count: usize,
     ) -> Self {
         Self {
             states: Vec::new(),
             initial_states,
             valuation_context,
+            atomic_proposition_count,
+            action_names: Vec::new(),
         }
     }
 
@@ -85,6 +90,18 @@ impl<M: ModelTypes> ProbabilisticModel<M> {
                 }
             }
         }
+        res
+    }
+
+    pub fn get_action_index_or_add(&mut self, action_name: &str) -> usize {
+        for (i, action) in self.action_names.iter().enumerate() {
+            if action == action_name {
+                return i;
+            }
+        }
+
+        let res = self.action_names.len();
+        self.action_names.push(action_name.to_string());
         res
     }
 
@@ -179,6 +196,7 @@ pub struct StateSuccessor {
 
 pub struct Action<D: Distribution> {
     pub successors: D,
+    pub action_name_index: usize,
 }
 
 pub type Mdp<P = NonTrackedPredecessors> = ProbabilisticModel<MdpType<P>>;

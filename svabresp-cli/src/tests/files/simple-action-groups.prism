@@ -1,0 +1,16 @@
+mdp
+
+label "obj" = counter=5;
+
+module PuzzleBox
+	counter: [0..61] init 58;
+	steps: [0..6] init 0;
+
+	[button1] (counter+2<=61) -> (counter'=counter+2) & (steps'=min(6, steps+1));
+	[button2] (counter*6+1<=61)-> (counter'=counter*6+1) & (steps'=min(6, steps+1));
+	[button3] (counter*counter<=61) -> (counter'=counter*counter) & (steps'=min(6, steps+1));
+
+	[button1] (counter+2>61) -> (counter'=61) & (steps'=min(6, steps+1));
+	[button2] (counter*6+1>61) -> (counter'=61) & (steps'=min(6, steps+1));
+	[button3] (counter*counter>61) -> (counter'=61) & (steps'=min(6, steps+1));
+endmodule

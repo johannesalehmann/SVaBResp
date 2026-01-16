@@ -35,7 +35,6 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
                 }
             }
         }
-        println!("Found {} large losing coalitions", losing_coalitions.len());
         losing_coalitions
     }
     pub fn create<C: SimpleCooperativeGame<PlayerDescriptions = P> + MonotoneCooperativeGame>(
@@ -84,7 +83,6 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
             }
 
             if !subset_winning && !superset_losing && coop_game.is_winning(coalition) {
-                println!("Minimal coalition: {:b}", coalition);
                 minimal_coalitions.push(coalition)
             }
         }

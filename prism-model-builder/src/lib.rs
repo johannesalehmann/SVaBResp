@@ -7,9 +7,8 @@ use prism_model::{
 use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
 use probabilistic_models::{
     Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, ContextBuilder,
-    Distribution, InitialStates, InitialStatesBuilder, MdpType, ModelTypes,
-    Predecessors, PredecessorsBuilder, ProbabilisticModel, State, Successor,
-    Valuation, ValuationBuilder,
+    Distribution, InitialStates, InitialStatesBuilder, MdpType, ModelTypes, Predecessors,
+    PredecessorsBuilder, ProbabilisticModel, State, Successor, Valuation, ValuationBuilder,
 };
 use probabilistic_models::{DistributionBuilder, Predecessor};
 use std::collections::HashMap;
@@ -72,6 +71,8 @@ pub struct ExplicitModelBuilder<M: ModelTypes, B: ModelBuilderTypes> {
     variable_bounds: VariableBounds,
     variable_types: VariableTypes,
     context: <M::Valuation as Valuation>::ContextType,
+    action_names: Vec<String>,
+    action_name_indices: HashMap<String, usize>,
 }
 
 impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
@@ -136,6 +137,8 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             variable_bounds,
             variable_types,
             context,
+            action_names: Vec::new(),
+            action_name_indices: HashMap::new(),
         };
 
         let initial_states = builder.create_initial_states(model, atomic_propositions.len())?;
@@ -150,7 +153,9 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         }
         let initial_states = initial_states_builder.finish();
 
-        let mut result = ProbabilisticModel::new(initial_states, builder.context);
+        let mut result =
+            ProbabilisticModel::new(initial_states, builder.context, atomic_propositions.len());
+        result.action_names = builder.action_names;
         for state_in_progress in builder.states.into_iter() {
             let state = State {
                 valuation: state_in_progress.valuation,
@@ -326,6 +331,21 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         context
     }
 
+    fn get_unnamed_action_name_index(&mut self) -> usize {
+        self.get_action_name_index("unnamed")
+    }
+
+    fn get_action_name_index(&mut self, name: &str) -> usize {
+        if let Some(&index) = self.action_name_indices.get(name) {
+            index
+        } else {
+            let index = self.action_names.len();
+            self.action_names.push(name.to_string());
+            self.action_name_indices.insert(name.to_string(), index);
+            index
+        }
+    }
+
     fn get_or_add_state(
         &mut self,
         valuation: M::Valuation,
@@ -412,8 +432,10 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                         });
                     }
 
+                    let action_name_index = self.get_unnamed_action_name_index();
                     self.states[state].actions.add_action(Action {
                         successors: distribution.finish(),
+                        action_name_index,
                     });
                     action_index += 1;
                 }
@@ -421,6 +443,8 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         }
 
         for synchronised_action in &synchronised_actions.actions {
+            let action_name_index = self.get_action_name_index(&synchronised_action.name);
+
             let valuation = &self.states[state].valuation;
             let val_source = ConstsAndVars::new(
                 &self.valuation_map,
@@ -543,6 +567,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
 
                     self.states[state].actions.add_action(Action {
                         successors: distribution.finish(),
+                        action_name_index,
                     });
                     action_index += 1;
 
@@ -1013,6 +1038,7 @@ pub struct SynchronisedActions {
 
 pub struct SynchronisedAction {
     participating_modules: Vec<SynchronisedActionModule>,
+    name: String,
 }
 
 pub struct SynchronisedActionModule {
@@ -1045,12 +1071,11 @@ impl SynchronisedActions {
                 if let Some(action) = actions.get_mut(&action_name) {
                     action.participating_modules.push(module_action);
                 } else {
-                    actions.insert(
-                        action_name,
-                        SynchronisedAction {
-                            participating_modules: vec![module_action],
-                        },
-                    );
+                    let synchronised_action_into = SynchronisedAction {
+                        name: action_name.clone(),
+                        participating_modules: vec![module_action],
+                    };
+                    actions.insert(action_name, synchronised_action_into);
                 }
             }
         }

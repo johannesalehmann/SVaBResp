@@ -8,15 +8,24 @@ use probabilistic_models::TwoPlayer;
 pub struct StateBasedResponsibilityGame<G: StateGroups, A: SolvableGame> {
     solvable: A,
     grouping: G,
+    always_helping: Vec<usize>,
+    always_adversarial: Vec<usize>,
     group_info: GroupInfo,
 }
 
 impl<'a, G: StateGroups, A: SolvableGame> StateBasedResponsibilityGame<G, A> {
-    pub fn new(solvable: A, grouping: G) -> Self {
+    pub fn new(
+        solvable: A,
+        grouping: G,
+        always_helping: Vec<usize>,
+        always_adversarial: Vec<usize>,
+    ) -> Self {
         let group_info = GroupInfo::from_grouping(&grouping);
         Self {
             solvable,
             grouping,
+            always_helping,
+            always_adversarial,
             group_info,
         }
     }
@@ -42,6 +51,12 @@ impl<G: StateGroups, A: SolvableGame> SimpleCooperativeGame for StateBasedRespon
     }
 
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool {
+        for &state in &self.always_helping {
+            self.solvable.set_owner(state, TwoPlayer::PlayerOne);
+        }
+        for &state in &self.always_adversarial {
+            self.solvable.set_owner(state, TwoPlayer::PlayerTwo);
+        }
         for i in 0..self.grouping.get_count() {
             if coalition.is_in_coalition(i) {
                 for state in self.grouping.get_states(i) {

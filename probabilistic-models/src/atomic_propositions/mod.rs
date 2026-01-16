@@ -4,6 +4,17 @@ pub trait AtomicPropositions {
     fn get_empty(capacity: usize) -> Self;
     fn set_value(&mut self, index: usize, value: bool);
     fn get_value(&self, index: usize) -> bool;
+
+    fn from_other<AP: AtomicPropositions>(capacity: usize, other: &AP) -> Self
+    where
+        Self: Sized,
+    {
+        let mut res = Self::get_empty(capacity);
+        for i in 0..capacity {
+            res.set_value(i, other.get_value(i));
+        }
+        res
+    }
 }
 
 pub struct BitFlagsAtomicPropositions {

@@ -1,3 +1,4 @@
+use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
 use probabilistic_models::{
     AtomicProposition, AtomicPropositions, ModelTypes, ProbabilisticModel, TwoPlayer,
@@ -46,7 +47,7 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         &mut self,
         game: &mut ProbabilisticModel<M>,
         property: &Property<AtomicProposition, f64>,
-    ) -> Self::GroupType {
+    ) -> GroupsAndAuxiliary<Self::GroupType> {
         let _ = property;
         let label_atomic_propositions = self.label_atomic_propositions.as_ref().unwrap();
         let mut groups = HashMap::new();
@@ -83,6 +84,6 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
             builder.create_group_from_vec(states, group_name);
         }
 
-        builder.finish()
+        GroupsAndAuxiliary::new(builder.finish())
     }
 }

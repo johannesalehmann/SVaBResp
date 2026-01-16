@@ -1,3 +1,4 @@
+use crate::state_based::grouping::GroupsAndAuxiliary;
 use probabilistic_models::{
     AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation, VectorPredecessors,
 };
@@ -18,7 +19,7 @@ impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
         &mut self,
         game: &mut ProbabilisticModel<M>,
         property: &Property<AtomicProposition, f64>,
-    ) -> Self::GroupType {
+    ) -> GroupsAndAuxiliary<Self::GroupType> {
         let mut builder = Self::GroupType::get_builder();
 
         let relevant_states = super::RelevantStates::compute(game, property);
@@ -37,6 +38,6 @@ impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
             "dummy states".to_string(),
         );
 
-        builder.finish()
+        GroupsAndAuxiliary::new(builder.finish())
     }
 }

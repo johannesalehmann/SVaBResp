@@ -124,6 +124,28 @@ pub struct Context {
     details: Vec<VariableInfo>,
 }
 
+impl super::Context for Context {
+    fn get_variable_count(&self) -> usize {
+        self.details.len()
+    }
+
+    fn is_bounded_int(&self, index: usize) -> bool {
+        self.details[index].variable_type == VariableType::BoundedInt
+    }
+
+    fn is_bool(&self, index: usize) -> bool {
+        self.details[index].variable_type == VariableType::Bool
+    }
+
+    fn is_unbounded_int(&self, index: usize) -> bool {
+        self.details[index].variable_type == VariableType::UnboundedInt
+    }
+
+    fn is_float(&self, index: usize) -> bool {
+        self.details[index].variable_type == VariableType::Float
+    }
+}
+
 pub struct VariableInfo {
     name: String,
     variable_type: super::VariableType,

@@ -1,3 +1,4 @@
+use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
 use prism_model::{VariableRange, VariableReference};
 use probabilistic_models::{
@@ -54,7 +55,7 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
         &mut self,
         game: &mut ProbabilisticModel<M>,
         property: &Property<AtomicProposition, f64>,
-    ) -> Self::GroupType {
+    ) -> GroupsAndAuxiliary<Self::GroupType> {
         let _ = property;
 
         let variable_references = self.variable_references.as_ref().unwrap();
@@ -101,7 +102,7 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
             builder.create_group_from_vec(states, group_name);
         }
 
-        builder.finish()
+        GroupsAndAuxiliary::new(builder.finish())
     }
 }
 

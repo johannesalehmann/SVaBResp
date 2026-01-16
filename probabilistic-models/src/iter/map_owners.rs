@@ -59,6 +59,14 @@ impl<
     fn take_valuation_context(&mut self) -> V::ContextType {
         self.base.take_valuation_context()
     }
+
+    fn take_actions(&mut self) -> Vec<String> {
+        self.base.take_actions()
+    }
+
+    fn take_atomic_proposition_count(&mut self) -> usize {
+        self.base.take_atomic_proposition_count()
+    }
 }
 
 pub struct MappedOwnersState<

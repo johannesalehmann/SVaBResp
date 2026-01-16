@@ -5,6 +5,7 @@ use probabilistic_models::{
 use probabilistic_properties::Property;
 
 mod action_groups;
+pub use action_groups::ActionGroupExtractionScheme;
 
 mod individual_groups;
 pub use individual_groups::IndividualGroupExtractionScheme;
@@ -32,5 +33,32 @@ pub trait GroupExtractionScheme {
         &mut self,
         game: &mut ProbabilisticModel<M>,
         property: &Property<AtomicProposition, f64>,
-    ) -> Self::GroupType;
+    ) -> GroupsAndAuxiliary<Self::GroupType>;
+}
+
+pub struct GroupsAndAuxiliary<G: super::super::grouping::StateGroups> {
+    pub groups: G,
+    pub always_helping: Vec<usize>,
+    pub always_adversarial: Vec<usize>,
+}
+
+impl<G: super::super::grouping::StateGroups> GroupsAndAuxiliary<G> {
+    pub fn new(groups: G) -> Self {
+        Self {
+            groups,
+            always_helping: Vec::new(),
+            always_adversarial: Vec::new(),
+        }
+    }
+    pub fn with_auxiliary(
+        groups: G,
+        always_helping: Vec<usize>,
+        always_adversarial: Vec<usize>,
+    ) -> Self {
+        Self {
+            groups,
+            always_helping,
+            always_adversarial,
+        }
+    }
 }

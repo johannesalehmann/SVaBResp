@@ -1,3 +1,4 @@
+use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
 use chumsky::span::SimpleSpan;
 use prism_model::{
@@ -208,7 +209,7 @@ impl super::GroupExtractionScheme for ModuleExtractionScheme {
         &mut self,
         game: &mut ProbabilisticModel<M>,
         property: &Property<AtomicProposition, f64>,
-    ) -> Self::GroupType {
+    ) -> GroupsAndAuxiliary<Self::GroupType> {
         let _ = property;
 
         let group_count = self.group_count.unwrap();
@@ -232,7 +233,7 @@ impl super::GroupExtractionScheme for ModuleExtractionScheme {
             builder.create_group_from_vec(group, group_name);
         }
 
-        builder.finish()
+        GroupsAndAuxiliary::new(builder.finish())
     }
 }
 

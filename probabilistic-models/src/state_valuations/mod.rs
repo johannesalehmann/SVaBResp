@@ -4,7 +4,7 @@ use std::fmt::Formatter;
 pub use valuation_vector::ValuationVector;
 
 pub trait Valuation: Sized + PartialEq + Clone + std::hash::Hash + Eq {
-    type ContextType;
+    type ContextType: Context;
     type ContextBuilderType: ContextBuilder<Self::ContextType>;
 
     type BuilderType: ValuationBuilder<Self>;
@@ -47,6 +47,14 @@ impl<'a, 'b, V: Valuation> std::fmt::Display for DisplayableValuation<'a, 'b, V>
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.valuation.format(f, self.context)
     }
+}
+
+pub trait Context {
+    fn get_variable_count(&self) -> usize;
+    fn is_bounded_int(&self, index: usize) -> bool;
+    fn is_bool(&self, index: usize) -> bool;
+    fn is_unbounded_int(&self, index: usize) -> bool;
+    fn is_float(&self, index: usize) -> bool;
 }
 
 pub trait ContextBuilder<C> {
