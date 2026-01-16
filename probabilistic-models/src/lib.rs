@@ -87,6 +87,29 @@ impl<M: ModelTypes> ProbabilisticModel<M> {
         }
         res
     }
+
+    pub fn rebuild_predecessors(&mut self) {
+        let mut new_predecessors = Vec::with_capacity(self.states.len());
+        for _ in 0..self.states.len() {
+            new_predecessors.push(<<M::Predecessors as Predecessors>::Builder>::create());
+        }
+
+        for (state_index, state) in self.states.iter().enumerate() {
+            for (action_index, action) in state.actions.iter().enumerate() {
+                for target in action.successors.iter() {
+                    new_predecessors[target.index].add(Predecessor {
+                        from: state_index,
+                        action_index,
+                        probability: target.probability,
+                    })
+                }
+            }
+        }
+
+        for (index, predecessors) in new_predecessors.into_iter().enumerate() {
+            self.states[index].predecessors = predecessors.finish();
+        }
+    }
 }
 
 pub struct State<M: ModelTypes> {
