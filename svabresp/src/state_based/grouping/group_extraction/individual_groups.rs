@@ -1,27 +1,33 @@
-use crate::state_based::grouping::GroupsAndAuxiliary;
+use crate::state_based::grouping::{GroupsAndAuxiliary, VectorStateGroupBuilder};
 use probabilistic_models::{
     AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation, VectorPredecessors,
 };
 use probabilistic_properties::Property;
 
-pub struct IndividualGroupExtractionScheme {}
+pub struct IndividualGroupExtractionScheme {
+    restrict_to_relevant_states: bool,
+}
 
 impl IndividualGroupExtractionScheme {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            restrict_to_relevant_states: true,
+        }
     }
-}
+    pub fn including_irrelevant_states() -> Self {
+        Self {
+            restrict_to_relevant_states: false,
+        }
+    }
 
-impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
-    type GroupType = crate::state_based::grouping::VectorStateGroups;
-
-    fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
-        &mut self,
+    fn build_groups_with_relevant_states<
+        M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>,
+    >(
+        &self,
+        builder: &mut VectorStateGroupBuilder,
         game: &mut ProbabilisticModel<M>,
         property: &Property<AtomicProposition, f64>,
-    ) -> GroupsAndAuxiliary<Self::GroupType> {
-        let mut builder = Self::GroupType::get_builder();
-
+    ) {
         let relevant_states = super::RelevantStates::compute(game, property);
 
         for i in 0..game.states.len() {
@@ -37,6 +43,39 @@ impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
             relevant_states.into_dummy_states(),
             "dummy states".to_string(),
         );
+    }
+
+    fn build_groups_with_all_states<
+        M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>,
+    >(
+        &self,
+        builder: &mut VectorStateGroupBuilder,
+        game: &mut ProbabilisticModel<M>,
+    ) {
+        for i in 0..game.states.len() {
+            let state = &game.states[i];
+            let label = format!("{}", state.valuation.displayable(&game.valuation_context));
+            builder.add_state(i);
+            builder.finish_group(label);
+        }
+    }
+}
+
+impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
+    type GroupType = crate::state_based::grouping::VectorStateGroups;
+
+    fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
+        &mut self,
+        game: &mut ProbabilisticModel<M>,
+        property: &Property<AtomicProposition, f64>,
+    ) -> GroupsAndAuxiliary<Self::GroupType> {
+        let mut builder = Self::GroupType::get_builder();
+
+        match self.restrict_to_relevant_states {
+            true => self.build_groups_with_relevant_states(&mut builder, game, property),
+            false => self.build_groups_with_all_states(&mut builder, game),
+        };
+        println!("Finished building groups!");
 
         GroupsAndAuxiliary::new(builder.finish())
     }

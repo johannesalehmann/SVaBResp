@@ -1,12 +1,21 @@
+use crate::regions::StateRegion;
 use crate::two_player_games::non_probabilistic::algorithm_collections::{
     AdaptableOwners, AlgorithmCollection, ChangeableOwners,
 };
 use probabilistic_models::{ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 
 pub trait SolvableGame {
+    type WinningRegionType: StateRegion;
+
+    type ModelTypes: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer> + Sized;
+
     fn set_owner(&mut self, state: usize, owner: TwoPlayer);
 
     fn get_winner(&mut self) -> TwoPlayer;
+
+    fn get_winning_region(&mut self) -> Self::WinningRegionType;
+
+    fn get_game(&self) -> &ProbabilisticModel<Self::ModelTypes>;
 }
 
 pub struct GameAndSolver<
@@ -38,6 +47,9 @@ impl<
     AC: AlgorithmCollection<ModelContext: AdaptableOwners>,
 > SolvableGame for GameAndSolver<M, AC>
 {
+    type WinningRegionType = AC::WinningRegionType;
+    type ModelTypes = M;
+
     fn set_owner(&mut self, state: usize, owner: TwoPlayer) {
         self.game.states[state].owner = owner;
     }
@@ -46,6 +58,16 @@ impl<
         self.context.adapt_to_owners(&self.game);
         self.solver
             .winning_with_context(&self.game, &mut self.context)
+    }
+
+    fn get_winning_region(&mut self) -> Self::WinningRegionType {
+        self.context.adapt_to_owners(&self.game);
+        self.solver
+            .winning_region_with_context(&self.game, &mut self.context)
+    }
+
+    fn get_game(&self) -> &ProbabilisticModel<Self::ModelTypes> {
+        &self.game
     }
 }
 
@@ -78,6 +100,9 @@ impl<
     AC: AlgorithmCollection<ModelContext: ChangeableOwners>,
 > SolvableGame for GameAndSolverExternalOwners<M, AC>
 {
+    type WinningRegionType = AC::WinningRegionType;
+    type ModelTypes = M;
+
     fn set_owner(&mut self, state: usize, owner: TwoPlayer) {
         self.context.set_owner(state, owner);
     }
@@ -85,5 +110,14 @@ impl<
     fn get_winner(&mut self) -> TwoPlayer {
         self.solver
             .winning_with_context(&self.game, &mut self.context)
+    }
+
+    fn get_winning_region(&mut self) -> Self::WinningRegionType {
+        self.solver
+            .winning_region_with_context(&self.game, &mut self.context)
+    }
+
+    fn get_game(&self) -> &ProbabilisticModel<Self::ModelTypes> {
+        &self.game
     }
 }

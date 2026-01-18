@@ -5,6 +5,10 @@ use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, IndividualGroupExtractionScheme, LabelGroupExtractionScheme,
     ModuleExtractionScheme, ValueGroupExtractionScheme,
 };
+use svabresp::state_based::refinement::{
+    FrontierSplittingHeuristics, IdentityGroupBlockingProvider, RandomBlockSelectionHeuristics,
+    RefinementGroupBlockingProvider, SingletonInitialPartition,
+};
 use svabresp::{CounterexampleFile, ModelFromString, ResponsibilityTask};
 
 #[test]
@@ -19,6 +23,7 @@ fn small_network_explicit() {
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
         grouping_scheme: IndividualGroupExtractionScheme::new(),
+        refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
 
@@ -45,6 +50,7 @@ fn labelled_groups() {
             "l2".to_string(),
             "dummy".to_string(),
         ]),
+        refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
 
@@ -70,6 +76,7 @@ fn value_groups() {
             "z".to_string(),
             "w".to_string(),
         ]),
+        refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
 
@@ -91,6 +98,7 @@ fn module_groups() {
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
         grouping_scheme: ModuleExtractionScheme::new(),
+        refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
 
@@ -116,6 +124,7 @@ fn action_groups() {
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
         grouping_scheme: ActionGroupExtractionScheme::new(),
+        refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
     for res in result.players.iter() {
@@ -124,6 +133,35 @@ fn action_groups() {
 
     assert_res("button1", "1/2", &result);
     assert_res("button2", "0", &result);
+    assert_res("button3", "1/2", &result);
+}
+
+#[test]
+fn simple_refinement() {
+    let task = ResponsibilityTask {
+        model_description: ModelFromString::new(
+            "simple-refinement.prism",
+            include_str!("files/simple-refinement.prism"),
+            "P=1 [F \"obj\"]",
+        ),
+        constants: "".to_string(),
+        coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
+        algorithm: BruteForceAlgorithm::new(),
+        grouping_scheme: IndividualGroupExtractionScheme::including_irrelevant_states(),
+        refinement: // IdentityGroupBlockingProvider::new(),
+        RefinementGroupBlockingProvider::new(
+            SingletonInitialPartition::new(),
+            RandomBlockSelectionHeuristics::new(1),
+            FrontierSplittingHeuristics::new(),
+        ),
+    };
+    let result = task.run();
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
+
+    assert_res("(x=4)", "1", &result);
+    assert_res("multiple states", "0", &result);
     assert_res("button3", "1/2", &result);
 }
 

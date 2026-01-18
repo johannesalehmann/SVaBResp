@@ -49,6 +49,7 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
 
         let large_losing_coalitions = Self::large_losing_coalitions(&mut coop_game, 4);
 
+        println!("Starting solving games!");
         std::io::stdout().flush().unwrap();
         for coalition in 0..max_coalition {
             if coalition % 10_000_000 == 0 && coalition > 0 {
@@ -59,7 +60,10 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
                     (coalition as f64 / max_coalition as f64) * 100.0,
                     game_counter,
                     skipped_counter
-                )
+                );
+                if coalition > 100_000_000 {
+                    panic!("Done");
+                }
             }
             let mut subset_winning = false;
             for &other_coalition in &minimal_coalitions {

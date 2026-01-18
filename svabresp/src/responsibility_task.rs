@@ -1,5 +1,6 @@
 use crate::shapley::ShapleyAlgorithm;
 use crate::state_based::grouping::GroupExtractionScheme;
+use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
 
 pub struct ResponsibilityTask<
@@ -7,12 +8,14 @@ pub struct ResponsibilityTask<
     C: CounterexampleSource,
     A: ShapleyAlgorithm,
     G: GroupExtractionScheme,
+    R: GroupBlockingProvider,
 > {
     pub model_description: M,
     pub constants: String,
     pub coop_game_type: CoopGameType<C>,
     pub algorithm: A,
     pub grouping_scheme: G,
+    pub refinement: R,
 }
 
 impl<
@@ -20,7 +23,8 @@ impl<
     C: CounterexampleSource,
     A: ShapleyAlgorithm,
     G: GroupExtractionScheme,
-> ResponsibilityTask<M, C, A, G>
+    R: GroupBlockingProvider,
+> ResponsibilityTask<M, C, A, G, R>
 {
     pub fn run(mut self) -> A::Output<String> {
         let (prism_model, property) = self.model_description.get_model_and_property();
@@ -31,6 +35,7 @@ impl<
             prism_model,
             property,
             self.grouping_scheme,
+            self.refinement,
             &mut self.algorithm,
             constants,
         );

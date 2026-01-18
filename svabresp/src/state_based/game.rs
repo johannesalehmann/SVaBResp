@@ -29,6 +29,75 @@ impl<'a, G: StateGroups, A: SolvableGame> StateBasedResponsibilityGame<G, A> {
             group_info,
         }
     }
+
+    pub fn map_grouping<G2: StateGroups, F: Fn(G) -> G2>(
+        self,
+        map: F,
+    ) -> StateBasedResponsibilityGame<G2, A> {
+        let grouping = map(self.grouping);
+        let group_info = GroupInfo::from_grouping(&grouping);
+
+        StateBasedResponsibilityGame {
+            solvable: self.solvable,
+            grouping,
+            always_helping: self.always_helping,
+            always_adversarial: self.always_adversarial,
+            group_info,
+        }
+    }
+
+    pub fn get_grouping(&self) -> &G {
+        &self.grouping
+    }
+
+    pub fn get_solvable(&self) -> &A {
+        &self.solvable
+    }
+
+    pub fn set_state_owners<C: CoalitionSpecifier>(&mut self, coalition: C) {
+        self.set_auxiliary_state_owners();
+        for i in 0..self.grouping.get_count() {
+            if coalition.is_in_coalition(i) {
+                self.set_group_owners(i, TwoPlayer::PlayerOne);
+            } else {
+                self.set_group_owners(i, TwoPlayer::PlayerTwo);
+            }
+        }
+    }
+
+    pub fn set_auxiliary_state_owners(&mut self) {
+        for &state in &self.always_helping {
+            self.solvable.set_owner(state, TwoPlayer::PlayerOne);
+        }
+        for &state in &self.always_adversarial {
+            self.solvable.set_owner(state, TwoPlayer::PlayerTwo);
+        }
+    }
+
+    pub fn set_group_owners(&mut self, group_index: usize, owner: TwoPlayer) {
+        for state in self.grouping.get_states(group_index) {
+            self.solvable.set_owner(state, owner);
+        }
+    }
+
+    // TODO: It is a bit of a hack that these functions exist, as they break the abstraction. It
+    // would be nicer if this were handled by passing a suitable CoalitionSpecifier to the main
+    // function instead of setting the owners explicitly.
+    pub fn is_winning_with_current_owners(&mut self) -> bool {
+        self.solvable.get_winner() == TwoPlayer::PlayerOne
+    }
+
+    pub fn get_winning_region<C: CoalitionSpecifier>(
+        &mut self,
+        coalition: C,
+    ) -> A::WinningRegionType {
+        self.set_state_owners(coalition);
+        self.solvable.get_winning_region()
+    }
+
+    pub fn get_winning_region_with_current_owners(&mut self) -> A::WinningRegionType {
+        self.solvable.get_winning_region()
+    }
 }
 
 impl<G: StateGroups, A: SolvableGame> SimpleCooperativeGame for StateBasedResponsibilityGame<G, A> {
@@ -51,24 +120,7 @@ impl<G: StateGroups, A: SolvableGame> SimpleCooperativeGame for StateBasedRespon
     }
 
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool {
-        for &state in &self.always_helping {
-            self.solvable.set_owner(state, TwoPlayer::PlayerOne);
-        }
-        for &state in &self.always_adversarial {
-            self.solvable.set_owner(state, TwoPlayer::PlayerTwo);
-        }
-        for i in 0..self.grouping.get_count() {
-            if coalition.is_in_coalition(i) {
-                for state in self.grouping.get_states(i) {
-                    self.solvable.set_owner(state, TwoPlayer::PlayerOne);
-                }
-            } else {
-                for state in self.grouping.get_states(i) {
-                    self.solvable.set_owner(state, TwoPlayer::PlayerTwo);
-                }
-            }
-        }
-
+        self.set_state_owners(coalition);
         self.solvable.get_winner() == TwoPlayer::PlayerOne
     }
 }

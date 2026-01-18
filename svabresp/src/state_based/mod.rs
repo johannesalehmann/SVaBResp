@@ -3,11 +3,15 @@ use probabilistic_models::{
 };
 
 mod game;
+pub use game::StateBasedResponsibilityGame;
+
 pub mod grouping;
 
-use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm};
-use crate::{PrismModel, PrismProperty};
+pub mod refinement;
 
+use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm};
+use crate::state_based::refinement::GroupBlockingProvider;
+use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
 use prism_model_builder::ConstValue;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
@@ -15,10 +19,15 @@ use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
     SafetyAlgorithmCollection,
 };
 
-pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
+pub fn compute_for_prism<
+    G: GroupExtractionScheme,
+    S: ShapleyAlgorithm,
+    B: GroupBlockingProvider,
+>(
     mut prism_model: PrismModel,
     mut prism_property: PrismProperty,
     mut grouping_scheme: G,
+    group_blocking_provider: B,
     shapley: &mut S,
     constants: std::collections::HashMap<String, ConstValue>,
 ) -> S::Output<String> {
@@ -55,23 +64,31 @@ pub fn compute_for_prism<G: GroupExtractionScheme, S: ShapleyAlgorithm>(
 
     if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
-        let coop_game = game::StateBasedResponsibilityGame::new(
+        let mut coop_game = game::StateBasedResponsibilityGame::new(
             solvable_game,
             grouping.groups,
             grouping.always_helping,
             grouping.always_adversarial,
         );
+
+        let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
+        let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+
         let cached_coop_game = MinimalCoalitionCache::create(coop_game);
 
         shapley.compute_simple(cached_coop_game)
     } else if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
-        let coop_game = game::StateBasedResponsibilityGame::new(
+        let mut coop_game = game::StateBasedResponsibilityGame::new(
             solvable_game,
             grouping.groups,
             grouping.always_helping,
             grouping.always_adversarial,
         );
+
+        let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
+        let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+
         let cached_coop_game = MinimalCoalitionCache::create(coop_game);
 
         shapley.compute_simple(cached_coop_game)

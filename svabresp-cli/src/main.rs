@@ -6,6 +6,7 @@ use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgori
 
 use clap::{Arg, Command, arg};
 use svabresp::state_based::grouping::{GroupExtractionScheme, IndividualGroupExtractionScheme};
+use svabresp::state_based::refinement::IdentityGroupBlockingProvider;
 use svabresp::{
     CoopGameType, CounterexampleFile, ModelAndPropertySource, ModelFromFile, ResponsibilityTask,
 };
@@ -197,6 +198,7 @@ fn execute_with_algorithm<
         coop_game_type: CoopGameType::<CounterexampleFile>::Forward, // TODO: Make this configurable
         algorithm,
         grouping_scheme,
+        refinement: IdentityGroupBlockingProvider::new(),
     };
 
     let output = task.run();
