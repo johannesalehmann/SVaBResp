@@ -6,7 +6,8 @@ use prism_model::{
     VariableReference,
 };
 use probabilistic_models::{
-    AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation, VectorPredecessors,
+    AtomicProposition, Context, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation,
+    VectorPredecessors,
 };
 use probabilistic_properties::Property;
 use std::collections::HashMap;
@@ -221,9 +222,14 @@ impl super::GroupExtractionScheme for ModuleExtractionScheme {
         }
 
         for (index, state) in game.states.iter().enumerate() {
+            // TODO: Using get_variable_count() - 1 as index is a hack that assumes that last-added
+            // variable is also the last variable in the valuation. We cannot use
+            // self.selected_module_variable.index, as the variable manager index does not
+            // correspond to the index in the valuation (the former includes constants, the latter
+            // does not)
             let value = state
                 .valuation
-                .evaluate_unbounded_int(selected_module_variable.index)
+                .evaluate_unbounded_int(game.valuation_context.get_variable_count() - 1)
                 as usize;
             groups[value].push(index);
         }
