@@ -12,13 +12,13 @@ use probabilistic_models::{
 use probabilistic_properties::Property;
 use std::collections::HashMap;
 
-pub struct ModuleExtractionScheme {
+pub struct ModuleGroupExtractionScheme {
     group_count: Option<usize>, // The number of groups includes the scheduler group, one group per module and one per synchronising action
     selected_module_variable: Option<VariableReference>,
     group_names: Vec<String>,
 }
 
-impl ModuleExtractionScheme {
+impl ModuleGroupExtractionScheme {
     pub fn new() -> Self {
         Self {
             group_count: None,
@@ -28,7 +28,7 @@ impl ModuleExtractionScheme {
     }
 }
 
-impl super::GroupExtractionScheme for ModuleExtractionScheme {
+impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
     type GroupType = crate::state_based::grouping::VectorStateGroups;
 
     fn transform_prism(&mut self, prism_model: &mut PrismModel, property: &mut PrismProperty) {
@@ -214,7 +214,6 @@ impl super::GroupExtractionScheme for ModuleExtractionScheme {
         let _ = property;
 
         let group_count = self.group_count.unwrap();
-        let selected_module_variable = self.selected_module_variable.unwrap();
 
         let mut groups = Vec::with_capacity(group_count);
         for _ in 0..group_count {

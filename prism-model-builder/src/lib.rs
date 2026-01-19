@@ -1,6 +1,7 @@
 mod expressions;
 
 use crate::expressions::{Evaluator, ValuationSource, VariableType};
+use log::info;
 use prism_model::{
     Expression, Identifier, Model, Update, VariableManager, VariableRange, VariableReference,
 };
@@ -167,7 +168,11 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             result.states.push(state);
         }
 
-        println!("Model built in {:?}", start_time.elapsed());
+        info!(
+            "Model built in {:?} ({} states)",
+            start_time.elapsed(),
+            result.states.len()
+        );
         Ok(result)
     }
 

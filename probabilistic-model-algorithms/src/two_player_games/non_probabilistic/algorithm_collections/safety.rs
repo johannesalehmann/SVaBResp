@@ -1,6 +1,6 @@
 use super::super::attractor;
 use super::AlgorithmCollection;
-use crate::regions::{InvertedStateRegion, StateRegion, VectorStateRegion};
+use crate::regions::{FlagStateRegion, InvertedStateRegion, StateRegion};
 use probabilistic_models::probabilistic_properties::{
     Path, ProbabilityConstraint, ProbabilityKind, ProbabilityOperator, Property,
 };
@@ -13,7 +13,7 @@ pub struct SafetyAlgorithmCollection {
 }
 
 impl AlgorithmCollection for SafetyAlgorithmCollection {
-    type WinningRegionType = InvertedStateRegion<VectorStateRegion>;
+    type WinningRegionType = InvertedStateRegion<FlagStateRegion>;
     type ModelContext = SafetyAlgorithmContext;
 
     fn create_model_context<
@@ -85,7 +85,7 @@ impl AlgorithmCollection for SafetyAlgorithmCollection {
         model: &ProbabilisticModel<M>,
         context: &mut Self::ModelContext,
     ) -> Self::WinningRegionType {
-        attractor::attractor_with_buffer::<_, _, VectorStateRegion>(
+        attractor::attractor_with_buffer::<_, _, FlagStateRegion>(
             model,
             context.bad_states.iter().cloned(),
             &mut context.buffer,

@@ -1,4 +1,5 @@
 use crate::shapley::PlayerDescriptions;
+use log::trace;
 use num_rational::BigRational;
 use num_traits::{FromPrimitive, Zero};
 use std::ops::Mul;
@@ -24,6 +25,7 @@ impl CriticalPairCounter {
         weights: Vec<BigRational>,
         player_infos: P,
     ) -> ResponsibilityValues<P::PlayerType> {
+        trace!("Transforming counts into responsibility values");
         let mut states = Vec::with_capacity(self.states.len());
 
         for (state, player_info) in self.states.into_iter().zip(player_infos.into_iterator()) {

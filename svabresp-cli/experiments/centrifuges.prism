@@ -1,0 +1,209 @@
+mdp
+
+const int CLEAN_SPEED_1 = 0;
+const int CLEAN_SPEED_2 = 1;
+const int INFECTED_SPEED_1 = 2;
+const int INFECTED_SPEED_2 = 3;
+
+const int SAMPLING_TIME=3;
+
+const int SAMPLING_LENGTH = 6;
+const int THRESHOLD_CLEAN = 4;
+
+const int CLEAN_SAMPLES = 2;
+const int INFECTED_SAMPLES = 1;
+
+formula done = state_1 = 1 & state_2=1 & state_3=1 & state_4=1 & state_5=1 & state_6=1 & state_7=1 & state_8=1 & state_9=1 & state_10=1 & clean_samples = 0 & infected_samples = 0;
+
+label "obj" = done & clean_results = CLEAN_SAMPLES & infected_results = INFECTED_SAMPLES;
+
+module SampleProvider
+    clean_samples: int init CLEAN_SAMPLES;
+    infected_samples: int init INFECTED_SAMPLES;
+
+    [take_clean_1] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_2] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_3] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_4] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_5] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_6] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_7] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_8] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_9] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+    [take_clean_10] (clean_samples>0) -> (clean_samples'=clean_samples - 1);
+
+    [take_infected_1] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_2] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_3] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_4] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_5] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_6] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_7] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_8] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_9] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+    [take_infected_10] (infected_samples>0) -> (infected_samples'=infected_samples - 1);
+endmodule
+
+module Centrifuge1
+    state_1: int init 1; // 1: ready to accept sample, 2: sampling, 3: time is up
+    position_1: int init 0;
+    speed_1: int init 0;
+    time_1: int init 0;
+
+    [take_clean_1] (state_1=1) -> (speed_1'=CLEAN_SPEED_1) & (state_1'=2);
+    [take_clean_1] (state_1=1) -> (speed_1'=CLEAN_SPEED_2) & (state_1'=2);
+
+    [take_infected_1] (state_1=1) -> (speed_1'=INFECTED_SPEED_1) & (state_1'=2);
+    [take_infected_1] (state_1=1) -> (speed_1'=INFECTED_SPEED_2) & (state_1'=2);
+
+    [] (state_1=2 & time_1<SAMPLING_TIME) -> (time_1'=time_1+1) & (position_1'=min(SAMPLING_LENGTH, position_1+speed_1));
+    [] (state_1=2 & time_1=SAMPLING_TIME) -> (state_1'=3)&(speed_1'=0);
+
+    [report_clean_1] (state_1=3 & position_1 < THRESHOLD_CLEAN) -> (state_1'=1)&(position_1'=0)&(time_1'=0);
+    [report_infected_1] (state_1=3 & position_1 >= THRESHOLD_CLEAN) -> (state_1'=1)&(position_1'=0)&(time_1'=0);
+endmodule
+
+module Centrifuge2 = Centrifuge1 [
+    state_1=state_2,
+    position_1=position_2,
+    speed_1=speed_2,
+    time_1=time_2,
+    take_clean_1=take_clean_2,
+    take_infected_1=take_infected_2,
+    report_clean_1=report_clean_2,
+    report_infected_1=report_infected_2
+] endmodule
+
+module Centrifuge3 = Centrifuge1 [
+    state_1=state_3,
+    position_1=position_3,
+    speed_1=speed_3,
+    time_1=time_3,
+    take_clean_1=take_clean_3,
+    take_infected_1=take_infected_3,
+    report_clean_1=report_clean_3,
+    report_infected_1=report_infected_3
+] endmodule
+
+module Centrifuge4 = Centrifuge1 [
+    state_1=state_4,
+    position_1=position_4,
+    speed_1=speed_4,
+    time_1=time_4,
+    take_clean_1=take_clean_4,
+    take_infected_1=take_infected_4,
+    report_clean_1=report_clean_4,
+    report_infected_1=report_infected_4
+] endmodule
+
+// module Centrifuge5 = Centrifuge1 [
+//     state_1=state_5,
+//     position_1=position_5,
+//     speed_1=speed_5,
+//     time_1=time_5,
+//     take_clean_1=take_clean_5,
+//     take_infected_1=take_infected_5,
+//     report_clean_1=report_clean_5,
+//     report_infected_1=report_infected_5
+// ] endmodule
+
+module Centrifuge5
+    state_5: int init 1; // 1: ready to accept sample, 2: sampling, 3: time is up
+    position_5: int init 0;
+    speed_5: int init 0;
+    time_5: int init 0;
+
+    [take_clean_5] (state_5=1) -> (speed_5'=CLEAN_SPEED_1) & (state_5'=2);
+    [take_clean_5] (state_5=1) -> (speed_5'=CLEAN_SPEED_2) & (state_5'=2);
+
+    [take_infected_5] (state_5=1) -> (speed_5'=INFECTED_SPEED_1) & (state_5'=2);
+    [take_infected_5] (state_5=1) -> (speed_5'=INFECTED_SPEED_2) & (state_5'=2);
+
+    [] (state_5=2 & time_5<=SAMPLING_TIME) -> (time_5'=time_5+1) & (position_5'=min(SAMPLING_LENGTH, position_5+speed_5));
+    [] (state_5=2 & time_5<=SAMPLING_TIME) -> (state_5'=3)&(speed_5'=0);
+
+    [report_clean_5] (state_5=3 & position_5 < THRESHOLD_CLEAN) -> (state_5'=1)&(position_5'=0)&(time_5'=0);
+    [report_infected_5] (state_5=3 & position_5 >= THRESHOLD_CLEAN) -> (state_5'=1)&(position_5'=0)&(time_5'=0);
+endmodule
+
+module Centrifuge6 = Centrifuge1 [
+    state_1=state_6,
+    position_1=position_6,
+    speed_1=speed_6,
+    time_1=time_6,
+    take_clean_1=take_clean_6,
+    take_infected_1=take_infected_6,
+    report_clean_1=report_clean_6,
+    report_infected_1=report_infected_6
+] endmodule
+
+module Centrifuge7 = Centrifuge1 [
+    state_1=state_7,
+    position_1=position_7,
+    speed_1=speed_7,
+    time_1=time_7,
+    take_clean_1=take_clean_7,
+    take_infected_1=take_infected_7,
+    report_clean_1=report_clean_7,
+    report_infected_1=report_infected_7
+] endmodule
+
+module Centrifuge8 = Centrifuge1 [
+    state_1=state_8,
+    position_1=position_8,
+    speed_1=speed_8,
+    time_1=time_8,
+    take_clean_1=take_clean_8,
+    take_infected_1=take_infected_8,
+    report_clean_1=report_clean_8,
+    report_infected_1=report_infected_8
+] endmodule
+
+module Centrifuge9 = Centrifuge1 [
+    state_1=state_9,
+    position_1=position_9,
+    speed_1=speed_9,
+    time_1=time_9,
+    take_clean_1=take_clean_9,
+    take_infected_1=take_infected_9,
+    report_clean_1=report_clean_9,
+    report_infected_1=report_infected_9
+] endmodule
+
+module Centrifuge10 = Centrifuge1 [
+    state_1=state_10,
+    position_1=position_10,
+    speed_1=speed_10,
+    time_1=time_10,
+    take_clean_1=take_clean_10,
+    take_infected_1=take_infected_10,
+    report_clean_1=report_clean_10,
+    report_infected_1=report_infected_10
+] endmodule
+
+module ResultsTracker
+    clean_results: int init 0;
+    infected_results: int init 0;
+
+    [report_clean_1] true -> (clean_results'=clean_results+1);
+    [report_clean_2] true -> (clean_results'=clean_results+1);
+    [report_clean_3] true -> (clean_results'=clean_results+1);
+    [report_clean_4] true -> (clean_results'=clean_results+1);
+    [report_clean_5] true -> (clean_results'=clean_results+1);
+    [report_clean_6] true -> (clean_results'=clean_results+1);
+    [report_clean_7] true -> (clean_results'=clean_results+1);
+    [report_clean_8] true -> (clean_results'=clean_results+1);
+    [report_clean_9] true -> (clean_results'=clean_results+1);
+    [report_clean_10] true -> (clean_results'=clean_results+1);
+
+    [report_infected_1] true -> (infected_results'=infected_results+1);
+    [report_infected_2] true -> (infected_results'=infected_results+1);
+    [report_infected_3] true -> (infected_results'=infected_results+1);
+    [report_infected_4] true -> (infected_results'=infected_results+1);
+    [report_infected_5] true -> (infected_results'=infected_results+1);
+    [report_infected_6] true -> (infected_results'=infected_results+1);
+    [report_infected_7] true -> (infected_results'=infected_results+1);
+    [report_infected_8] true -> (infected_results'=infected_results+1);
+    [report_infected_9] true -> (infected_results'=infected_results+1);
+    [report_infected_10] true -> (infected_results'=infected_results+1);
+endmodule

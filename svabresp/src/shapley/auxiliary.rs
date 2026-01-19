@@ -1,8 +1,10 @@
+use log::trace;
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use num_traits::identities::{One, Zero};
 
 pub fn compute_weights(n: usize) -> Vec<BigRational> {
+    trace!("Computing weights");
     let mut factorials = Vec::with_capacity(n + 1);
     let mut current_value = BigInt::one();
     factorials.push(BigInt::one());

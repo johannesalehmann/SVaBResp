@@ -75,7 +75,6 @@ impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
             true => self.build_groups_with_relevant_states(&mut builder, game, property),
             false => self.build_groups_with_all_states(&mut builder, game),
         };
-        println!("Finished building groups!");
 
         GroupsAndAuxiliary::new(builder.finish())
     }

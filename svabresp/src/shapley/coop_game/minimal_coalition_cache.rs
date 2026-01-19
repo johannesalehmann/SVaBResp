@@ -1,5 +1,6 @@
 use crate::shapley::coop_game::PlayerDescriptions;
 use crate::shapley::{CoalitionSpecifier, MonotoneCooperativeGame, SimpleCooperativeGame};
+use log::trace;
 use std::io::Write;
 
 pub struct MinimalCoalitionCache<P: PlayerDescriptions> {
@@ -40,6 +41,7 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
     pub fn create<C: SimpleCooperativeGame<PlayerDescriptions = P> + MonotoneCooperativeGame>(
         mut coop_game: C,
     ) -> Self {
+        trace!("Building minimal coalition cache");
         let mut minimal_coalitions = Vec::new();
 
         let max_coalition = 1u64 << coop_game.get_player_count();
@@ -49,7 +51,6 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
 
         let large_losing_coalitions = Self::large_losing_coalitions(&mut coop_game, 4);
 
-        println!("Starting solving games!");
         std::io::stdout().flush().unwrap();
         for coalition in 0..max_coalition {
             if coalition % 10_000_000 == 0 && coalition > 0 {
@@ -61,9 +62,6 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
                     game_counter,
                     skipped_counter
                 );
-                if coalition > 100_000_000 {
-                    panic!("Done");
-                }
             }
             let mut subset_winning = false;
             for &other_coalition in &minimal_coalitions {

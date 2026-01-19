@@ -1,4 +1,5 @@
 use crate::state_based::grouping::{StateGroups, VectorStateGroups};
+use log::trace;
 use std::collections::HashMap;
 
 pub struct PlayerPartition {
@@ -50,6 +51,7 @@ impl PlayerPartition {
     }
 
     pub fn apply_to_grouping<G: StateGroups>(&self, groups: G) -> VectorStateGroups {
+        trace!("Applying group blocking to grouping");
         let mut builder = VectorStateGroups::get_builder();
 
         for entry in &self.entries {

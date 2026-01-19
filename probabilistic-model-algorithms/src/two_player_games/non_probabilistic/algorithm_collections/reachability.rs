@@ -1,6 +1,6 @@
 use super::super::attractor;
 use super::AlgorithmCollection;
-use crate::regions::VectorStateRegion;
+use crate::regions::FlagStateRegion;
 use probabilistic_models::probabilistic_properties::{
     Path, ProbabilityConstraint, ProbabilityKind, ProbabilityOperator, Property,
 };
@@ -13,7 +13,7 @@ pub struct ReachabilityAlgorithmCollection {
 }
 
 impl AlgorithmCollection for ReachabilityAlgorithmCollection {
-    type WinningRegionType = VectorStateRegion;
+    type WinningRegionType = FlagStateRegion;
     type ModelContext = ReachabilityAlgorithmContext;
 
     fn create_model_context<

@@ -5,11 +5,16 @@ use svabresp::num_traits::ToPrimitive;
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgorithm};
 
 use clap::{Arg, Command, arg};
+use env_logger::Target;
+use log::{LevelFilter, Log, trace};
 use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, GroupExtractionScheme, IndividualGroupExtractionScheme,
     LabelGroupExtractionScheme, ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
 };
-use svabresp::state_based::refinement::IdentityGroupBlockingProvider;
+use svabresp::state_based::refinement::{
+    FrontierSplittingHeuristics, GroupBlockingProvider, IdentityGroupBlockingProvider,
+    RandomBlockSelectionHeuristics, RefinementGroupBlockingProvider, SingletonInitialPartition,
+};
 use svabresp::{
     CoopGameType, CounterexampleFile, ModelAndPropertySource, ModelFromFile, ResponsibilityTask,
 };
@@ -21,6 +26,7 @@ struct Cli {
     algorithm: AlgorithmKind,
     grouping: GroupingKind,
     output: OutputKind,
+    logging_level: LoggingLevel,
 }
 
 enum AlgorithmKind {
@@ -43,6 +49,14 @@ enum OutputKind {
     Silent,
 }
 
+enum LoggingLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
 impl Cli {
     pub fn from_arguments() -> Self {
         let matches =         Command::new("svabresp").about("Computes responsibility values")
@@ -50,8 +64,10 @@ impl Cli {
             .arg(arg!(-g --grouping <GROUPING> "The scheme that is used to group states. Legal values are `individual`, `labels([space-separated list of label names])`, `modules`, `actions`, `variables([space-separated list of variable names])`. The default is `individual`").default_value("individual"))
             .arg(arg!(-o --output <OUTPUT> "How the output should be presented. Legal values are `human-readable`, `parsable` (simple format that can be processed by other tools) and `silent` (no output). The default is `human-readable`").default_value("human-readable"))
             .arg(arg!(-c --constants <CONSTANTS> "Values for the undefined constants in the model").required(false))
+            .arg(arg!(-l --logging <LEVEL> "The level of detail for the logs. Legal values are `error`, `warn`, `info`, `debug` and `trace`.").default_value("warn"))
             .arg(Arg::new("model").required(true).help("File name of the PRISM model file"))
             .arg(Arg::new("property").required(true).help("Property to be checked, given in PRISM property language"))
+
             .get_matches();
 
         let model = matches
@@ -100,6 +116,14 @@ impl Cli {
             Some(c) => c.clone(),
             None => "".to_string(),
         };
+        let logging_level = match matches.get_one::<String>("logging").unwrap().as_str() {
+            "error" => LoggingLevel::Error,
+            "warn" => LoggingLevel::Warn,
+            "info" => LoggingLevel::Info,
+            "debug" => LoggingLevel::Debug,
+            "trace" => LoggingLevel::Trace,
+            l => panic!("Unknown logging level `{}`", l),
+        };
 
         Cli {
             model,
@@ -108,6 +132,7 @@ impl Cli {
             algorithm,
             grouping,
             output,
+            logging_level,
         }
     }
 
@@ -133,6 +158,28 @@ fn main() {
 }
 
 fn execute_cli(cli: Cli) {
+    let mut logging_builder = env_logger::Builder::from_default_env();
+    logging_builder.target(Target::Stdout);
+    match cli.logging_level {
+        LoggingLevel::Error => {
+            logging_builder.filter(None, LevelFilter::Error);
+        }
+        LoggingLevel::Warn => {
+            logging_builder.filter(None, LevelFilter::Warn);
+        }
+        LoggingLevel::Info => {
+            logging_builder.filter(None, LevelFilter::Info);
+        }
+        LoggingLevel::Debug => {
+            logging_builder.filter(None, LevelFilter::Debug);
+        }
+        LoggingLevel::Trace => {
+            logging_builder.filter(None, LevelFilter::Trace);
+        }
+    }
+    logging_builder.init();
+    trace!("Trace-level logging enabled");
+
     let model_description = ModelFromFile::new(cli.model.clone(), cli.property.clone());
     execute_with_model_description(cli, model_description);
 }
@@ -181,13 +228,23 @@ fn execute_with_grouping_scheme<M: ModelAndPropertySource, G: GroupExtractionSch
             grouping_scheme,
             BruteForceAlgorithm::new(),
             ResponsibilityValuesPrinter {},
+            IdentityGroupBlockingProvider::new(),
         ),
         AlgorithmKind::Stochastic => {
             panic!("Stochastic algorithm not implemented in cli yet")
         }
-        AlgorithmKind::Refinement => {
-            panic!("Refinement algorithm not implemented in cli yet")
-        }
+        AlgorithmKind::Refinement => execute_with_algorithm(
+            cli,
+            model_description,
+            grouping_scheme,
+            BruteForceAlgorithm::new(),
+            ResponsibilityValuesPrinter {},
+            RefinementGroupBlockingProvider::new(
+                SingletonInitialPartition::new(),
+                RandomBlockSelectionHeuristics::new(1),
+                FrontierSplittingHeuristics::new(),
+            ),
+        ),
     }
 }
 
@@ -196,12 +253,14 @@ fn execute_with_algorithm<
     G: GroupExtractionScheme,
     A: ShapleyAlgorithm,
     P: OutputPrinter<A::Output<String>>,
+    B: GroupBlockingProvider,
 >(
     cli: Cli,
     model_description: M,
     grouping_scheme: G,
     algorithm: A,
     printer: P,
+    refinement: B,
 ) {
     let task = ResponsibilityTask {
         model_description,
@@ -209,9 +268,10 @@ fn execute_with_algorithm<
         coop_game_type: CoopGameType::<CounterexampleFile>::Forward, // TODO: Make this configurable
         algorithm,
         grouping_scheme,
-        refinement: IdentityGroupBlockingProvider::new(),
+        refinement,
     };
 
+    trace!("Finished preparing responsibility task");
     let output = task.run();
 
     match cli.output {

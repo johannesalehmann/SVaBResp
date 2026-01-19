@@ -70,7 +70,8 @@ impl<'a, G: StateGroups, A: SolvableGame> SimpleCooperativeGame for GroupedGame<
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool {
         self.set_owners(coalition);
 
-        self.game.is_winning_with_current_owners()
+        let result = self.game.is_winning_with_current_owners();
+        result
     }
 }
 

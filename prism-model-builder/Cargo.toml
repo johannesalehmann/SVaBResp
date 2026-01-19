@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 prism-model = { path = "../prism-model" }
 probabilistic-models = { path = "../probabilistic-models" }
+log = "0.4.29"

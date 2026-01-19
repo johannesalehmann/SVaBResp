@@ -2,6 +2,7 @@ use crate::shapley::ShapleyAlgorithm;
 use crate::state_based::grouping::GroupExtractionScheme;
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
+use log::trace;
 
 pub struct ResponsibilityTask<
     M: ModelAndPropertySource,
@@ -27,7 +28,9 @@ impl<
 > ResponsibilityTask<M, C, A, G, R>
 {
     pub fn run(mut self) -> A::Output<String> {
+        trace!("Loading model and property");
         let (prism_model, property) = self.model_description.get_model_and_property();
+        trace!("Parsing constants");
         let constants = tiny_pmc::parsing::parse_const_assignments(&self.constants)
             .expect("Failed to parse constants");
 

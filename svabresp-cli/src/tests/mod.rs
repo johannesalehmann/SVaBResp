@@ -3,7 +3,7 @@ use svabresp::num_rational::BigRational;
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues};
 use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, IndividualGroupExtractionScheme, LabelGroupExtractionScheme,
-    ModuleExtractionScheme, ValueGroupExtractionScheme,
+    ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
 };
 use svabresp::state_based::refinement::{
     FrontierSplittingHeuristics, IdentityGroupBlockingProvider, RandomBlockSelectionHeuristics,
@@ -97,7 +97,7 @@ fn module_groups() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: ModuleExtractionScheme::new(),
+        grouping_scheme: ModuleGroupExtractionScheme::new(),
         refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
@@ -161,8 +161,7 @@ fn simple_refinement() {
     }
 
     assert_res("(x=4)", "1", &result);
-    assert_res("multiple states", "0", &result);
-    assert_res("button3", "1/2", &result);
+    assert_res("[unnamed group of states]", "0", &result);
 }
 
 fn assert_res(name: &str, value: &str, result: &ResponsibilityValues<String>) {

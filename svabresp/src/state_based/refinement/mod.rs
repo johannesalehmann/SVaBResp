@@ -1,5 +1,7 @@
 mod block_selection;
+
 pub use block_selection::{BlockSelectionHeuristics, RandomBlockSelectionHeuristics};
+use log::trace;
 
 mod block_splitting;
 pub use block_splitting::{BlockSplittingHeuristics, FrontierSplittingHeuristics};
@@ -140,16 +142,28 @@ impl<
     }
 
     pub fn run(&mut self) {
+        trace!("Running refinement algorithm");
         while let Some(bsps) = self.compute_refinement_candidates() {
             self.iteration(bsps);
         }
+        trace!("Finished refinement");
     }
 
     pub fn iteration(&mut self, bsps: Vec<BlockSwitchingPair<A::WinningRegionType>>) {
+        trace!("Performing refinement iteration");
+        trace!("Selecting refinement targets");
         let to_refine =
             self.selection_heuristics
                 .select_blocks(&self.game, &self.current_partition, bsps);
-        for block in to_refine {
+
+        let n = to_refine.len();
+        trace!(
+            "Splitting {} {}",
+            n,
+            if n == 1 { "block" } else { "blocks" }
+        );
+        for (index, block) in to_refine.into_iter().enumerate() {
+            trace!("Splitting block {}/{}", index, n);
             self.splitting_heuristics
                 .split_block(&self.game, &mut self.current_partition, block);
         }
@@ -158,6 +172,7 @@ impl<
     pub fn compute_refinement_candidates(
         &mut self,
     ) -> Option<Vec<BlockSwitchingPair<A::WinningRegionType>>> {
+        trace!("Computing refinement candidates");
         let mut bsps = Vec::new();
 
         let game = grouped_game::GroupedGame::new(&mut self.game, &self.current_partition);
@@ -180,6 +195,7 @@ impl<
                 }
             }
         }
+        trace!("Found {} refinement candidates", bsps.len());
 
         if bsps.len() == 0 { None } else { Some(bsps) }
     }
