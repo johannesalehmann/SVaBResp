@@ -5,7 +5,10 @@ use svabresp::num_traits::ToPrimitive;
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgorithm};
 
 use clap::{Arg, Command, arg};
-use svabresp::state_based::grouping::{GroupExtractionScheme, IndividualGroupExtractionScheme};
+use svabresp::state_based::grouping::{
+    ActionGroupExtractionScheme, GroupExtractionScheme, IndividualGroupExtractionScheme,
+    LabelGroupExtractionScheme, ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
+};
 use svabresp::state_based::refinement::IdentityGroupBlockingProvider;
 use svabresp::{
     CoopGameType, CounterexampleFile, ModelAndPropertySource, ModelFromFile, ResponsibilityTask,
@@ -141,19 +144,27 @@ fn execute_with_model_description<M: ModelAndPropertySource>(cli: Cli, model_des
             model_description,
             IndividualGroupExtractionScheme::new(),
         ),
-        GroupingKind::Labels { labels } => {
-            let _ = labels;
-            unimplemented!()
+        GroupingKind::Labels { ref labels } => {
+            let labels = labels.clone();
+            execute_with_grouping_scheme(
+                cli,
+                model_description,
+                LabelGroupExtractionScheme::new(labels),
+            )
         }
         GroupingKind::Modules => {
-            unimplemented!()
+            execute_with_grouping_scheme(cli, model_description, ModuleGroupExtractionScheme::new())
         }
         GroupingKind::Actions => {
-            unimplemented!()
+            execute_with_grouping_scheme(cli, model_description, ActionGroupExtractionScheme::new())
         }
-        GroupingKind::Variables { variables } => {
-            let _ = variables;
-            unimplemented!()
+        GroupingKind::Variables { ref variables } => {
+            let variables = variables.clone();
+            execute_with_grouping_scheme(
+                cli,
+                model_description,
+                ValueGroupExtractionScheme::new(variables),
+            )
         }
     }
 }
