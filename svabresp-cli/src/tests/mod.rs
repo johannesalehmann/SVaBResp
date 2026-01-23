@@ -164,6 +164,32 @@ fn simple_refinement() {
     assert_res("[unnamed group of states]", "0", &result);
 }
 
+#[test]
+fn refinement_from_paper() {
+    let task = ResponsibilityTask {
+        model_description: ModelFromString::new(
+            "refinement-example-paper.prism",
+            include_str!("files/refinement-example-paper.prism"),
+            "P=1 [G !\"obj\"]",
+        ),
+        constants: "".to_string(),
+        coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
+        algorithm: BruteForceAlgorithm::new(),
+        grouping_scheme: IndividualGroupExtractionScheme::new(),
+        refinement: RefinementGroupBlockingProvider::new(
+            SingletonInitialPartition::new(),
+            RandomBlockSelectionHeuristics::new(1),
+            FrontierSplittingHeuristics::new(),
+        ),
+    };
+    let result = task.run();
+
+    assert_res("(s=2)", "5/12", &result);
+    assert_res("(s=3)", "5/12", &result);
+    assert_res("(s=6)", "1/12", &result);
+    assert_res("(s=8)", "1/12", &result);
+}
+
 fn assert_res(name: &str, value: &str, result: &ResponsibilityValues<String>) {
     assert_eq!(
         result
