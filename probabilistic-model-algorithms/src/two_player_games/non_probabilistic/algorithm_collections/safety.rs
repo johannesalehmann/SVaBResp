@@ -45,6 +45,16 @@ impl AlgorithmCollection for SafetyAlgorithmCollection {
         } = property
         {
             Some(Self { good_states: *ap })
+        } else if let Property {
+            operator:
+                ProbabilityOperator {
+                    kind: ProbabilityKind::P,
+                    constraint: ProbabilityConstraint::GreaterOrEqual(1.0),
+                },
+            path: Path::Generally(ap),
+        } = property
+        {
+            Some(Self { good_states: *ap })
         } else {
             None
         }

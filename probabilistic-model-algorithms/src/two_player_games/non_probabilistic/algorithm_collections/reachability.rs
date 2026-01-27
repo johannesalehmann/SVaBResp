@@ -45,6 +45,16 @@ impl AlgorithmCollection for ReachabilityAlgorithmCollection {
         } = property
         {
             Some(Self { target_states: *ap })
+        } else if let Property {
+            operator:
+                ProbabilityOperator {
+                    kind: ProbabilityKind::P,
+                    constraint: ProbabilityConstraint::GreaterOrEqual(1.0),
+                },
+            path: Path::Eventually(ap),
+        } = property
+        {
+            Some(Self { target_states: *ap })
         } else {
             None
         }
