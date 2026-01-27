@@ -1,12 +1,11 @@
-use probabilistic_models::{
-    ActionCollection, ProbabilisticModel, TwoPlayer, VectorPredecessors,
-};
+use probabilistic_models::{ActionCollection, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 
 pub struct AttractorBuffer {
     counts: Vec<Count>,
     pub open_list: Vec<usize>,
 }
 
+#[derive(Copy, Clone)]
 struct Count {
     current: u32,
     default: u32,
@@ -25,6 +24,9 @@ impl Count {
     }
     fn reset_avoiding_player(&mut self) {
         self.current = self.default;
+    }
+    fn reset_sink_state(&mut self) {
+        self.current = self.default + 1;
     }
 }
 
@@ -68,6 +70,10 @@ impl AttractorBuffer {
 
     pub fn reset_avoiding_player(&mut self, index: usize) {
         self.counts[index].reset_avoiding_player()
+    }
+
+    pub fn reset_sink_state(&mut self, index: usize) {
+        self.counts[index].reset_sink_state()
     }
 
     pub fn get_value(&self, index: usize) -> u32 {

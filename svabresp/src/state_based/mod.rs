@@ -16,8 +16,8 @@ use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
 use prism_model_builder::ConstValue;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
-    AlgorithmCollection, GameAndSolverExternalOwners, ReachabilityAlgorithmCollection,
-    SafetyAlgorithmCollection,
+    AlgorithmCollection, BuechiAlgorithmCollection, GameAndSolverExternalOwners,
+    ReachabilityAlgorithmCollection, SafetyAlgorithmCollection,
 };
 
 pub fn compute_for_prism<
@@ -87,6 +87,21 @@ pub fn compute_for_prism<
 
         shapley.compute_simple(cached_coop_game)
     } else if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
+        let solvable_game = GameAndSolverExternalOwners::new(game, solver);
+        let mut coop_game = game::StateBasedResponsibilityGame::new(
+            solvable_game,
+            grouping.groups,
+            grouping.always_helping,
+            grouping.always_adversarial,
+        );
+
+        let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
+        let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+
+        let cached_coop_game = MinimalCoalitionCache::create(coop_game);
+
+        shapley.compute_simple(cached_coop_game)
+    } else if let Some(solver) = BuechiAlgorithmCollection::create_if_compatible(&property) {
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
         let mut coop_game = game::StateBasedResponsibilityGame::new(
             solvable_game,

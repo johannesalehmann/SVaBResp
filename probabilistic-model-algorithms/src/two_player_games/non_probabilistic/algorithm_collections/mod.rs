@@ -4,6 +4,9 @@ pub use reachability::{ReachabilityAlgorithmCollection, ReachabilityAlgorithmCon
 mod safety;
 pub use safety::{SafetyAlgorithmCollection, SafetyAlgorithmContext};
 
+mod buechi;
+pub use buechi::{BuechiAlgorithmCollection, BuechiAlgorithmContext};
+
 use crate::regions::{BoxedStateRegion, StateRegion};
 use probabilistic_models::probabilistic_properties::Property;
 use probabilistic_models::{AtomicProposition, ProbabilisticModel, TwoPlayer, VectorPredecessors};
@@ -104,6 +107,8 @@ pub fn is_winning<
         ReachabilityAlgorithmCollection::create_if_compatible(property)
     {
         reachability.winning(model)
+    } else if let Some(mut buechi) = BuechiAlgorithmCollection::create_if_compatible(property) {
+        buechi.winning(model)
     } else {
         panic!("Unsupported property type")
     }
@@ -122,6 +127,8 @@ pub fn winning_from_state<
         ReachabilityAlgorithmCollection::create_if_compatible(property)
     {
         reachability.winning_from_state(model, state)
+    } else if let Some(mut buechi) = BuechiAlgorithmCollection::create_if_compatible(property) {
+        buechi.winning_from_state(model, state)
     } else {
         panic!("Unsupported property type")
     }
@@ -139,6 +146,8 @@ pub fn winning_region<
         ReachabilityAlgorithmCollection::create_if_compatible(property)
     {
         reachability.winning_region(model).into()
+    } else if let Some(mut buechi) = BuechiAlgorithmCollection::create_if_compatible(property) {
+        buechi.winning_region(model).into()
     } else {
         panic!("Unsupported property type")
     }

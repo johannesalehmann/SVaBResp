@@ -1,5 +1,6 @@
 use super::{MutableStateRegion, OrderedStateRegion, StateRegion};
 
+#[derive(Clone)]
 pub struct FlagStateRegion {
     flags: Vec<bool>,
 }
@@ -45,7 +46,10 @@ impl<'a> IntoIterator for &'a FlagStateRegion {
     type IntoIter = FlagStateRegionIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        todo!()
+        FlagStateRegionIterator {
+            index: 0,
+            data: &self.flags,
+        }
     }
 }
 
