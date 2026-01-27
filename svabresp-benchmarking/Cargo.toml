@@ -1,0 +1,9 @@
+[package]
+name = "svabresp-benchmarking"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+svabresp = { path = "../svabresp" }
+tokio = { version = "1.49.0", features = ["full"] }
+indicatif = "0.18.3"

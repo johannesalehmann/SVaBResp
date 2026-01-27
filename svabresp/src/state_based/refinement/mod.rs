@@ -7,7 +7,9 @@ mod block_splitting;
 pub use block_splitting::{BlockSplittingHeuristics, FrontierSplittingHeuristics};
 
 mod initial_partition;
-pub use initial_partition::{InitialPartitionProvider, SingletonInitialPartition};
+pub use initial_partition::{
+    InitialPartitionProvider, RandomInitialPartition, SingletonInitialPartition,
+};
 mod grouped_game;
 mod partition;
 
@@ -99,6 +101,8 @@ impl<
 
 pub struct BlockSwitchingPair<R: StateRegion> {
     block_index: usize,
+    #[allow(unused)]
+    // It might be useful to have the coalition available in the future, even if it currently is not used
     coalition_bitmap: u64,
     winning_region_without: R,
     winning_region_with: R,

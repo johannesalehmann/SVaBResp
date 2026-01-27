@@ -101,6 +101,10 @@ where
         .or(just(Token::Generally)
             .ignore_then(expression_parser())
             .map(probabilistic_properties::Path::Generally))
+        .or(just(Token::Generally)
+            .ignore_then(just(Token::Finally))
+            .ignore_then(expression_parser())
+            .map(probabilistic_properties::Path::InfinitelyOften))
 }
 
 pub fn program_parser<'a, 'b, I>()

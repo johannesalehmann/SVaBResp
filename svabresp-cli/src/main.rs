@@ -6,7 +6,7 @@ use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgori
 
 use clap::{Arg, Command, arg};
 use env_logger::Target;
-use log::{LevelFilter, Log, trace};
+use log::{LevelFilter, trace};
 use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, GroupExtractionScheme, IndividualGroupExtractionScheme,
     LabelGroupExtractionScheme, ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
