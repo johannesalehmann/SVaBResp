@@ -12,6 +12,8 @@ use svabresp::{CounterexampleFile, ModelFromFile, ResponsibilityTask};
 
 use indicatif::{ProgressBar, ProgressStyle};
 
+use wait_timeout::ChildExt;
+
 #[tokio::main]
 async fn main() {
     evaluate_initial_partition_heuristics().await;
@@ -33,11 +35,10 @@ fn get_heuristics_models() -> Vec<ModelSource> {
 }
 
 fn get_timeout() -> Duration {
-    Duration::from_secs(30)
+    Duration::from_secs(1)
 }
 
-fn get_initial_partition_refinement_groups() -> (Table, Vec<Option<Box<impl GroupBlockingProvider>>>)
-{
+fn get_initial_partition_refinement_groups() -> (Table, Vec<Vec<String>>) {
     let ks = vec![1, 2, 3, 4, 5];
 
     let mut table = Table::new();
@@ -45,23 +46,31 @@ fn get_initial_partition_refinement_groups() -> (Table, Vec<Option<Box<impl Grou
     table.add_to_header("\\emph{{no refinement}}", 1);
 
     let mut blocking_providers = Vec::with_capacity(ks.len() + 1);
-    blocking_providers.push(None);
+    blocking_providers.push(vec![
+        "--refinement".to_string(),
+        "--initialpartition".to_string(),
+        "singleton".to_string(),
+        "--blockselection".to_string(),
+        "random".to_string(),
+        "--splitting".to_string(),
+        "frontier(random)".to_string(),
+    ]);
     for &k in &ks {
         table.add_to_header(format!("$n={}$", k), 1);
-        blocking_providers.push(Some(Box::new(RefinementGroupBlockingProvider::new(
-            RandomInitialPartition::new(k),
-            RandomBlockSelectionHeuristics::new(1),
-            FrontierSplittingHeuristics::new(),
-        ))));
+        blocking_providers.push(vec![
+            "--refinement".to_string(),
+            "--initialpartition".to_string(),
+            format!("n({})", k),
+            "--blockselection".to_string(),
+            "random".to_string(),
+            "--splitting".to_string(),
+            "frontier(random)".to_string(),
+        ]);
     }
     (table, blocking_providers)
 }
 
-async fn produce_table<
-    GBP: GroupBlockingProvider + Send + 'static,
-    MF: Fn() -> Vec<ModelSource>,
-    RF: Fn() -> (Table, Vec<Option<Box<GBP>>>),
->(
+async fn produce_table<MF: Fn() -> Vec<ModelSource>, RF: Fn() -> (Table, Vec<Vec<String>>)>(
     benchmark_name: &'static str,
     models: MF,
     refinement: RF,
@@ -91,28 +100,32 @@ async fn produce_table<
                 refinements.len()
             ));
             let start = std::time::Instant::now();
-            let result = match refinement {
-                Some(refinement) => tokio::spawn(tokio::time::timeout(
-                    get_timeout(),
-                    run(model.clone(), *refinement),
-                ))
-                .await
-                .unwrap(),
-                None => tokio::spawn(tokio::time::timeout(
-                    get_timeout(),
-                    run(model.clone(), IdentityGroupBlockingProvider::new()),
-                ))
-                .await
-                .unwrap(),
-            };
-            match result {
-                Ok(_) => {
+            let mut child = std::process::Command::new("./target/release/svabresp-cli")
+                .arg(model.file.as_str())
+                .arg(model.property.as_str())
+                .args(refinement.iter())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .unwrap();
+
+            match child.wait_timeout(get_timeout()).unwrap() {
+                Some(status) => {
                     table.add_runtime(start.elapsed().as_secs_f64());
+                    if status.code() != Some(0) {
+                        println!(
+                            "There was an error for configuration \"{}\" \"{}\" {}",
+                            model.file,
+                            model.property,
+                            refinement.join(" ")
+                        );
+                    }
                 }
-                Err(_) => {
+                None => {
+                    child.kill().unwrap();
                     table.add_timeout();
                 }
-            }
+            };
             pb.inc(1);
         }
     }

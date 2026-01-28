@@ -25,14 +25,14 @@ module P1
     [] (pc1=3 & turn=1) -> (pc1'=2) & (wte1'=1);
 
     // Enter critical section and do super critical work
-    [] (pc1=4) -> (pc1'=5);
+    //[] (pc1=4) -> (pc1'=5);
     [] (pc1=4) -> (pc1'=6);
-    [] (pc1=5) -> (pc1'=6);
+    // [] (pc1=5) -> (pc1'=6);
 
     // Leave critical section
-    [TurnB] (pc1=6) -> (pc1'=7);
+    [TurnB] (pc1=6) -> (pc1'=0)&(wte1'=0);
 
-    [] (pc1=7) -> (pc1'=7)&(wte1'=0);
+    [] (pc1=7) -> (pc1'=0)&(wte1'=0);
 endmodule
 
 module P2 = P1 [pc1=pc2,wte1=wte2,TurnB=TurnA] endmodule

@@ -1,6 +1,6 @@
 use crate::shapley::coop_game::PlayerDescriptions;
 use crate::shapley::{CoalitionSpecifier, MonotoneCooperativeGame, SimpleCooperativeGame};
-use log::trace;
+use log::{info, trace};
 use std::io::Write;
 
 pub struct MinimalCoalitionCache<P: PlayerDescriptions> {
@@ -54,7 +54,7 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
         std::io::stdout().flush().unwrap();
         for coalition in 0..max_coalition {
             if coalition % 10_000_000 == 0 && coalition > 0 {
-                println!(
+                info!(
                     "{}/{} ({:.2}%)  (solved {} games, skipped {})",
                     coalition,
                     max_coalition,
