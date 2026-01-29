@@ -24,6 +24,9 @@ struct Cli {
     property: String,
     constants: String,
     algorithm: AlgorithmKind,
+    refinement_initial_partition: RefinementInitialPartition,
+    refinement_block_selection: RefinementBlockSelection,
+    refinement_splitting: RefinementSplitting,
     grouping: GroupingKind,
     output: OutputKind,
     logging_level: LoggingLevel,
@@ -33,6 +36,22 @@ enum AlgorithmKind {
     BruteForce,
     Stochastic,
     Refinement,
+}
+
+enum RefinementInitialPartition {
+    Singleton,
+    Random { block_count: usize },
+}
+
+enum RefinementBlockSelection {
+    Random { block_count: usize },
+}
+
+enum RefinementSplitting {
+    Random,
+    FrontierRandom,
+    FrontierPreferPotentiallyWinning,
+    FrontierPreferPotentiallyLosing,
 }
 
 enum GroupingKind {
@@ -59,12 +78,16 @@ enum LoggingLevel {
 
 impl Cli {
     pub fn from_arguments() -> Self {
-        let matches =         Command::new("svabresp").about("Computes responsibility values")
-            .arg(arg!(-a --algorithm <ALGORITHM> "The algorithm that is used to compute the responsibility values. Legal values are `brute-force`, `stochastic`, `refinement`. The default is `brute-force`").default_value("brute-force"))
-            .arg(arg!(-g --grouping <GROUPING> "The scheme that is used to group states. Legal values are `individual`, `labels([space-separated list of label names])`, `modules`, `actions`, `variables([space-separated list of variable names])`. The default is `individual`").default_value("individual"))
-            .arg(arg!(-o --output <OUTPUT> "How the output should be presented. Legal values are `human-readable`, `parsable` (simple format that can be processed by other tools) and `silent` (no output). The default is `human-readable`").default_value("human-readable"))
+        let matches =
+            Command::new("svabresp").about("Computes responsibility values")
+            .arg(arg!(-a --algorithm <ALGORITHM> "The algorithm that is used to compute the responsibility values. Legal values are `brute-force`, `stochastic`, `refinement`.").default_value("brute-force"))
+            .arg(arg!(-g --grouping <GROUPING> "The scheme that is used to group states. Legal values are `individual`, `labels([space-separated list of label names])`, `modules`, `actions`, `variables([space-separated list of variable names])`.").default_value("individual"))
+            .arg(arg!(-o --output <OUTPUT> "How the output should be presented. Legal values are `human-readable`, `parsable` (simple format that can be processed by other tools) and `silent` (no output).").default_value("human-readable"))
             .arg(arg!(-c --constants <CONSTANTS> "Values for the undefined constants in the model").required(false))
             .arg(arg!(-l --logging <LEVEL> "The level of detail for the logs. Legal values are `error`, `warn`, `info`, `debug` and `trace`.").default_value("warn"))
+            .arg(arg!(--initialpartition <HEURISTICS> "Refinement algorithm: The heuristics used to construct the initial partition. Legal values are `singleton` and `random(<INTEGER>)`, where <INTEGER> is a positive integer.").default_value("singleton"))
+            .arg(arg!(--blockselection <HEURISTICS> "Refinement algorithm: The heuristics used to select a block for refinement. Legal values are `random`. Every value may be succeeded immediately by `(<INTEGER>)`, where <INTEGER> is a positive integer. This indicates how many blocks should be refined in a single iteration.").default_value("random(1)"))
+            .arg(arg!(--splitting <HEURISTICS> "Refinement algorithm: The heuristics used to split a block. Legal values are `random`, `frontier(random)`, `frontier(prefer_winning)` and `frontier(prefer_losing)`.").default_value("frontier(random)"))
             .arg(Arg::new("model").required(true).help("File name of the PRISM model file"))
             .arg(Arg::new("property").required(true).help("Property to be checked, given in PRISM property language"))
 
@@ -125,11 +148,76 @@ impl Cli {
             l => panic!("Unknown logging level `{}`", l),
         };
 
+        let refinement_initial_partition = match matches
+            .get_one::<String>("initialpartition")
+            .unwrap()
+            .as_str()
+        {
+            i if i.starts_with("random") => {
+                let count_string = i["random".len()..].trim();
+
+                if !count_string.starts_with("(") || !count_string.ends_with(")") {
+                    panic!(
+                        "Invalid argument `{}` for --initialpartition. A valid argument for the random heuristics must have form random(<INTEGER>), where <INTEGER> is a positive integer",
+                        i
+                    );
+                }
+                let count_string = count_string[1..count_string.len() - 1].trim();
+                let blocks = match count_string.parse::<usize>() {
+                    Ok(val) => val,
+                    Err(err) => panic!("Could not parse `{}` as integer", count_string),
+                };
+                RefinementInitialPartition::Random {
+                    block_count: blocks,
+                }
+            }
+            "singleton" => RefinementInitialPartition::Singleton,
+            i => panic!("Unknown initial partition option `{}`", i),
+        };
+
+        let refinement_block_selection = match matches
+            .get_one::<String>("blockselection")
+            .unwrap()
+            .as_str()
+        {
+            "random" => RefinementBlockSelection::Random { block_count: 1 },
+            b if b.starts_with("random") => {
+                let count_string = b["random".len()..].trim();
+
+                if !count_string.starts_with("(") || !count_string.ends_with(")") {
+                    panic!(
+                        "Invalid argument `{}` for --blockselection. A valid argument for the random heuristics must have form random(<INTEGER>), where <INTEGER> is a positive integer",
+                        b
+                    );
+                }
+                let count_string = count_string[1..count_string.len() - 1].trim();
+                let blocks = match count_string.parse::<usize>() {
+                    Ok(val) => val,
+                    Err(err) => panic!("Could not parse `{}` as integer", count_string),
+                };
+                RefinementBlockSelection::Random {
+                    block_count: blocks,
+                }
+            }
+            b => panic!("Unknown block selection option `{}`", b),
+        };
+
+        let refinement_splitting = match matches.get_one::<String>("splitting").unwrap().as_str() {
+            "random" => RefinementSplitting::Random,
+            "frontier(random)" | "frontier" => RefinementSplitting::FrontierRandom,
+            "frontier(prefer_winning)" => RefinementSplitting::FrontierPreferPotentiallyWinning,
+            "frontier(prefer_losing)" => RefinementSplitting::FrontierPreferPotentiallyLosing,
+            s => panic!("Unknown splitting heuristics `{}`", s),
+        };
+
         Cli {
             model,
             property,
             constants,
             algorithm,
+            refinement_initial_partition,
+            refinement_block_selection,
+            refinement_splitting,
             grouping,
             output,
             logging_level,

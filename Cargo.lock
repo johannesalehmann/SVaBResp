@@ -783,7 +783,6 @@ name = "svabresp-benchmarking"
 version = "0.1.0"
 dependencies = [
  "indicatif",
- "svabresp",
  "tokio",
  "wait-timeout",
 ]

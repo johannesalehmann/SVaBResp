@@ -2,13 +2,6 @@ mod table;
 
 use crate::table::Table;
 use std::time::Duration;
-use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues};
-use svabresp::state_based::grouping::IndividualGroupExtractionScheme;
-use svabresp::state_based::refinement::{
-    FrontierSplittingHeuristics, GroupBlockingProvider, IdentityGroupBlockingProvider,
-    RandomBlockSelectionHeuristics, RandomInitialPartition, RefinementGroupBlockingProvider,
-};
-use svabresp::{CounterexampleFile, ModelFromFile, ResponsibilityTask};
 
 use indicatif::{ProgressBar, ProgressStyle};
 
@@ -47,7 +40,8 @@ fn get_initial_partition_refinement_groups() -> (Table, Vec<Vec<String>>) {
 
     let mut blocking_providers = Vec::with_capacity(ks.len() + 1);
     blocking_providers.push(vec![
-        "--refinement".to_string(),
+        "--algorithm".to_string(),
+        "refinement".to_string(),
         "--initialpartition".to_string(),
         "singleton".to_string(),
         "--blockselection".to_string(),
@@ -58,9 +52,10 @@ fn get_initial_partition_refinement_groups() -> (Table, Vec<Vec<String>>) {
     for &k in &ks {
         table.add_to_header(format!("$n={}$", k), 1);
         blocking_providers.push(vec![
-            "--refinement".to_string(),
+            "--algorithm".to_string(),
+            "refinement".to_string(),
             "--initialpartition".to_string(),
-            format!("n({})", k),
+            format!("random({})", k),
             "--blockselection".to_string(),
             "random".to_string(),
             "--splitting".to_string(),
@@ -104,8 +99,8 @@ async fn produce_table<MF: Fn() -> Vec<ModelSource>, RF: Fn() -> (Table, Vec<Vec
                 .arg(model.file.as_str())
                 .arg(model.property.as_str())
                 .args(refinement.iter())
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
+                // .stdout(std::process::Stdio::null())
+                // .stderr(std::process::Stdio::null())
                 .spawn()
                 .unwrap();
 
@@ -143,25 +138,25 @@ async fn evaluate_initial_partition_heuristics() {
     .await;
 }
 
-async fn run<G: GroupBlockingProvider>(
-    model_source: ModelSource,
-    refinement: G,
-) -> ResponsibilityValues<String> {
-    let task = ResponsibilityTask {
-        model_description: ModelFromFile::new(
-            model_source.file.as_str(),
-            model_source.property.as_str(),
-        ),
-        constants: "".to_string(),
-        coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
-        algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: IndividualGroupExtractionScheme::new(),
-        refinement,
-    };
-    let result = task.run();
-
-    result
-}
+// async fn run<G: GroupBlockingProvider>(
+//     model_source: ModelSource,
+//     refinement: G,
+// ) -> ResponsibilityValues<String> {
+//     let task = ResponsibilityTask {
+//         model_description: ModelFromFile::new(
+//             model_source.file.as_str(),
+//             model_source.property.as_str(),
+//         ),
+//         constants: "".to_string(),
+//         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
+//         algorithm: BruteForceAlgorithm::new(),
+//         grouping_scheme: IndividualGroupExtractionScheme::new(),
+//         refinement,
+//     };
+//     let result = task.run();
+//
+//     result
+// }
 
 #[derive(Clone)]
 struct ModelSource {
