@@ -19,12 +19,16 @@ where
 }
 
 impl<'a, R: StateRegion> StateRegion for InvertedStateRegion<R> {
-    fn get_size(&self) -> usize {
-        self.base.get_size()
+    fn model_state_count(&self) -> usize {
+        self.base.model_state_count()
     }
 
     fn contains(&self, index: usize) -> bool {
         !self.base.contains(index)
+    }
+
+    fn size(&self) -> usize {
+        self.model_state_count() - self.base.size()
     }
 }
 
@@ -61,7 +65,7 @@ where
             base_iter,
             counter: 0,
             next_base_value,
-            size: region.get_size(),
+            size: region.model_state_count(),
         }
     }
 }

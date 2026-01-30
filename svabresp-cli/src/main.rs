@@ -12,8 +12,11 @@ use svabresp::state_based::grouping::{
     LabelGroupExtractionScheme, ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
 };
 use svabresp::state_based::refinement::{
+    BlockSelectionHeuristics, BlockSplittingHeuristics, FrontierSizeSelectionHeuristics,
     FrontierSplittingHeuristics, GroupBlockingProvider, IdentityGroupBlockingProvider,
-    RandomBlockSelectionHeuristics, RefinementGroupBlockingProvider, SingletonInitialPartition,
+    InitialPartitionProvider, RandomBlockSelectionHeuristics, RandomInitialPartition,
+    RandomSplittingHeuristics, RefinementGroupBlockingProvider, SingletonInitialPartition,
+    WinningRegionSizeSelectionHeuristics,
 };
 use svabresp::{
     CoopGameType, CounterexampleFile, ModelAndPropertySource, ModelFromFile, ResponsibilityTask,
@@ -45,11 +48,14 @@ enum RefinementInitialPartition {
 
 enum RefinementBlockSelection {
     Random { block_count: usize },
+    MaxDelta { block_count: usize },
+    MinDelta { block_count: usize },
+    MinFrontier { block_count: usize },
 }
 
 enum RefinementSplitting {
     Random,
-    FrontierRandom,
+    FrontierAny,
     FrontierPreferPotentiallyWinning,
     FrontierPreferPotentiallyLosing,
 }
@@ -86,7 +92,7 @@ impl Cli {
             .arg(arg!(-c --constants <CONSTANTS> "Values for the undefined constants in the model").required(false))
             .arg(arg!(-l --logging <LEVEL> "The level of detail for the logs. Legal values are `error`, `warn`, `info`, `debug` and `trace`.").default_value("warn"))
             .arg(arg!(--initialpartition <HEURISTICS> "Refinement algorithm: The heuristics used to construct the initial partition. Legal values are `singleton` and `random(<INTEGER>)`, where <INTEGER> is a positive integer.").default_value("singleton"))
-            .arg(arg!(--blockselection <HEURISTICS> "Refinement algorithm: The heuristics used to select a block for refinement. Legal values are `random`. Every value may be succeeded immediately by `(<INTEGER>)`, where <INTEGER> is a positive integer. This indicates how many blocks should be refined in a single iteration.").default_value("random(1)"))
+            .arg(arg!(--blockselection <HEURISTICS> "Refinement algorithm: The heuristics used to select a block for refinement. Legal values are `random`, `min-delta`, `max-delta`, `min-frontier`. Every value may be succeeded immediately by `(<INTEGER>)`, where <INTEGER> is a positive integer. This indicates how many blocks should be refined in a single iteration.").default_value("random(1)"))
             .arg(arg!(--splitting <HEURISTICS> "Refinement algorithm: The heuristics used to split a block. Legal values are `random`, `frontier(random)`, `frontier(prefer_winning)` and `frontier(prefer_losing)`.").default_value("frontier(random)"))
             .arg(Arg::new("model").required(true).help("File name of the PRISM model file"))
             .arg(Arg::new("property").required(true).help("Property to be checked, given in PRISM property language"))
@@ -165,7 +171,7 @@ impl Cli {
                 let count_string = count_string[1..count_string.len() - 1].trim();
                 let blocks = match count_string.parse::<usize>() {
                     Ok(val) => val,
-                    Err(err) => panic!("Could not parse `{}` as integer", count_string),
+                    Err(_) => panic!("Could not parse `{}` as integer", count_string),
                 };
                 RefinementInitialPartition::Random {
                     block_count: blocks,
@@ -175,36 +181,37 @@ impl Cli {
             i => panic!("Unknown initial partition option `{}`", i),
         };
 
-        let refinement_block_selection = match matches
-            .get_one::<String>("blockselection")
-            .unwrap()
-            .as_str()
-        {
-            "random" => RefinementBlockSelection::Random { block_count: 1 },
-            b if b.starts_with("random") => {
-                let count_string = b["random".len()..].trim();
+        let refinement_block_selection_string =
+            matches.get_one::<String>("blockselection").unwrap();
+        let (refinement_block_selection_string, block_count) =
+            if refinement_block_selection_string.contains("(") {
+                let open_par_index = refinement_block_selection_string.find("(").unwrap();
+                let before = refinement_block_selection_string[0..open_par_index]
+                    .trim()
+                    .to_string();
 
-                if !count_string.starts_with("(") || !count_string.ends_with(")") {
-                    panic!(
-                        "Invalid argument `{}` for --blockselection. A valid argument for the random heuristics must have form random(<INTEGER>), where <INTEGER> is a positive integer",
-                        b
-                    );
+                let parenthesised = refinement_block_selection_string[open_par_index..].trim();
+                if !parenthesised.ends_with(")") {
+                    panic!("Invalid value for option --blockselection");
                 }
-                let count_string = count_string[1..count_string.len() - 1].trim();
-                let blocks = match count_string.parse::<usize>() {
-                    Ok(val) => val,
-                    Err(err) => panic!("Could not parse `{}` as integer", count_string),
-                };
-                RefinementBlockSelection::Random {
-                    block_count: blocks,
-                }
-            }
+                let without_parentheses = parenthesised[1..parenthesised.len() - 1].trim();
+                let count = without_parentheses.parse::<usize>().unwrap();
+
+                (before, count)
+            } else {
+                (refinement_block_selection_string.clone(), 1)
+            };
+        let refinement_block_selection = match refinement_block_selection_string.as_str() {
+            "random" => RefinementBlockSelection::Random { block_count },
+            "max-delta" => RefinementBlockSelection::MaxDelta { block_count },
+            "min-delta" => RefinementBlockSelection::MinDelta { block_count },
+            "min-frontier" => RefinementBlockSelection::MinFrontier { block_count },
             b => panic!("Unknown block selection option `{}`", b),
         };
 
         let refinement_splitting = match matches.get_one::<String>("splitting").unwrap().as_str() {
             "random" => RefinementSplitting::Random,
-            "frontier(random)" | "frontier" => RefinementSplitting::FrontierRandom,
+            "frontier(random)" | "frontier" => RefinementSplitting::FrontierAny,
             "frontier(prefer_winning)" => RefinementSplitting::FrontierPreferPotentiallyWinning,
             "frontier(prefer_losing)" => RefinementSplitting::FrontierPreferPotentiallyLosing,
             s => panic!("Unknown splitting heuristics `{}`", s),
@@ -321,19 +328,152 @@ fn execute_with_grouping_scheme<M: ModelAndPropertySource, G: GroupExtractionSch
         AlgorithmKind::Stochastic => {
             panic!("Stochastic algorithm not implemented in cli yet")
         }
-        AlgorithmKind::Refinement => execute_with_algorithm(
+        AlgorithmKind::Refinement => match cli.refinement_initial_partition {
+            RefinementInitialPartition::Singleton => execute_with_initial_partition_provider(
+                cli,
+                model_description,
+                grouping_scheme,
+                SingletonInitialPartition::new(),
+            ),
+            RefinementInitialPartition::Random { block_count } => {
+                execute_with_initial_partition_provider(
+                    cli,
+                    model_description,
+                    grouping_scheme,
+                    RandomInitialPartition::new(block_count),
+                )
+            }
+        },
+    }
+}
+fn execute_with_initial_partition_provider<
+    M: ModelAndPropertySource,
+    G: GroupExtractionScheme,
+    I: InitialPartitionProvider,
+>(
+    cli: Cli,
+    model_description: M,
+    grouping_scheme: G,
+    initial_partition_provider: I,
+) {
+    match cli.refinement_block_selection {
+        RefinementBlockSelection::Random { block_count } => {
+            execute_with_block_selection_heuristics(
+                cli,
+                model_description,
+                grouping_scheme,
+                initial_partition_provider,
+                RandomBlockSelectionHeuristics::new(block_count),
+            )
+        }
+        RefinementBlockSelection::MaxDelta { block_count } => {
+            execute_with_block_selection_heuristics(
+                cli,
+                model_description,
+                grouping_scheme,
+                initial_partition_provider,
+                WinningRegionSizeSelectionHeuristics::maximise_delta(block_count),
+            )
+        }
+        RefinementBlockSelection::MinDelta { block_count } => {
+            execute_with_block_selection_heuristics(
+                cli,
+                model_description,
+                grouping_scheme,
+                initial_partition_provider,
+                WinningRegionSizeSelectionHeuristics::minimise_delta(block_count),
+            )
+        }
+        RefinementBlockSelection::MinFrontier { block_count } => {
+            execute_with_block_selection_heuristics(
+                cli,
+                model_description,
+                grouping_scheme,
+                initial_partition_provider,
+                FrontierSizeSelectionHeuristics::new(block_count),
+            )
+        }
+    }
+}
+
+fn execute_with_block_selection_heuristics<
+    M: ModelAndPropertySource,
+    G: GroupExtractionScheme,
+    I: InitialPartitionProvider,
+    B: BlockSelectionHeuristics,
+>(
+    cli: Cli,
+    model_description: M,
+    grouping_scheme: G,
+    initial_partition_provider: I,
+    block_selection_heuristics: B,
+) {
+    match cli.refinement_splitting {
+        RefinementSplitting::Random => execute_with_block_splitting_heuristics(
             cli,
             model_description,
             grouping_scheme,
-            BruteForceAlgorithm::new(),
-            ResponsibilityValuesPrinter {},
-            RefinementGroupBlockingProvider::new(
-                SingletonInitialPartition::new(),
-                RandomBlockSelectionHeuristics::new(1),
-                FrontierSplittingHeuristics::new(),
-            ),
+            initial_partition_provider,
+            block_selection_heuristics,
+            RandomSplittingHeuristics::new(),
         ),
+        RefinementSplitting::FrontierAny => execute_with_block_splitting_heuristics(
+            cli,
+            model_description,
+            grouping_scheme,
+            initial_partition_provider,
+            block_selection_heuristics,
+            FrontierSplittingHeuristics::any_state(),
+        ),
+        RefinementSplitting::FrontierPreferPotentiallyWinning => {
+            execute_with_block_splitting_heuristics(
+                cli,
+                model_description,
+                grouping_scheme,
+                initial_partition_provider,
+                block_selection_heuristics,
+                FrontierSplittingHeuristics::prefer_states_reaching_winning(),
+            )
+        }
+        RefinementSplitting::FrontierPreferPotentiallyLosing => {
+            execute_with_block_splitting_heuristics(
+                cli,
+                model_description,
+                grouping_scheme,
+                initial_partition_provider,
+                block_selection_heuristics,
+                FrontierSplittingHeuristics::prefer_states_reaching_losing(),
+            )
+        }
     }
+}
+
+fn execute_with_block_splitting_heuristics<
+    M: ModelAndPropertySource,
+    G: GroupExtractionScheme,
+    I: InitialPartitionProvider,
+    B: BlockSelectionHeuristics,
+    S: BlockSplittingHeuristics,
+>(
+    cli: Cli,
+    model_description: M,
+    grouping_scheme: G,
+    initial_partition_provider: I,
+    block_selection_heuristics: B,
+    block_splitting_heuristics: S,
+) {
+    execute_with_algorithm(
+        cli,
+        model_description,
+        grouping_scheme,
+        BruteForceAlgorithm::new(),
+        ResponsibilityValuesPrinter {},
+        RefinementGroupBlockingProvider::new(
+            initial_partition_provider,
+            block_selection_heuristics,
+            block_splitting_heuristics,
+        ),
+    )
 }
 
 fn execute_with_algorithm<

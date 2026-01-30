@@ -14,9 +14,11 @@ pub trait MutableStateRegion: StateRegion {
 }
 
 pub trait StateRegion: Sized {
-    fn get_size(&self) -> usize;
+    fn model_state_count(&self) -> usize;
 
     fn contains(&self, index: usize) -> bool;
+
+    fn size(&self) -> usize;
 
     fn inverted(self) -> InvertedStateRegion<Self> {
         InvertedStateRegion::new(self)
@@ -33,7 +35,7 @@ trait BoxableStateRegion {
 
 impl<R: StateRegion> BoxableStateRegion for R {
     fn get_size(&self) -> usize {
-        StateRegion::get_size(self)
+        StateRegion::model_state_count(self)
     }
 
     fn contains(&self, index: usize) -> bool {

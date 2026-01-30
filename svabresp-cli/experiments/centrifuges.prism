@@ -96,17 +96,6 @@ module Centrifuge4 = Centrifuge1 [
     report_infected_1=report_infected_4
 ] endmodule
 
-// module Centrifuge5 = Centrifuge1 [
-//     state_1=state_5,
-//     position_1=position_5,
-//     speed_1=speed_5,
-//     time_1=time_5,
-//     take_clean_1=take_clean_5,
-//     take_infected_1=take_infected_5,
-//     report_clean_1=report_clean_5,
-//     report_infected_1=report_infected_5
-// ] endmodule
-
 module Centrifuge5
     state_5: int init 1; // 1: ready to accept sample, 2: sampling, 3: time is up
     position_5: int init 0;

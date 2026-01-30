@@ -152,7 +152,7 @@ impl BuechiAlgorithmContext {
 
     fn add_new_unreachable_states(&mut self, new_unreachable: &FlagStateRegion) -> bool {
         let mut changed = false;
-        for state in 0..self.unreachable.get_size() {
+        for state in 0..self.unreachable.model_state_count() {
             if !self.unreachable.contains(state) && new_unreachable.contains(state) {
                 self.unreachable.add_state(state);
                 changed = true;

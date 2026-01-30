@@ -30,12 +30,16 @@ impl MutableStateRegion for FlagStateRegion {
 }
 
 impl StateRegion for FlagStateRegion {
-    fn get_size(&self) -> usize {
+    fn model_state_count(&self) -> usize {
         self.flags.len()
     }
 
     fn contains(&self, index: usize) -> bool {
         self.flags[index]
+    }
+
+    fn size(&self) -> usize {
+        self.flags.iter().filter(|f| **f).count()
     }
 }
 

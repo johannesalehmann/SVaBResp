@@ -1,16 +1,10 @@
-use super::{BlockSwitchingPair, PlayerPartition};
-use crate::state_based::{StateBasedResponsibilityGame, grouping::StateGroups};
+use crate::state_based::StateBasedResponsibilityGame;
+use crate::state_based::grouping::StateGroups;
+use crate::state_based::refinement::{
+    BlockSelectionHeuristics, BlockSwitchingPair, PlayerPartition,
+};
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
 use rand::Rng;
-
-pub trait BlockSelectionHeuristics {
-    fn select_blocks<G: StateGroups, A: SolvableGame>(
-        &mut self,
-        game: &StateBasedResponsibilityGame<G, A>,
-        partition: &PlayerPartition,
-        block_switching_pairs: Vec<BlockSwitchingPair<A::WinningRegionType>>,
-    ) -> Vec<BlockSwitchingPair<A::WinningRegionType>>;
-}
 
 pub struct RandomBlockSelectionHeuristics {
     blocks_per_iteration: usize,

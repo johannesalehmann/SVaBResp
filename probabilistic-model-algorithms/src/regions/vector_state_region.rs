@@ -28,12 +28,16 @@ impl MutableStateRegion for VectorStateRegion {
 }
 
 impl StateRegion for VectorStateRegion {
-    fn get_size(&self) -> usize {
+    fn model_state_count(&self) -> usize {
         self.size
     }
 
     fn contains(&self, index: usize) -> bool {
         self.states.iter().any(|i| *i == index)
+    }
+
+    fn size(&self) -> usize {
+        self.states.len()
     }
 }
 
@@ -63,12 +67,16 @@ impl OrderedVectorStateRegion {
 }
 
 impl StateRegion for OrderedVectorStateRegion {
-    fn get_size(&self) -> usize {
+    fn model_state_count(&self) -> usize {
         self.base.size
     }
 
     fn contains(&self, index: usize) -> bool {
         self.base.contains(index)
+    }
+
+    fn size(&self) -> usize {
+        self.base.size()
     }
 }
 

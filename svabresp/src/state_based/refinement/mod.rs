@@ -1,21 +1,19 @@
 mod block_selection;
-
-pub use block_selection::{BlockSelectionHeuristics, RandomBlockSelectionHeuristics};
-use log::trace;
+pub use block_selection::*;
 
 mod block_splitting;
-pub use block_splitting::{BlockSplittingHeuristics, FrontierSplittingHeuristics};
+pub use block_splitting::*;
 
 mod initial_partition;
-pub use initial_partition::{
-    InitialPartitionProvider, RandomInitialPartition, SingletonInitialPartition,
-};
+pub use initial_partition::*;
+
 mod grouped_game;
 mod partition;
 
 use super::StateBasedResponsibilityGame;
 use crate::shapley::{BruteForceAlgorithm, OnePairPerStateCollector};
 use crate::state_based::grouping::StateGroups;
+use log::trace;
 pub use partition::{PlayerPartition, PlayerPartitionEntry};
 use probabilistic_model_algorithms::regions::StateRegion;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
@@ -106,6 +104,12 @@ pub struct BlockSwitchingPair<R: StateRegion> {
     coalition_bitmap: u64,
     winning_region_without: R,
     winning_region_with: R,
+}
+
+impl<R: StateRegion> BlockSwitchingPair<R> {
+    fn winning_region_size_delta(&self) -> usize {
+        self.winning_region_with.size() - self.winning_region_without.size()
+    }
 }
 
 pub struct RefinementAlgorithm<
