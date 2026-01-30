@@ -6,7 +6,7 @@ use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgori
 
 use clap::{Arg, Command, arg};
 use env_logger::Target;
-use log::{LevelFilter, trace};
+use log::{LevelFilter, info, trace};
 use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, GroupExtractionScheme, IndividualGroupExtractionScheme,
     LabelGroupExtractionScheme, ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
@@ -350,6 +350,7 @@ fn execute_with_algorithm<
     printer: P,
     refinement: B,
 ) {
+    let start = std::time::Instant::now();
     let task = ResponsibilityTask {
         model_description,
         constants: cli.constants,
@@ -363,7 +364,13 @@ fn execute_with_algorithm<
     let output = task.run();
 
     match cli.output {
-        OutputKind::HumanReadable => printer.print_human_readable(output),
+        OutputKind::HumanReadable => {
+            info!(
+                "Computed responsibility in {:?} (including the time for model building)",
+                start.elapsed()
+            );
+            printer.print_human_readable(output)
+        }
         OutputKind::Parsable => printer.print_parsable(output),
         OutputKind::Silent => {
             // psst!

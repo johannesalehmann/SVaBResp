@@ -1,4 +1,4 @@
-use log::trace;
+use log::{info, trace};
 use probabilistic_models::{
     IterFunctions, IterProbabilisticModel, MdpType, TwoPlayer, VectorPredecessors,
 };
@@ -11,6 +11,7 @@ pub mod grouping;
 pub mod refinement;
 
 use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm};
+use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
@@ -69,6 +70,7 @@ pub fn compute_for_prism<
 
     trace!("Computing state groups");
     let grouping = grouping_scheme.create_groups(&mut game, &property);
+    info!("There are {} state groups", grouping.groups.get_count());
 
     if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
