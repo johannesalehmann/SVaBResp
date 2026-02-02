@@ -25,8 +25,8 @@ impl BlockSplittingHeuristics for RandomSplittingHeuristics {
         let players = &partition.entries[bsp.block_index].players;
         for &player in players {
             for state in game.get_grouping().get_states(player) {
-                if bsp.winning_region_without.contains(state)
-                    && !bsp.winning_region_with.contains(state)
+                if !bsp.winning_region_without.contains(state)
+                    && bsp.winning_region_with.contains(state)
                 {
                     overlapping_players.push(player);
                 }
