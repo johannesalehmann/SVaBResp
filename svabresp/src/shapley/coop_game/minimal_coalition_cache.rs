@@ -6,7 +6,7 @@ use std::io::Write;
 pub struct MinimalCoalitionCache<P: PlayerDescriptions> {
     player_descriptions: P,
     player_count: usize,
-    minimal_coalitions: Vec<u64>,
+    pub minimal_coalitions: Vec<u64>,
 }
 
 impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {

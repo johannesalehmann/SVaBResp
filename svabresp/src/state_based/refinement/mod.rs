@@ -181,32 +181,46 @@ impl<
         &mut self,
     ) -> Option<Vec<BlockSwitchingPair<A::WinningRegionType>>> {
         trace!("Computing refinement candidates");
-        let mut bsps = Vec::new();
+        let mut bsps = Vec::with_capacity(self.current_partition.entries.len());
+        for _ in 0..self.current_partition.entries.len() {
+            bsps.push(None);
+        }
 
         let game = grouped_game::GroupedGame::new(&mut self.game, &self.current_partition);
         let cached_group_game = MinimalCoalitionCache::create(game);
-
-        let (_, switching_pairs) = BruteForceAlgorithm::new()
-            .compute_switching_pairs_simple::<_, OnePairPerStateCollector>(cached_group_game);
-
+        // Create another copy of the game so we can compute winning regions for the blocks with BSPs
         let mut game = grouped_game::GroupedGame::new(&mut self.game, &self.current_partition);
-        for block in 0..self.current_partition.entries.len() {
-            if self.current_partition.entries[block].players.len() > 1 {
-                if let Some(switching_pair) = switching_pairs.get_coalition_for_player(block) {
-                    let winning_region_without = game.get_winning_region(switching_pair);
-                    let winning_region_with = game.get_winning_region(switching_pair | 1 << block);
 
-                    bsps.push(BlockSwitchingPair {
-                        block_index: block,
-                        coalition_bitmap: switching_pair,
-                        winning_region_without,
-                        winning_region_with,
-                    })
+        for coalition in cached_group_game.minimal_coalitions {
+            for block in 0..self.current_partition.entries.len() {
+                if self.current_partition.entries[block].players.len() > 1 {
+                    if coalition & 1 << block != 0 {
+                        if bsps[block].is_none() {
+                            let coalition_without = coalition & !(1 << block);
+                            let winning_region_without = game.get_winning_region(coalition_without);
+                            let winning_region_with = game.get_winning_region(coalition);
+
+                            bsps[block] = Some(BlockSwitchingPair {
+                                block_index: block,
+                                coalition_bitmap: coalition_without,
+                                winning_region_without,
+                                winning_region_with,
+                            })
+                        }
+                    }
                 }
             }
         }
+
         trace!("Found {} refinement candidates", bsps.len());
 
-        if bsps.len() == 0 { None } else { Some(bsps) }
+        let mut res = Vec::new();
+        for bsp in bsps {
+            if let Some(bsp) = bsp {
+                res.push(bsp);
+            }
+        }
+
+        if res.len() == 0 { None } else { Some(res) }
     }
 }
