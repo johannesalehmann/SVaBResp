@@ -39,10 +39,9 @@ impl IndividualGroupExtractionScheme {
             }
         }
 
-        builder.create_group_from_vec(
-            relevant_states.into_dummy_states(),
-            "dummy states".to_string(),
-        );
+        for state in relevant_states.into_dummy_states() {
+            builder.add_dummy_state(state);
+        }
     }
 
     fn build_groups_with_all_states<

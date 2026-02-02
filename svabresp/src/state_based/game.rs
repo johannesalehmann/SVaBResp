@@ -66,6 +66,9 @@ impl<'a, G: StateGroups, A: SolvableGame> StateBasedResponsibilityGame<G, A> {
     }
 
     pub fn set_auxiliary_state_owners(&mut self) {
+        for state in self.grouping.get_dummy_states() {
+            self.solvable.set_owner(state, TwoPlayer::PlayerOne);
+        }
         for &state in &self.always_helping {
             self.solvable.set_owner(state, TwoPlayer::PlayerOne);
         }
