@@ -1,5 +1,7 @@
 use super::PlayerPartition;
-use crate::shapley::{CoalitionSpecifier, PlayerDescriptions, SimpleCooperativeGame};
+use crate::shapley::{
+    CoalitionSpecifier, MonotoneCooperativeGame, PlayerDescriptions, SimpleCooperativeGame,
+};
 use crate::state_based::{StateBasedResponsibilityGame, grouping::StateGroups};
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
 use probabilistic_models::TwoPlayer;
@@ -74,6 +76,8 @@ impl<'a, G: StateGroups, A: SolvableGame> SimpleCooperativeGame for GroupedGame<
         result
     }
 }
+
+impl<'a, G: StateGroups, A: SolvableGame> MonotoneCooperativeGame for GroupedGame<'a, G, A> {}
 
 pub struct GroupedGamePlayerDescriptions {
     players: Vec<usize>,

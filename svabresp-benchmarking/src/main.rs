@@ -10,6 +10,8 @@ use wait_timeout::ChildExt;
 #[tokio::main]
 async fn main() {
     evaluate_initial_partition_heuristics().await;
+    evaluate_block_selection_heuristics().await;
+    evaluate_block_splitting_heuristics().await;
 }
 
 fn model_base_path() -> &'static str {
@@ -18,20 +20,24 @@ fn model_base_path() -> &'static str {
 
 fn get_heuristics_models() -> Vec<ModelSource> {
     vec![
-        ModelSource::new("dekker", "dekker.prism", "P=1 [G F \"obj\"]"),
+        // ModelSource::new("dekker", "dekker.prism", "P=1 [G F \"obj\"]"),
         ModelSource::new("generals", "generals_3.prism", "P=1 [G !\"obj\"]"),
         ModelSource::new("railway", "railway.prism", "P=1 [F \"obj\"]"),
-        ModelSource::new("station", "railway.prism", "P=1 [G !\"obj\"]"),
-        ModelSource::new("philosophers", "railway.prism", "P=1 [G !\"obj\"]"),
-        ModelSource::new("clouds", "railway.prism", "P=1 [F \"obj\"]"),
+        ModelSource::new("station", "station.prism", "P=1 [G !\"obj\"]"),
+        ModelSource::new(
+            "philosophers",
+            "dining_philosophers.prism",
+            "P=1 [G !\"obj\"]",
+        ),
+        //ModelSource::new("clouds", "clouds.prism", "P=1 [F \"obj\"]"),
     ]
 }
 
 fn get_timeout() -> Duration {
-    Duration::from_secs(1)
+    Duration::from_secs(30)
 }
 
-fn get_initial_partition_refinement_groups() -> (Table, Vec<Vec<String>>) {
+fn get_initial_partition_refinements() -> (Table, Vec<Vec<String>>) {
     let ks = vec![1, 2, 3, 4, 5];
 
     let mut table = Table::new();
@@ -39,16 +45,7 @@ fn get_initial_partition_refinement_groups() -> (Table, Vec<Vec<String>>) {
     table.add_to_header("\\emph{{no refinement}}", 1);
 
     let mut blocking_providers = Vec::with_capacity(ks.len() + 1);
-    blocking_providers.push(vec![
-        "--algorithm".to_string(),
-        "refinement".to_string(),
-        "--initialpartition".to_string(),
-        "singleton".to_string(),
-        "--blockselection".to_string(),
-        "random".to_string(),
-        "--splitting".to_string(),
-        "frontier(random)".to_string(),
-    ]);
+    blocking_providers.push(vec!["--algorithm".to_string(), "brute-force".to_string()]);
     for &k in &ks {
         table.add_to_header(format!("$n={}$", k), 1);
         blocking_providers.push(vec![
@@ -62,6 +59,65 @@ fn get_initial_partition_refinement_groups() -> (Table, Vec<Vec<String>>) {
             "frontier(random)".to_string(),
         ]);
     }
+    (table, blocking_providers)
+}
+fn get_block_selection_refinements() -> (Table, Vec<Vec<String>>) {
+    let mut table = Table::new();
+    table.start_new_header();
+    table.add_to_header("\\emph{{random}}", 1);
+    table.add_to_header("\\emph{{max-$\\Delta$}}", 1);
+    table.add_to_header("\\emph{{min-$\\Delta$}}", 1);
+    table.add_to_header("\\emph{{min-frontier}}", 1);
+
+    let mut blocking_providers = Vec::new();
+
+    let block_selections = ["random", "max-delta", "min-delta", "min-frontier"];
+
+    for block_selection in block_selections {
+        blocking_providers.push(vec![
+            "--algorithm".to_string(),
+            "refinement".to_string(),
+            "--initialpartition".to_string(),
+            "singleton".to_string(),
+            "--blockselection".to_string(),
+            block_selection.to_string(),
+            "--splitting".to_string(),
+            "frontier(random)".to_string(),
+        ]);
+    }
+
+    (table, blocking_providers)
+}
+fn get_splitting_heuristics_refinements() -> (Table, Vec<Vec<String>>) {
+    let mut table = Table::new();
+    table.start_new_header();
+    table.add_to_header("\\emph{{random}}", 1);
+    table.add_to_header("\\emph{{frontier-any}}", 1);
+    table.add_to_header("\\emph{{frontier-to-losing}}", 1);
+    table.add_to_header("\\emph{{frontier-to-winning}}", 1);
+
+    let mut blocking_providers = Vec::new();
+
+    let splitting_heuristicses = [
+        "random",
+        "frontier(random)",
+        "frontier(prefer_losing)",
+        "frontier(prefer_winning)",
+    ];
+
+    for splitting_heuristics in splitting_heuristicses {
+        blocking_providers.push(vec![
+            "--algorithm".to_string(),
+            "refinement".to_string(),
+            "--initialpartition".to_string(),
+            "singleton".to_string(),
+            "--blockselection".to_string(),
+            "random".to_string(),
+            "--splitting".to_string(),
+            splitting_heuristics.to_string(),
+        ]);
+    }
+
     (table, blocking_providers)
 }
 
@@ -99,8 +155,8 @@ async fn produce_table<MF: Fn() -> Vec<ModelSource>, RF: Fn() -> (Table, Vec<Vec
                 .arg(model.file.as_str())
                 .arg(model.property.as_str())
                 .args(refinement.iter())
-                // .stdout(std::process::Stdio::null())
-                // .stderr(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
                 .spawn()
                 .unwrap();
 
@@ -133,30 +189,28 @@ async fn evaluate_initial_partition_heuristics() {
     produce_table(
         "initial partition benchmark",
         get_heuristics_models,
-        get_initial_partition_refinement_groups,
+        get_initial_partition_refinements,
     )
     .await;
 }
 
-// async fn run<G: GroupBlockingProvider>(
-//     model_source: ModelSource,
-//     refinement: G,
-// ) -> ResponsibilityValues<String> {
-//     let task = ResponsibilityTask {
-//         model_description: ModelFromFile::new(
-//             model_source.file.as_str(),
-//             model_source.property.as_str(),
-//         ),
-//         constants: "".to_string(),
-//         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
-//         algorithm: BruteForceAlgorithm::new(),
-//         grouping_scheme: IndividualGroupExtractionScheme::new(),
-//         refinement,
-//     };
-//     let result = task.run();
-//
-//     result
-// }
+async fn evaluate_block_selection_heuristics() {
+    produce_table(
+        "block selection benchmark",
+        get_heuristics_models,
+        get_block_selection_refinements,
+    )
+    .await;
+}
+
+async fn evaluate_block_splitting_heuristics() {
+    produce_table(
+        "block splitting benchmark",
+        get_heuristics_models,
+        get_splitting_heuristics_refinements,
+    )
+    .await;
+}
 
 #[derive(Clone)]
 struct ModelSource {

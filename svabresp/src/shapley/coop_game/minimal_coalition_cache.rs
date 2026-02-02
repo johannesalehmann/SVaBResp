@@ -9,8 +9,7 @@ pub struct MinimalCoalitionCache<P: PlayerDescriptions> {
     minimal_coalitions: Vec<u64>,
 }
 
-// TODO: Remove PlayerType=String restriction (only used for debugging)
-impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
+impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {
     pub fn large_losing_coalitions<
         C: SimpleCooperativeGame<PlayerDescriptions = P> + MonotoneCooperativeGame,
     >(
@@ -89,6 +88,11 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
             }
         }
 
+        trace!(
+            "Minimal coalition cache contains {} coalitions",
+            minimal_coalitions.len()
+        );
+
         Self {
             player_count: coop_game.get_player_count(),
             minimal_coalitions,
@@ -101,9 +105,7 @@ impl<P: PlayerDescriptions<PlayerType = String>> MinimalCoalitionCache<P> {
     }
 }
 
-impl<P: PlayerDescriptions<PlayerType = String>> SimpleCooperativeGame
-    for MinimalCoalitionCache<P>
-{
+impl<P: PlayerDescriptions> SimpleCooperativeGame for MinimalCoalitionCache<P> {
     type PlayerDescriptions = P;
 
     fn get_player_count(&self) -> usize {

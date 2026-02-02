@@ -11,7 +11,7 @@ mod grouped_game;
 mod partition;
 
 use super::StateBasedResponsibilityGame;
-use crate::shapley::{BruteForceAlgorithm, OnePairPerStateCollector};
+use crate::shapley::{BruteForceAlgorithm, MinimalCoalitionCache, OnePairPerStateCollector};
 use crate::state_based::grouping::StateGroups;
 use log::trace;
 pub use partition::{PlayerPartition, PlayerPartitionEntry};
@@ -184,8 +184,10 @@ impl<
         let mut bsps = Vec::new();
 
         let game = grouped_game::GroupedGame::new(&mut self.game, &self.current_partition);
+        let cached_group_game = MinimalCoalitionCache::create(game);
+
         let (_, switching_pairs) = BruteForceAlgorithm::new()
-            .compute_switching_pairs_simple::<_, OnePairPerStateCollector>(game);
+            .compute_switching_pairs_simple::<_, OnePairPerStateCollector>(cached_group_game);
 
         let mut game = grouped_game::GroupedGame::new(&mut self.game, &self.current_partition);
         for block in 0..self.current_partition.entries.len() {
