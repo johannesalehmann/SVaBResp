@@ -69,6 +69,10 @@ impl PlayerPartition {
             builder.finish_group(label)
         }
 
+        for dummy_state in groups.get_dummy_states() {
+            builder.add_dummy_state(dummy_state);
+        }
+
         builder.finish()
     }
 }
