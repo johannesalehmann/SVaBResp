@@ -3,7 +3,7 @@ use crate::state_based::StateBasedResponsibilityGame;
 use crate::state_based::grouping::StateGroups;
 use probabilistic_model_algorithms::regions::StateRegion;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
-use probabilistic_models::{ActionCollection, Distribution};
+use probabilistic_models::{ActionCollection, Distribution, Valuation};
 
 pub enum FrontierSplittingVariant {
     AnyState,
@@ -54,13 +54,19 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
                 if !bsp.winning_region_without.contains(state)
                     && bsp.winning_region_with.contains(state)
                 {
+                    println!(
+                        "    {} is in the winning region delta",
+                        game.get_solvable().get_game().states[state]
+                            .valuation
+                            .displayable(&game.get_solvable().get_game().valuation_context)
+                    );
                     let game = game.get_solvable().get_game();
                     for action in game.states[state].actions.iter() {
                         for destination in action.successors.iter() {
                             if bsp.winning_region_without.contains(destination.index) {
                                 states_to_winning += 1;
                             }
-                            if !bsp.winning_region_without.contains(destination.index) {
+                            if !bsp.winning_region_with.contains(destination.index) {
                                 states_to_losing += 1;
                             }
                         }
