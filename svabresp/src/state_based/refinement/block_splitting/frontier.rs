@@ -71,11 +71,6 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
     ) {
         let players = &partition.entries[bsp.block_index].players;
 
-        println!(
-            "Splitting block {} with coalition {:b}",
-            bsp.block_index, bsp.coalition_bitmap
-        );
-
         let mut overlap_sizes = Vec::new();
 
         for &player in players {
@@ -100,13 +95,6 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
             }
 
             overlap_sizes.push(overlap_value);
-        }
-
-        for (i, overlap) in overlap_sizes.iter().enumerate() {
-            println!(
-                "  {}: {} to winning, {} to losing, random {}",
-                i, overlap.states_to_winning, overlap.states_to_losing, overlap.random_value
-            );
         }
 
         let zipped = players.iter().zip(overlap_sizes);

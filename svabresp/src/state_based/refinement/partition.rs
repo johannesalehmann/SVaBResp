@@ -50,6 +50,26 @@ impl PlayerPartition {
         }
     }
 
+    pub fn merge_non_singletons(&mut self) {
+        let mut first_non_singleton_index = None;
+        let mut entries = Vec::new();
+        std::mem::swap(&mut entries, &mut self.entries);
+        for mut entry in entries {
+            if entry.players.len() == 1 {
+                self.entries.push(entry);
+            } else {
+                if let Some(first_singleton_index) = first_non_singleton_index {
+                    let first_non_singleton: &mut PlayerPartitionEntry =
+                        &mut self.entries[first_singleton_index];
+                    first_non_singleton.players.append(&mut entry.players);
+                } else {
+                    first_non_singleton_index = Some(self.entries.len());
+                    self.entries.push(entry);
+                }
+            }
+        }
+    }
+
     pub fn apply_to_grouping<G: StateGroups>(&self, groups: G) -> VectorStateGroups {
         trace!("Applying group blocking to grouping");
         let mut builder = VectorStateGroups::get_builder();

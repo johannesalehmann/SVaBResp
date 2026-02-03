@@ -154,6 +154,7 @@ impl<
         while let Some(bsps) = self.compute_refinement_candidates() {
             self.iteration(bsps);
         }
+        self.current_partition.merge_non_singletons();
         trace!("Finished refinement");
     }
 
