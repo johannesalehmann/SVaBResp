@@ -21,7 +21,7 @@ fn model_base_path() -> &'static str {
 fn get_heuristics_models() -> Vec<ModelSource> {
     vec![
         // ModelSource::new("dekker", "dekker.prism", "P=1 [G F \"obj\"]"),
-        ModelSource::new("generals", "generals_3.prism", "P=1 [G !\"obj\"]"),
+        ModelSource::new("generals", "generals_3.prism", "P=1 [F \"obj\"]"),
         ModelSource::new("railway", "railway.prism", "P=1 [F \"obj\"]"),
         ModelSource::new("station", "station.prism", "P=1 [G !\"obj\"]"),
         ModelSource::new(
@@ -29,7 +29,22 @@ fn get_heuristics_models() -> Vec<ModelSource> {
             "dining_philosophers.prism",
             "P=1 [G !\"obj\"]",
         ),
-        //ModelSource::new("clouds", "clouds.prism", "P=1 [F \"obj\"]"),
+        ModelSource::new(
+            "large_frontier_reach",
+            "large_frontier.prism",
+            "P=1 [F \"obj\"]",
+        ),
+        ModelSource::new(
+            "large_frontier_safety",
+            "large_frontier.prism",
+            "P=1 [G !\"obj\"]",
+        ),
+        ModelSource::new(
+            "almost_empty_frontier",
+            "almost_empty_frontier.prism",
+            "P=1 [F \"obj\"]",
+        ),
+        ModelSource::new("clouds", "clouds.prism", "P=1 [F \"obj\"]"),
     ]
 }
 
@@ -92,17 +107,19 @@ fn get_splitting_heuristics_refinements() -> (Table, Vec<Vec<String>>) {
     let mut table = Table::new();
     table.start_new_header();
     table.add_to_header("\\emph{{random}}", 1);
-    table.add_to_header("\\emph{{frontier-any}}", 1);
-    table.add_to_header("\\emph{{frontier-to-losing}}", 1);
-    table.add_to_header("\\emph{{frontier-to-winning}}", 1);
+    table.add_to_header("\\emph{{frontier-random}}", 1);
+    table.add_to_header("\\emph{{frontier-most-edges-to-winning-and-losing}}", 1);
+    table.add_to_header("\\emph{{frontier-most-edges-to-losing}}", 1);
+    table.add_to_header("\\emph{{frontier-most-edges-to-winning}}", 1);
 
     let mut blocking_providers = Vec::new();
 
     let splitting_heuristicses = [
         "random",
         "frontier(random)",
-        "frontier(prefer_losing)",
-        "frontier(prefer_winning)",
+        "frontier(most-edges-to-winning-and-losing)",
+        "frontier(most-edges-to-winning)",
+        "frontier(most-edges-to-losing)",
     ];
 
     for splitting_heuristics in splitting_heuristicses {

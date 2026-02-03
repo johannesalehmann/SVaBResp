@@ -1,0 +1,23 @@
+mdp
+
+label "obj" = s= 3 * CLOUD_SIZE + 1;
+
+const int CLOUD_SIZE = 20;
+
+module main
+    s: [0..3 * CLOUD_SIZE + 1] init 0;
+
+    [] (s>=0 & s<CLOUD_SIZE - 1) | (s >=CLOUD_SIZE+1 & s < 2* CLOUD_SIZE) | (s >= 2*CLOUD_SIZE+1 & s < 3 * CLOUD_SIZE) -> (s'=s+1);
+    [] (s>=0 & s<CLOUD_SIZE - 1 - 1 ) | (s >=CLOUD_SIZE+1 & s < 2* CLOUD_SIZE - 1) | (s >= 2*CLOUD_SIZE+1 & s < 3 * CLOUD_SIZE - 1) -> (s'=s+2);
+    [] (s>=0 & s<CLOUD_SIZE - 1 - 5) | (s >=CLOUD_SIZE+1 & s < 2* CLOUD_SIZE - 5) | (s >= 2*CLOUD_SIZE+1 & s < 3 * CLOUD_SIZE - 5) -> (s'=s+5);
+    [] (s>=0 & s<CLOUD_SIZE - 1 - 50) | (s >=CLOUD_SIZE+1 & s < 2* CLOUD_SIZE - 50) | (s >= 2*CLOUD_SIZE+1 & s < 3 * CLOUD_SIZE - 50) -> (s'=s+50);
+
+    [] (s = CLOUD_SIZE - 1) -> (s'=CLOUD_SIZE);
+
+    [] (s = CLOUD_SIZE) -> (s'=CLOUD_SIZE + 1);
+    [] (s = CLOUD_SIZE) -> (s'=2*CLOUD_SIZE + 1);
+
+    [] (s = CLOUD_SIZE * 2) -> (s'= 2* CLOUD_SIZE);
+
+    [] (s = CLOUD_SIZE * 3) -> (s'= 3* CLOUD_SIZE + 1);
+endmodule

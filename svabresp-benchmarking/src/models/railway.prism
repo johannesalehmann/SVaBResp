@@ -62,13 +62,13 @@ module Train
     [] (loc=21&direction=0) -> (loc'=31);
     [] (loc=22&direction=0) -> (loc'=31);
 
-    // [] (loc=21&direction=0) -> (loc'=31);
-    // [] (loc=21&direction=0) -> (loc'=32);
+    [] (loc=21&direction=0) -> (loc'=31);
+    [] (loc=21&direction=0) -> (loc'=32);
 
-    // [] (loc=22&direction=0) -> (loc'=30);
-    // [] (loc=22&direction=0) -> (loc'=31);
+    [] (loc=22&direction=0) -> (loc'=30);
+    [] (loc=22&direction=0) -> (loc'=31);
 
-    // [] (loc=23&direction=0) -> (loc'=27);
+    [] (loc=23&direction=0) -> (loc'=27);
     [] (loc=23&direction=0) -> (loc'=30);
 
     [] (loc=24&direction=0) -> (loc'=25);

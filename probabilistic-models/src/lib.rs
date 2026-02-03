@@ -1,4 +1,5 @@
 pub use probabilistic_properties;
+use std::fmt::Formatter;
 use std::marker::PhantomData;
 
 mod distributions;
@@ -40,6 +41,41 @@ pub struct ProbabilisticModel<M: ModelTypes> {
     pub valuation_context: <M::Valuation as Valuation>::ContextType,
     pub atomic_proposition_count: usize,
     pub action_names: Vec<String>,
+}
+
+impl<M: ModelTypes> std::fmt::Debug for ProbabilisticModel<M> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for state in &self.states {
+            write!(
+                f,
+                "{}",
+                state.valuation.displayable(&self.valuation_context)
+            )?;
+            for i in 0..self.atomic_proposition_count {
+                if state.atomic_propositions.get_value(i) {
+                    write!(f, "    Fulfils atomic proposition {}", i)?;
+                }
+            }
+            for action in state.actions.iter() {
+                write!(
+                    f,
+                    "    Action `{}`",
+                    self.action_names[action.action_name_index]
+                )?;
+                for target in action.successors.iter() {
+                    write!(
+                        f,
+                        "        {} -> {}",
+                        target.probability,
+                        self.states[target.index]
+                            .valuation
+                            .displayable(&self.valuation_context)
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<M: ModelTypes> ProbabilisticModel<M> {

@@ -11,7 +11,7 @@ mod grouped_game;
 mod partition;
 
 use super::StateBasedResponsibilityGame;
-use crate::shapley::{BruteForceAlgorithm, MinimalCoalitionCache, OnePairPerStateCollector};
+use crate::shapley::MinimalCoalitionCache;
 use crate::state_based::grouping::StateGroups;
 use log::trace;
 pub use partition::{PlayerPartition, PlayerPartitionEntry};

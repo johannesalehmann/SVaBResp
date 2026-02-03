@@ -1,6 +1,6 @@
 use crate::shapley::responsibility_values::{CriticalPairCounter, ResponsibilityValues};
 use crate::shapley::{CooperativeGame, PlayerDescriptions, SimpleCooperativeGame};
-use log::trace;
+use log::{info, trace};
 
 pub struct BruteForceAlgorithm {}
 
@@ -33,20 +33,21 @@ impl BruteForceAlgorithm {
         let mut counts = CriticalPairCounter::new(n);
 
         let start = std::time::Instant::now();
+        let mut next_round_number = 10_000_000;
         for base_coalition in 0..coalition_count {
-            if base_coalition % 1_000_000 == 0
-                && base_coalition > 0
-                && start.elapsed().as_secs_f32() > 2.0
-            {
-                trace!(
-                    "{}k/{}k ({} games per second)",
-                    base_coalition / 1000,
-                    coalition_count / 1000,
-                    base_coalition as f32 / start.elapsed().as_secs_f32()
-                );
+            if base_coalition == next_round_number && base_coalition > 0 {
+                next_round_number += 10_000_000;
+                if start.elapsed().as_secs_f32() > 5.0 {
+                    info!(
+                        "Checked {}m/{:.1}m ({:.2}%) switching pairs",
+                        base_coalition / 1000_000,
+                        coalition_count as f64 / 1000_000.0,
+                        (base_coalition as f64 / coalition_count as f64) * 100.0
+                    );
+                }
             }
-            let size = base_coalition.count_ones() as usize;
             if !game.is_winning(base_coalition) {
+                let size = base_coalition.count_ones() as usize;
                 for added_state in 0..n {
                     let coalition = base_coalition | 1 << added_state;
                     if coalition != base_coalition && game.is_winning(coalition) {

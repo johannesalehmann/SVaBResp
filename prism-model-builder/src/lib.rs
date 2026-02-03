@@ -71,7 +71,7 @@ pub struct ExplicitModelBuilder<M: ModelTypes, B: ModelBuilderTypes> {
     consts: ConstValuations,
     variable_bounds: VariableBounds,
     variable_types: VariableTypes,
-    context: <M::Valuation as Valuation>::ContextType,
+    valuation_context: <M::Valuation as Valuation>::ContextType,
     action_names: Vec<String>,
     action_name_indices: HashMap<String, usize>,
 }
@@ -124,7 +124,8 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         let variable_bounds =
             Self::prepare_variable_bounds(&model.variable_manager, &consts, &valuation_map)?;
         let variable_types = Self::prepare_variable_types(&model.variable_manager);
-        let context = Self::prepare_valuation_context(model, &valuation_map, &variable_bounds);
+        let valuation_context =
+            Self::prepare_valuation_context(model, &valuation_map, &variable_bounds);
 
         let synchronised_actions = SynchronisedActions::from_prism(model);
 
@@ -137,7 +138,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             consts,
             variable_bounds,
             variable_types,
-            context,
+            valuation_context,
             action_names: Vec::new(),
             action_name_indices: HashMap::new(),
         };
@@ -154,8 +155,11 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         }
         let initial_states = initial_states_builder.finish();
 
-        let mut result =
-            ProbabilisticModel::new(initial_states, builder.context, atomic_propositions.len());
+        let mut result = ProbabilisticModel::new(
+            initial_states,
+            builder.valuation_context,
+            atomic_propositions.len(),
+        );
         result.action_names = builder.action_names;
         for state_in_progress in builder.states.into_iter() {
             let state = State {
@@ -438,8 +442,17 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     }
 
                     let action_name_index = self.get_unnamed_action_name_index();
+                    let successors = distribution.finish();
+                    if successors.number_of_successors() == 0 {
+                        println!(
+                            "State {} a local action with zero successors",
+                            self.states[state]
+                                .valuation
+                                .displayable(&self.valuation_context)
+                        )
+                    }
                     self.states[state].actions.add_action(Action {
-                        successors: distribution.finish(),
+                        successors,
                         action_name_index,
                     });
                     action_index += 1;
@@ -680,7 +693,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                 phantom_data: Default::default(),
             };
 
-        let mut valuation_builder = M::Valuation::get_builder(&self.context);
+        let mut valuation_builder = M::Valuation::get_builder(&self.valuation_context);
 
         for (i, variable) in model.variable_manager.variables.iter().enumerate() {
             if let ValuationMapEntry::Var(index) = &self.valuation_map.entries[i] {

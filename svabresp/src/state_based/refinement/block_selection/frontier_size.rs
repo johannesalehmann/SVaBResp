@@ -24,7 +24,7 @@ impl BlockSelectionHeuristics for FrontierSizeSelectionHeuristics {
         &mut self,
         game: &StateBasedResponsibilityGame<G, A>,
         partition: &PlayerPartition,
-        mut refinement_candidates: Vec<BlockSwitchingPair<A::WinningRegionType>>,
+        refinement_candidates: Vec<BlockSwitchingPair<A::WinningRegionType>>,
     ) -> Vec<BlockSwitchingPair<A::WinningRegionType>> {
         let _ = (game, partition);
 

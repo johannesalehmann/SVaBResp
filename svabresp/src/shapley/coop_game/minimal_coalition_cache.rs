@@ -54,9 +54,9 @@ impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {
         for coalition in 0..max_coalition {
             if coalition % 10_000_000 == 0 && coalition > 0 {
                 info!(
-                    "{}/{} ({:.2}%)  (solved {} games, skipped {})",
-                    coalition,
-                    max_coalition,
+                    "{}m/{:.1}m ({:.2}%)  (solved {} games, skipped {})",
+                    coalition / 1_000_000,
+                    max_coalition as f64 / 1_000_000.0,
                     (coalition as f64 / max_coalition as f64) * 100.0,
                     game_counter,
                     skipped_counter

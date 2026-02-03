@@ -1,0 +1,41 @@
+mdp
+
+label "obj" = pc1=4;
+
+const int WORK_AMOUNT = 2;
+
+module Turn
+    turn: [1..2] init 1;
+
+    [TurnA] true -> (turn'=1);
+    [TurnB] true -> (turn'=2);
+endmodule
+
+module P1
+    pc1: [0..100] init 0;
+    wte1: [0..1] init 0;
+    work_counter_1: [0..30] init 0;
+
+    // Non-critical section
+    [] (pc1=0) -> (pc1'=2) & (wte1'=1); // Decide to visit critical section
+
+    // Check whether other process also wants to enter
+    [] (pc1=2 & wte2=0) -> (pc1'=4);
+    [] (pc1=2 & wte2=1) -> (pc1'=3) & (wte1'=0);
+
+    // Wait for turn
+    [] (pc1=3 & turn!=1) -> (pc1'=3);
+    [] (pc1=3 & turn=1) -> (pc1'=2) & (wte1'=1);
+
+    // Enter critical section and do super critical work
+    [] (pc1=4 & work_counter_1 < WORK_AMOUNT) -> (work_counter_1'=work_counter_1+1);
+    [] (pc1=4 & work_counter_1 < WORK_AMOUNT-1) -> (work_counter_1'=work_counter_1+2);
+    [] (pc1=4 & work_counter_1 = WORK_AMOUNT) -> (pc1'=5)&(work_counter_1'=0);
+
+    // Leave critical section
+    [TurnB] (pc1=5) -> (pc1'=6);
+
+    [] (pc1=6) -> (pc1'=7)&(wte1'=0);
+endmodule
+
+module P2 = P1 [pc1=pc2,wte1=wte2,TurnB=TurnA,work_counter_1=work_counter_2] endmodule
