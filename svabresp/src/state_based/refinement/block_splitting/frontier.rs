@@ -73,12 +73,6 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
                 if !bsp.winning_region_without.contains(state)
                     && bsp.winning_region_with.contains(state)
                 {
-                    println!(
-                        "    {} is in the winning region delta",
-                        game.get_solvable().get_game().states[state]
-                            .valuation
-                            .displayable(&game.get_solvable().get_game().valuation_context)
-                    );
                     let game = game.get_solvable().get_game();
                     for action in game.states[state].actions.iter() {
                         for destination in action.successors.iter() {
