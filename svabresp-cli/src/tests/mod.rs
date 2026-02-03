@@ -152,7 +152,7 @@ fn simple_refinement() {
         RefinementGroupBlockingProvider::new(
             SingletonInitialPartition::new(),
             RandomBlockSelectionHeuristics::new(1),
-            FrontierSplittingHeuristics::any_state(),
+            FrontierSplittingHeuristics::random_state(),
         ),
     };
     let result = task.run();
@@ -179,7 +179,7 @@ fn refinement_from_paper() {
         refinement: RefinementGroupBlockingProvider::new(
             SingletonInitialPartition::new(),
             RandomBlockSelectionHeuristics::new(1),
-            FrontierSplittingHeuristics::any_state(),
+            FrontierSplittingHeuristics::random_state(),
         ),
     };
     let result = task.run();

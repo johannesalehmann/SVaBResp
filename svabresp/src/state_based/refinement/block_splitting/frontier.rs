@@ -3,13 +3,14 @@ use crate::state_based::StateBasedResponsibilityGame;
 use crate::state_based::grouping::StateGroups;
 use probabilistic_model_algorithms::regions::StateRegion;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
-use probabilistic_models::{ActionCollection, Distribution, Valuation};
+use probabilistic_models::{ActionCollection, Distribution};
 use rand::Rng;
 
 pub enum FrontierSplittingVariant {
-    AnyState,
-    PreferStatesReachingLosing,
-    PreferStatesReachingWinning,
+    RandomState,
+    MostEdgesToWinningAndLosing,
+    MostEdgesToLosing,
+    MostEdgesToWinning,
 }
 
 pub struct FrontierSplittingHeuristics {
@@ -17,21 +18,27 @@ pub struct FrontierSplittingHeuristics {
 }
 
 impl FrontierSplittingHeuristics {
-    pub fn any_state() -> Self {
+    pub fn random_state() -> Self {
         Self {
-            variant: FrontierSplittingVariant::AnyState,
+            variant: FrontierSplittingVariant::RandomState,
         }
     }
 
-    pub fn prefer_states_reaching_losing() -> Self {
+    pub fn most_edges_to_winning_and_losing() -> Self {
         Self {
-            variant: FrontierSplittingVariant::PreferStatesReachingLosing,
+            variant: FrontierSplittingVariant::MostEdgesToWinningAndLosing,
         }
     }
 
-    pub fn prefer_states_reaching_winning() -> Self {
+    pub fn most_edges_to_losing() -> Self {
         Self {
-            variant: FrontierSplittingVariant::PreferStatesReachingWinning,
+            variant: FrontierSplittingVariant::MostEdgesToLosing,
+        }
+    }
+
+    pub fn most_edges_to_winning() -> Self {
+        Self {
+            variant: FrontierSplittingVariant::MostEdgesToWinning,
         }
     }
 }
@@ -64,6 +71,11 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
     ) {
         let players = &partition.entries[bsp.block_index].players;
 
+        println!(
+            "Splitting block {} with coalition {:b}",
+            bsp.block_index, bsp.coalition_bitmap
+        );
+
         let mut overlap_sizes = Vec::new();
 
         for &player in players {
@@ -90,18 +102,26 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
             overlap_sizes.push(overlap_value);
         }
 
+        for (i, overlap) in overlap_sizes.iter().enumerate() {
+            println!(
+                "  {}: {} to winning, {} to losing, random {}",
+                i, overlap.states_to_winning, overlap.states_to_losing, overlap.random_value
+            );
+        }
+
         let zipped = players.iter().zip(overlap_sizes);
         let split_player = zipped
             .max_by(|(_, o1), (_, o2)| {
                 match self.variant {
-                    FrontierSplittingVariant::AnyState => {
+                    FrontierSplittingVariant::RandomState => 1.cmp(&1),
+                    FrontierSplittingVariant::MostEdgesToWinningAndLosing => {
                         o1.total_overlap().cmp(&o2.total_overlap())
                     }
-                    FrontierSplittingVariant::PreferStatesReachingLosing => o1
+                    FrontierSplittingVariant::MostEdgesToLosing => o1
                         .states_to_losing
                         .cmp(&o2.states_to_losing)
                         .then(o1.states_to_winning.cmp(&o2.states_to_winning)),
-                    FrontierSplittingVariant::PreferStatesReachingWinning => o1
+                    FrontierSplittingVariant::MostEdgesToWinning => o1
                         .states_to_winning
                         .cmp(&o2.states_to_winning)
                         .then(o1.states_to_losing.cmp(&o2.states_to_losing)),

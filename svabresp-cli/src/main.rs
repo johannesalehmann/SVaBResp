@@ -55,9 +55,10 @@ enum RefinementBlockSelection {
 
 enum RefinementSplitting {
     Random,
-    FrontierAny,
-    FrontierPreferPotentiallyWinning,
-    FrontierPreferPotentiallyLosing,
+    FrontierRandom,
+    FrontierMostEdgesToWinningAndLosing,
+    FrontierMostEdgesToWinning,
+    FrontierMostEdgesToLosing,
 }
 
 enum GroupingKind {
@@ -93,7 +94,7 @@ impl Cli {
             .arg(arg!(-l --logging <LEVEL> "The level of detail for the logs. Legal values are `error`, `warn`, `info`, `debug` and `trace`.").default_value("warn"))
             .arg(arg!(--initialpartition <HEURISTICS> "Refinement algorithm: The heuristics used to construct the initial partition. Legal values are `singleton` and `random(<INTEGER>)`, where <INTEGER> is a positive integer.").default_value("singleton"))
             .arg(arg!(--blockselection <HEURISTICS> "Refinement algorithm: The heuristics used to select a block for refinement. Legal values are `random`, `min-delta`, `max-delta`, `min-frontier`. Every value may be succeeded immediately by `(<INTEGER>)`, where <INTEGER> is a positive integer. This indicates how many blocks should be refined in a single iteration.").default_value("random(1)"))
-            .arg(arg!(--splitting <HEURISTICS> "Refinement algorithm: The heuristics used to split a block. Legal values are `random`, `frontier(random)`, `frontier(prefer_winning)` and `frontier(prefer_losing)`.").default_value("frontier(random)"))
+            .arg(arg!(--splitting <HEURISTICS> "Refinement algorithm: The heuristics used to split a block. Legal values are `random`, `frontier(random)`, `frontier(most-edges-to-winning-and-losing)`, `frontier(most-edges-to-winning)` and `frontier(most-edges-to-losing)`.").default_value("frontier(random)"))
             .arg(Arg::new("model").required(true).help("File name of the PRISM model file"))
             .arg(Arg::new("property").required(true).help("Property to be checked, given in PRISM property language"))
 
@@ -211,9 +212,12 @@ impl Cli {
 
         let refinement_splitting = match matches.get_one::<String>("splitting").unwrap().as_str() {
             "random" => RefinementSplitting::Random,
-            "frontier(random)" | "frontier" => RefinementSplitting::FrontierAny,
-            "frontier(prefer_winning)" => RefinementSplitting::FrontierPreferPotentiallyWinning,
-            "frontier(prefer_losing)" => RefinementSplitting::FrontierPreferPotentiallyLosing,
+            "frontier(random)" | "frontier" => RefinementSplitting::FrontierRandom,
+            "frontier(most-edges-to-winning-and-losing)" => {
+                RefinementSplitting::FrontierMostEdgesToWinningAndLosing
+            }
+            "frontier(most-edges-to-winning)" => RefinementSplitting::FrontierMostEdgesToWinning,
+            "frontier(most-edges-to-losing)" => RefinementSplitting::FrontierMostEdgesToLosing,
             s => panic!("Unknown splitting heuristics `{}`", s),
         };
 
@@ -417,34 +421,40 @@ fn execute_with_block_selection_heuristics<
             block_selection_heuristics,
             RandomSplittingHeuristics::new(),
         ),
-        RefinementSplitting::FrontierAny => execute_with_block_splitting_heuristics(
+        RefinementSplitting::FrontierRandom => execute_with_block_splitting_heuristics(
             cli,
             model_description,
             grouping_scheme,
             initial_partition_provider,
             block_selection_heuristics,
-            FrontierSplittingHeuristics::any_state(),
+            FrontierSplittingHeuristics::random_state(),
         ),
-        RefinementSplitting::FrontierPreferPotentiallyWinning => {
+        RefinementSplitting::FrontierMostEdgesToWinningAndLosing => {
             execute_with_block_splitting_heuristics(
                 cli,
                 model_description,
                 grouping_scheme,
                 initial_partition_provider,
                 block_selection_heuristics,
-                FrontierSplittingHeuristics::prefer_states_reaching_winning(),
+                FrontierSplittingHeuristics::most_edges_to_winning(),
             )
         }
-        RefinementSplitting::FrontierPreferPotentiallyLosing => {
-            execute_with_block_splitting_heuristics(
-                cli,
-                model_description,
-                grouping_scheme,
-                initial_partition_provider,
-                block_selection_heuristics,
-                FrontierSplittingHeuristics::prefer_states_reaching_losing(),
-            )
-        }
+        RefinementSplitting::FrontierMostEdgesToWinning => execute_with_block_splitting_heuristics(
+            cli,
+            model_description,
+            grouping_scheme,
+            initial_partition_provider,
+            block_selection_heuristics,
+            FrontierSplittingHeuristics::most_edges_to_winning(),
+        ),
+        RefinementSplitting::FrontierMostEdgesToLosing => execute_with_block_splitting_heuristics(
+            cli,
+            model_description,
+            grouping_scheme,
+            initial_partition_provider,
+            block_selection_heuristics,
+            FrontierSplittingHeuristics::most_edges_to_winning_and_losing(),
+        ),
     }
 }
 
