@@ -21,8 +21,7 @@ fn model_base_path() -> &'static str {
 fn get_heuristics_models() -> Vec<ModelSource> {
     vec![
         // ModelSource::new("dekker", "dekker.prism", "P=1 [G F \"obj\"]"),
-        ModelSource::new("generals", "generals_3.prism", "P=1 [F \"obj\"]"),
-        ModelSource::new("railway", "railway.prism", "P=1 [F \"obj\"]"),
+        ModelSource::new("generals", "generals_4.prism", "P=1 [F \"obj\"]"),
         ModelSource::new("station", "station.prism", "P=1 [G !\"obj\"]"),
         ModelSource::new(
             "philosophers",
@@ -30,26 +29,37 @@ fn get_heuristics_models() -> Vec<ModelSource> {
             "P=1 [G !\"obj\"]",
         ),
         ModelSource::new(
-            "large_frontier_reach",
-            "large_frontier.prism",
+            "large\\_frontier\\_reach",
+            "large_frontier_reachability.prism",
             "P=1 [F \"obj\"]",
         ),
         ModelSource::new(
-            "large_frontier_safety",
-            "large_frontier.prism",
+            "large\\_frontier\\_safety",
+            "large_frontier_safety.prism",
             "P=1 [G !\"obj\"]",
         ),
         ModelSource::new(
-            "almost_empty_frontier",
+            "almost\\_empty\\_frontier",
             "almost_empty_frontier.prism",
             "P=1 [F \"obj\"]",
         ),
+        ModelSource::with_additional_arguments(
+            "centrifuges",
+            "centrifuges.prism",
+            "P=1 [F \"obj\"]",
+            vec!["--grouping", "modules"],
+        ),
         ModelSource::new("clouds", "clouds.prism", "P=1 [F \"obj\"]"),
+        ModelSource::new(
+            "complex\\_clouds",
+            "clouds_complex.prism",
+            "P=1 [G F \"obj\"]",
+        ),
     ]
 }
 
 fn get_timeout() -> Duration {
-    Duration::from_secs(30)
+    Duration::from_secs(60)
 }
 
 fn get_initial_partition_refinements() -> (Table, Vec<Vec<String>>) {
@@ -138,6 +148,10 @@ fn get_splitting_heuristics_refinements() -> (Table, Vec<Vec<String>>) {
     (table, blocking_providers)
 }
 
+fn get_repeats() -> usize {
+    10
+}
+
 async fn produce_table<MF: Fn() -> Vec<ModelSource>, RF: Fn() -> (Table, Vec<Vec<String>>)>(
     benchmark_name: &'static str,
     models: MF,
@@ -161,39 +175,50 @@ async fn produce_table<MF: Fn() -> Vec<ModelSource>, RF: Fn() -> (Table, Vec<Vec
             .into_iter()
             .enumerate()
         {
-            pb.set_message(format!(
-                "{} ({}/{})",
-                model.name,
-                refinement_index,
-                refinements.len()
-            ));
-            let start = std::time::Instant::now();
-            let mut child = std::process::Command::new("./target/release/svabresp-cli")
-                .arg(model.file.as_str())
-                .arg(model.property.as_str())
-                .args(refinement.iter())
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .spawn()
-                .unwrap();
+            let mut times = Vec::new();
+            for repeat in 0..get_repeats() {
+                pb.set_message(format!(
+                    "{} ({}/{}), run {}/{}",
+                    model.name,
+                    refinement_index,
+                    refinements.len(),
+                    repeat + 1,
+                    get_repeats()
+                ));
+                let start = std::time::Instant::now();
+                let mut child = std::process::Command::new("./target/release/svabresp-cli")
+                    .arg(model.file.as_str())
+                    .arg(model.property.as_str())
+                    .args(model.additional_arguments.iter())
+                    .args(refinement.iter())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .unwrap();
 
-            match child.wait_timeout(get_timeout()).unwrap() {
-                Some(status) => {
-                    table.add_runtime(start.elapsed().as_secs_f64());
-                    if status.code() != Some(0) {
-                        println!(
-                            "There was an error for configuration \"{}\" \"{}\" {}",
-                            model.file,
-                            model.property,
-                            refinement.join(" ")
-                        );
+                match child.wait_timeout(get_timeout()).unwrap() {
+                    Some(status) => {
+                        times.push(start.elapsed().as_secs_f64());
+                        if status.code() != Some(0) {
+                            println!(
+                                "There was an error for configuration \"{}\" \"{}\" {}",
+                                model.file,
+                                model.property,
+                                refinement.join(" ")
+                            );
+                        }
                     }
-                }
-                None => {
-                    child.kill().unwrap();
-                    table.add_timeout();
-                }
-            };
+                    None => {
+                        child.kill().unwrap();
+                        table.add_timeout();
+                        break;
+                    }
+                };
+            }
+            if times.len() == get_repeats() {
+                let average = times.iter().sum::<f64>() / get_repeats() as f64;
+                table.add_runtime(average);
+            }
             pb.inc(1);
         }
     }
@@ -234,6 +259,7 @@ struct ModelSource {
     name: String,
     file: String,
     property: String,
+    additional_arguments: Vec<String>,
 }
 impl ModelSource {
     pub fn new(name: &'static str, file: &'static str, property: &'static str) -> Self {
@@ -241,6 +267,20 @@ impl ModelSource {
             name: name.into(),
             file: format!("{}{}", model_base_path(), file),
             property: property.into(),
+            additional_arguments: Vec::new(),
+        }
+    }
+    pub fn with_additional_arguments(
+        name: &'static str,
+        file: &'static str,
+        property: &'static str,
+        additional_arguments: Vec<&'static str>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            file: format!("{}{}", model_base_path(), file),
+            property: property.into(),
+            additional_arguments: additional_arguments.iter().map(|f| f.to_string()).collect(),
         }
     }
 }

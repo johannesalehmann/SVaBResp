@@ -95,6 +95,17 @@ impl PlayerPartition {
 
         builder.finish()
     }
+
+    pub fn print<G: StateGroups>(&self, groups: &G) {
+        print!("{{");
+        for (i, player) in self.entries.iter().enumerate() {
+            if i > 0 {
+                print!(", ");
+            }
+            player.print(groups);
+        }
+        print!("}}");
+    }
 }
 
 pub struct PlayerPartitionEntry {
@@ -110,5 +121,15 @@ impl PlayerPartitionEntry {
 
     pub fn with_players(players: Vec<usize>) -> Self {
         Self { players }
+    }
+    pub fn print<G: StateGroups>(&self, groups: &G) {
+        print!("{{");
+        for (i, &player) in self.players.iter().enumerate() {
+            if i > 0 {
+                print!(", ");
+            }
+            print!("{}", groups.get_label(player));
+        }
+        print!("}}");
     }
 }

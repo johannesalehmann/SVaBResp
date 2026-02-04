@@ -1,10 +1,5 @@
 mdp
 
-// In this model, each state can reach the objective s=0. However, each state is only reached if all previous states are
-// also controlled by Player Sat. In particular, this requires controlling initial state s=1, which can reach s=0 on its
-// own. Therefore, s=1 is winning on its own and then other states have no responsibility, even though they are all in
-// the frontier.
-
 label "obj" = s=0;
 
 const int length=100;
@@ -14,5 +9,5 @@ module main
 
     [] (s>0 & s<= length) -> (s'=s);
     [] (s>0 & s<= length) -> (s'=0);
-    [] (s>0 & s< length) -> (s'=s + 1);
+    [] (s>0 & s < length) -> (s'=s + 1);
 endmodule

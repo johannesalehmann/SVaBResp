@@ -3,7 +3,7 @@ use crate::state_based::StateBasedResponsibilityGame;
 use crate::state_based::grouping::StateGroups;
 use probabilistic_model_algorithms::regions::StateRegion;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
-use probabilistic_models::{ActionCollection, Distribution};
+use probabilistic_models::{ActionCollection, Distribution, Valuation};
 use rand::Rng;
 
 pub enum FrontierSplittingVariant {
@@ -73,6 +73,31 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
 
         let mut overlap_sizes = Vec::new();
 
+        let print = false;
+
+        if print {
+            print!("Splitting (");
+            partition.entries[bsp.block_index].print(game.get_grouping());
+            println!(") with coalition {:b}", bsp.coalition_bitmap);
+
+            println!("Winning regions:");
+            for state in 0..bsp.winning_region_with.size() {
+                if bsp.winning_region_with.contains(state) {
+                    print!(
+                        "  {}",
+                        game.get_solvable().get_game().states[state]
+                            .valuation
+                            .displayable(&game.get_solvable().get_game().valuation_context)
+                    );
+                    if bsp.winning_region_without.contains(state) {
+                        print!(" (also in region without)");
+                    }
+                    println!();
+                }
+            }
+
+            println!("Overlaps:");
+        }
         for &player in players {
             let mut overlap_value = OverlapData::new(rand::rng().random_range(0..1_000_000));
 
@@ -85,9 +110,31 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
                         for destination in action.successors.iter() {
                             if bsp.winning_region_without.contains(destination.index) {
                                 overlap_value.states_to_winning += 1;
+                                if print {
+                                    println!(
+                                        "  {} has transition to {} (winning)",
+                                        game.states[state]
+                                            .valuation
+                                            .displayable(&game.valuation_context),
+                                        game.states[destination.index]
+                                            .valuation
+                                            .displayable(&game.valuation_context)
+                                    )
+                                }
                             }
                             if !bsp.winning_region_with.contains(destination.index) {
                                 overlap_value.states_to_losing += 1;
+                                if print {
+                                    println!(
+                                        "  {} has transition to {} (losing)",
+                                        game.states[state]
+                                            .valuation
+                                            .displayable(&game.valuation_context),
+                                        game.states[destination.index]
+                                            .valuation
+                                            .displayable(&game.valuation_context)
+                                    )
+                                }
                             }
                         }
                     }
@@ -101,7 +148,9 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
         let split_player = zipped
             .max_by(|(_, o1), (_, o2)| {
                 match self.variant {
-                    FrontierSplittingVariant::RandomState => 1.cmp(&1),
+                    FrontierSplittingVariant::RandomState => {
+                        o1.total_overlap().min(1).cmp(&o2.total_overlap().min(1))
+                    }
                     FrontierSplittingVariant::MostEdgesToWinningAndLosing => {
                         o1.total_overlap().cmp(&o2.total_overlap())
                     }
@@ -118,6 +167,13 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
             })
             .map(|(p, _)| *p)
             .expect("Could not refine any players");
+
+        if print {
+            println!(
+                "  Splitting off {}",
+                game.get_grouping().get_label(split_player)
+            );
+        }
 
         partition.split_entry(bsp.block_index, |p| if p == split_player { 1 } else { 0 });
     }

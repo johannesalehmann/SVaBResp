@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use svabresp::num_traits::ToPrimitive;
+use svabresp::num_traits::{Signed, ToPrimitive};
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgorithm};
 
 use clap::{Arg, Command, arg};
@@ -436,7 +436,7 @@ fn execute_with_block_selection_heuristics<
                 grouping_scheme,
                 initial_partition_provider,
                 block_selection_heuristics,
-                FrontierSplittingHeuristics::most_edges_to_winning(),
+                FrontierSplittingHeuristics::most_edges_to_winning_and_losing(),
             )
         }
         RefinementSplitting::FrontierMostEdgesToWinning => execute_with_block_splitting_heuristics(
@@ -453,7 +453,7 @@ fn execute_with_block_selection_heuristics<
             grouping_scheme,
             initial_partition_provider,
             block_selection_heuristics,
-            FrontierSplittingHeuristics::most_edges_to_winning_and_losing(),
+            FrontierSplittingHeuristics::most_edges_to_losing(),
         ),
     }
 }
@@ -540,6 +540,7 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD>>
 {
     fn print_human_readable(self, output: ResponsibilityValues<PD>) {
         println!("Responsibility values:");
+        let mut counter = 0;
         for player in output.players {
             println!(
                 " {}: {} ({})",
@@ -551,7 +552,11 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD>>
                     .unwrap_or_else(|| "err".to_string()),
                 player.value
             );
+            if player.value.is_positive() {
+                counter += 1;
+            }
         }
+        println!("{} entities have responsibility", counter);
     }
 
     fn print_parsable(self, output: ResponsibilityValues<PD>) {

@@ -2,7 +2,7 @@ mdp
 
 label "obj" = s= 3 * CLOUD_SIZE + 1;
 
-const int CLOUD_SIZE = 20;
+const int CLOUD_SIZE = 333000;
 
 module main
     s: [0..3 * CLOUD_SIZE + 1] init 0;

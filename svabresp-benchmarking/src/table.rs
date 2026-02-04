@@ -44,7 +44,7 @@ impl Table {
 
     pub fn print_latex(&self) {
         let width = self.get_width();
-        println!("\\begin{{tabular}}{{l{}}}", "r".repeat(width - 1));
+        println!("\\begin{{tabular}}{{l{}}}", "r".repeat(width));
         println!("    \\toprule");
         for (index, header) in self.headers.iter().enumerate() {
             assert_eq!(width, header.get_width());
@@ -75,13 +75,13 @@ impl Table {
             for (entry_index, entry) in row.entries.iter().enumerate() {
                 match entry {
                     TableTime::Timeout => {
-                        print!("        & TO")
+                        print!("        TO")
                     }
                     TableTime::Seconds(s) => {
                         if *s < 1.0 {
-                            print!("        & \\statCell[ms]{{{:.0}}}", s * 1000.0)
+                            print!("        \\statCell[ms]{{{:.0}}}", s * 1000.0)
                         } else {
-                            print!("        & \\statCell{{{:.2}}}", s)
+                            print!("        \\statCell{{{:.2}}}", s)
                         }
                     }
                 }

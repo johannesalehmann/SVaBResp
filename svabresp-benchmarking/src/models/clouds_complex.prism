@@ -1,0 +1,35 @@
+mdp
+
+label "obj" = s= 3 * CLOUD_SIZE;
+
+
+const int CLOUD_SIZE = 142857;
+
+module main
+    s: [1 .. 7 * CLOUD_SIZE] init 1;
+
+    [] (mod(s, CLOUD_SIZE) > 0 & mod(s, CLOUD_SIZE) < CLOUD_SIZE) -> (s'=s+1);
+    [] (mod(s, CLOUD_SIZE) > 0 & mod(s, CLOUD_SIZE) < CLOUD_SIZE - 1) -> (s'=s+2);
+    [] (mod(s, CLOUD_SIZE) > 0 & mod(s, CLOUD_SIZE) < CLOUD_SIZE - 5) -> (s'=s+6);
+    [] (mod(s, CLOUD_SIZE) > 0 & mod(s, CLOUD_SIZE) < CLOUD_SIZE - 60) -> (s'=s+61);
+
+    [] (s = CLOUD_SIZE) -> (s '= CLOUD_SIZE + 1);
+    [] (s = CLOUD_SIZE) -> (s '= 3*CLOUD_SIZE + 1);
+
+    [] (s = 2*CLOUD_SIZE) -> (s '= 3*CLOUD_SIZE + 1);
+    [] (s = 2*CLOUD_SIZE) -> (s '= 2*CLOUD_SIZE + 1);
+
+    [] (s = 3*CLOUD_SIZE) -> (s '= 3*CLOUD_SIZE + 1);
+    [] (s = 3*CLOUD_SIZE) -> (s '= 4*CLOUD_SIZE + 1);
+
+    [] (s = 4*CLOUD_SIZE) -> (s '= 3*CLOUD_SIZE + 1);
+
+    [] (s = 5*CLOUD_SIZE) -> (s '= 3*CLOUD_SIZE + 1);
+    [] (s = 5*CLOUD_SIZE) -> (s '= 5*CLOUD_SIZE + 1);
+
+    [] (s = 6*CLOUD_SIZE) -> (s '= 0*CLOUD_SIZE + 1);
+    [] (s = 6*CLOUD_SIZE) -> (s '= 6*CLOUD_SIZE + 1);
+
+    [] (s = 7*CLOUD_SIZE) -> (s '= 0*CLOUD_SIZE + 1);
+    [] (s = 7*CLOUD_SIZE) -> (s '= 1*CLOUD_SIZE + 1);
+endmodule

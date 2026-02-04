@@ -2,9 +2,6 @@ mdp
 
 label "obj" = s=2;
 
-const int FRONTIER_TO_BAD = 15;
-const int FRONTIER_TO_GOOD = 15;
-
 module main
     s: [0..40] init 0;
 

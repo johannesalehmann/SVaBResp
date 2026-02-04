@@ -6,7 +6,7 @@ formula reached_dead_end = (t=69 | t=70 | t=71);
 formula reached_bay_platform = (t=54 | t=55 | t=56 | t=57 | t=58 | t=59 | t=60);
 
 // This can only be avoided if a train first visits a specific platform and then continues on to prague.
-label "obj" = reached_dead_end | reached_bay_platform | (reached_prague & !visited_platform);
+label "obj" = t=54 | t=59; //reached_dead_end | reached_bay_platform | (reached_prague & !visited_platform);
 // To specify the platform(s), add the action "Platform" to the transition corresponding to the given platform:
 // Track 1 -> 63
 // Track 2 -> 62
@@ -28,7 +28,7 @@ label "obj" = reached_dead_end | reached_bay_platform | (reached_prague & !visit
 
 module hbf
 
-    t: [0..77] init 0; // Set to 2, 1 or 4 for a larger model (because more switches are reachable).
+    t: [-4..77] init -4; // negative values as extension to model approach
     // initial values from Dresden-Neustadt:
     // 9, 10, 7, 2, 1, 4
     // initial values from Chemnitz:
@@ -36,9 +36,26 @@ module hbf
     // final values to Prague:
     // 72, 73, 74, 75
 
-    [] (t=0) -> (t'=1);
+
+    // Approach
+    [] (t=-4) -> (t'=-3);
+    [] (t=-4) -> (t'=-2);
+
+    [] (t=-3) -> (t'=-2);
+    [] (t=-3) -> (t'=-1);
+
+    [] (t=-2) -> (t'=-1);
+    [] (t=-2) -> (t'=0);
+
+    [] (t=-1) -> (t'=0);
+
+    // Decide from which track we enter the station
+    // [] (t=0) -> (t'=1);
     [] (t=0) -> (t'=2);
     [] (t=0) -> (t'=4);
+    [] (t=0) -> (t'=23);
+    [] (t=0) -> (t'=33);
+    [] (t=0) -> (t'=34);
 
     [] (t=1) -> (t'=2);
     [] (t=1) -> (t'=5);
