@@ -1,18 +1,18 @@
-use crate::{Command, Identifier, VariableManager};
+use crate::{Command, Expression, Identifier, VariableManager};
 use std::fmt::{Display, Formatter};
 
-pub struct ModuleManager<A, V, S: Clone> {
-    pub modules: Vec<Module<A, V, S>>,
+pub struct ModuleManager<A, E, V, S: Clone> {
+    pub modules: Vec<Module<A, E, V, S>>,
 }
 
-impl<A, V, S: Clone> ModuleManager<A, V, S> {
+impl<A, E, V, S: Clone> ModuleManager<A, E, V, S> {
     pub fn new() -> Self {
         Self {
             modules: Vec::new(),
         }
     }
 
-    pub fn get(&self, index: usize) -> Option<&Module<A, V, S>> {
+    pub fn get(&self, index: usize) -> Option<&Module<A, E, V, S>> {
         self.modules.get(index)
     }
 
@@ -24,11 +24,11 @@ impl<A, V, S: Clone> ModuleManager<A, V, S> {
             .map(|(i, _)| i)
     }
 
-    pub fn get_by_name(&self, name: &Identifier<S>) -> Option<&Module<A, V, S>> {
+    pub fn get_by_name(&self, name: &Identifier<S>) -> Option<&Module<A, E, V, S>> {
         self.modules.iter().find(|m| &m.name == name)
     }
 
-    pub fn add(&mut self, module: Module<A, V, S>) -> Result<usize, AddModuleError> {
+    pub fn add(&mut self, module: Module<A, E, V, S>) -> Result<usize, AddModuleError> {
         for (index, other_module) in self.modules.iter().enumerate() {
             if other_module.name == module.name {
                 return Err(AddModuleError::ModuleExists { index });
@@ -38,8 +38,12 @@ impl<A, V, S: Clone> ModuleManager<A, V, S> {
         self.modules.push(module);
         Ok(index)
     }
-
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> ModuleManager<A, V, S2> {
+}
+impl<A, V, S: Clone> ModuleManager<A, Expression<V, S>, V, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> ModuleManager<A, Expression<V, S2>, V, S2> {
         let mut module_manager = ModuleManager {
             modules: Vec::with_capacity(self.modules.len()),
         };
@@ -56,13 +60,13 @@ pub enum AddModuleError {
     ModuleExists { index: usize },
 }
 
-pub struct Module<A, V, S: Clone> {
+pub struct Module<A, E, V, S: Clone> {
     pub name: Identifier<S>,
-    pub commands: Vec<Command<A, V, S>>,
+    pub commands: Vec<Command<A, E, V, S>>,
     pub span: S,
 }
 
-impl<A, V, S: Clone> Module<A, V, S> {
+impl<A, E, V, S: Clone> Module<A, E, V, S> {
     pub fn new(name: Identifier<S>, span: S) -> Self {
         Self {
             name,
@@ -70,8 +74,12 @@ impl<A, V, S: Clone> Module<A, V, S> {
             span,
         }
     }
-
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Module<A, V, S2> {
+}
+impl<A, V, S: Clone> Module<A, Expression<V, S>, V, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> Module<A, Expression<V, S2>, V, S2> {
         Module {
             name: self.name.map_span(map),
             commands: self.commands.into_iter().map(|c| c.map_span(map)).collect(),
@@ -80,12 +88,12 @@ impl<A, V, S: Clone> Module<A, V, S> {
     }
 }
 
-impl<A: Display, V: Display, S: Clone> Module<A, V, S> {
+impl<A: Display, E: Display, V: Display, S: Clone> Module<A, E, V, S> {
     pub fn format<'a, 'b>(
         &'a self,
-        variable_manager: &'b VariableManager<V, S>,
+        variable_manager: &'b VariableManager<E, S>,
         own_index: usize,
-    ) -> PrintableModule<'a, 'b, A, V, S> {
+    ) -> PrintableModule<'a, 'b, A, E, V, S> {
         PrintableModule {
             module: self,
             variable_manager,
@@ -94,13 +102,15 @@ impl<A: Display, V: Display, S: Clone> Module<A, V, S> {
     }
 }
 
-pub struct PrintableModule<'a, 'b, A: Display, V: Display, S: Clone> {
-    module: &'a Module<A, V, S>,
-    variable_manager: &'b VariableManager<V, S>,
+pub struct PrintableModule<'a, 'b, A: Display, E: Display, V: Display, S: Clone> {
+    module: &'a Module<A, E, V, S>,
+    variable_manager: &'b VariableManager<E, S>,
     own_index: usize,
 }
 
-impl<'a, 'b, A: Display, V: Display, S: Clone> Display for PrintableModule<'a, 'b, A, V, S> {
+impl<'a, 'b, A: Display, E: Display, V: Display, S: Clone> Display
+    for PrintableModule<'a, 'b, A, E, V, S>
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "module {}", self.module.name)?;
         write!(

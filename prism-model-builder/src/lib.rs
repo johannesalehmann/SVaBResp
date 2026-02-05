@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 pub fn build_model<S: Clone, M: ModelTypes>(
-    model: &Model<(), Identifier<S>, VariableReference, S>,
+    model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     atomic_propositions: &[Expression<VariableReference, S>],
     const_values: &HashMap<String, ConstValue>,
 ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
@@ -30,7 +30,7 @@ pub fn build_properties<
     S: Clone,
     I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
 >(
-    model: &Model<(), Identifier<S>, VariableReference, S>,
+    model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     properties: I,
     const_values: &HashMap<String, ConstValue>,
 ) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
@@ -81,7 +81,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         S: Clone,
         I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
     >(
-        model: &Model<(), Identifier<S>, VariableReference, S>,
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         properties: I,
         const_values: &HashMap<String, ConstValue>,
     ) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
@@ -114,7 +114,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     }
 
     pub fn run<S: Clone>(
-        model: &Model<(), Identifier<S>, VariableReference, S>,
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
         const_values: &HashMap<String, ConstValue>,
     ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
@@ -181,7 +181,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     }
 
     fn prepare_valuation_map_and_consts<S: Clone>(
-        variables: &VariableManager<VariableReference, S>,
+        variables: &VariableManager<Expression<VariableReference, S>, S>,
         const_values: &HashMap<String, ConstValue>,
     ) -> Result<(ValuationMap, ConstValuations), ModelBuildingError> {
         let mut valuation_map = ValuationMap {
@@ -257,7 +257,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     }
 
     fn prepare_variable_bounds<S: Clone>(
-        variables: &VariableManager<VariableReference, S>,
+        variables: &VariableManager<Expression<VariableReference, S>, S>,
         consts: &ConstValuations,
         valuation_map: &ValuationMap,
     ) -> Result<VariableBounds, ModelBuildingError> {
@@ -288,7 +288,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     }
 
     fn prepare_variable_types<S: Clone>(
-        variables: &VariableManager<VariableReference, S>,
+        variables: &VariableManager<Expression<VariableReference, S>, S>,
     ) -> VariableTypes {
         let mut variable_types = VariableTypes { types: Vec::new() };
         for variable in variables.variables.iter() {
@@ -309,7 +309,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     }
 
     fn prepare_valuation_context<S: Clone>(
-        model: &Model<(), Identifier<S>, VariableReference, S>,
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         valuation_map: &ValuationMap,
         variable_bounds: &VariableBounds,
     ) -> <<M as ModelTypes>::Valuation as Valuation>::ContextType {
@@ -386,7 +386,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     fn process_state<S: Clone>(
         &mut self,
         state: usize,
-        model: &Model<(), Identifier<S>, VariableReference, S>,
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
         synchronised_actions: &SynchronisedActions,
     ) -> Result<(), ModelBuildingError> {
@@ -630,10 +630,10 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
 
     fn apply_assignments<S: Clone>(
         &self,
-        variable_manager: &VariableManager<VariableReference, S>,
+        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
         valuation: &<M as ModelTypes>::Valuation,
         val_source: &ConstsAndVars<<M as ModelTypes>::Valuation>,
-        updates: &[&Update<VariableReference, S>],
+        updates: &[&Update<Expression<VariableReference, S>, VariableReference, S>],
     ) -> <M as ModelTypes>::Valuation {
         let mut new_valuation = valuation.clone();
         for update in updates {
@@ -680,7 +680,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
 
     fn create_initial_states<S: Clone>(
         &mut self,
-        model: &Model<(), Identifier<S>, VariableReference, S>,
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         atomic_proposition_len: usize,
     ) -> Result<Vec<usize>, ModelBuildingError> {
         if model.init_constraint.is_some() {
@@ -757,7 +757,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     fn print_valuation<S: Clone>(
         valuation: &M::Valuation,
         valuation_map: &ValuationMap,
-        model: &Model<(), Identifier<S>, VariableReference, S>,
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     ) {
         print!("(");
         let mut first = true;
@@ -917,7 +917,7 @@ impl ConstValuation {
 }
 
 struct ConstRecursiveEvaluator<'a, 'b, S: Clone, E: Evaluator> {
-    variables: &'a VariableManager<VariableReference, S>,
+    variables: &'a VariableManager<Expression<VariableReference, S>, S>,
     const_values: &'b HashMap<String, ConstValue>,
     phantom_data: PhantomData<E>,
 }
@@ -1065,7 +1065,9 @@ pub struct SynchronisedActionModule {
 }
 
 impl SynchronisedActions {
-    pub fn from_prism<S: Clone>(model: &Model<(), Identifier<S>, VariableReference, S>) -> Self {
+    pub fn from_prism<S: Clone>(
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+    ) -> Self {
         let mut actions: HashMap<String, SynchronisedAction> = HashMap::new();
 
         for (module_index, module) in model.modules.modules.iter().enumerate() {

@@ -12,7 +12,13 @@ pub use prism_model_builder::ConstValue;
 use chumsky::span::SimpleSpan;
 use prism_model::{Expression, Identifier, VariableReference};
 
-type PrismModel = prism_model::Model<(), Identifier<SimpleSpan>, VariableReference, SimpleSpan>;
+type PrismModel = prism_model::Model<
+    (),
+    Identifier<SimpleSpan>,
+    Expression<VariableReference, SimpleSpan>,
+    VariableReference,
+    SimpleSpan,
+>;
 type PrismProperty = probabilistic_properties::Property<
     Expression<VariableReference, SimpleSpan>,
     Expression<VariableReference, SimpleSpan>,

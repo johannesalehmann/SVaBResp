@@ -14,7 +14,7 @@ impl<S> SpannedDependency<S> {
 }
 
 pub struct FormulaCountingVisitor<'a, S: Clone> {
-    formulas: &'a Vec<Formula<Identifier<S>, S>>,
+    formulas: &'a Vec<Formula<Expression<Identifier<S>, S>, S>>,
     found_formulas: Vec<SpannedDependency<S>>,
 }
 
@@ -31,7 +31,7 @@ impl<'a, S: Clone> DefaultMapExpression<Identifier<S>, S, ()> for FormulaCountin
     }
 }
 
-impl<S: Clone> FormulaManager<Identifier<S>, S> {
+impl<S: Clone> FormulaManager<Expression<Identifier<S>, S>, S> {
     pub fn get_spanned_formulas_in_expression(
         &self,
         expression: Expression<Identifier<S>, S>,
@@ -51,7 +51,7 @@ impl<S: Clone> FormulaManager<Identifier<S>, S> {
     }
 }
 
-impl<S: Clone> FormulaManager<Identifier<S>, S> {
+impl<S: Clone> FormulaManager<Expression<Identifier<S>, S>, S> {
     // The S: Clone dependency can be removed by adding a visitor pattern for &Expression and passing &f.condition instead of f.condition.clone() to get_formulas_in_expression
     pub fn get_formula_replacement_ordering(&self) -> Result<Vec<usize>, CyclicDependency<S>> {
         let mut dependencies = self

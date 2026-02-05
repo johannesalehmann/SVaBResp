@@ -1,14 +1,16 @@
 use crate::expressions::UnknownVariableError;
 use crate::{
-    Assignment, Command, Identifier, Label, LabelManager, Model, RewardsElement, RewardsManager,
-    VariableInfo, VariableReference,
+    Assignment, Command, Expression, Identifier, Label, LabelManager, Model, RewardsElement,
+    RewardsManager, VariableInfo, VariableReference,
 };
 
-impl<S: Clone> super::Model<(), Identifier<S>, Identifier<S>, S> {
+impl<S: Clone> super::Model<(), Identifier<S>, Expression<Identifier<S>, S>, Identifier<S>, S> {
     pub fn replace_identifiers_by_variable_indices(
         self,
-    ) -> Result<super::Model<(), Identifier<S>, VariableReference, S>, Vec<UnknownVariableError<S>>>
-    {
+    ) -> Result<
+        super::Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        Vec<UnknownVariableError<S>>,
+    > {
         let mut errors: Vec<UnknownVariableError<_>> = Vec::new();
 
         let mut variables = Vec::with_capacity(self.variable_manager.variables.len());

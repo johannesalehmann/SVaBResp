@@ -107,8 +107,18 @@ where
             .map(probabilistic_properties::Path::InfinitelyOften))
 }
 
-pub fn program_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::Model<(), Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+pub fn program_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    prism_model::Model<
+        (),
+        Identifier<Span>,
+        Expression<Identifier<Span>, Span>,
+        Identifier<Span>,
+        Span,
+    >,
+    E<'a>,
+>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -119,8 +129,8 @@ where
 }
 
 fn add_or_emit_variable(
-    manager: &mut VariableManager<Identifier<Span>, Span>,
-    variable: VariableInfo<Identifier<Span>, Span>,
+    manager: &mut VariableManager<Expression<Identifier<Span>, Span>, Span>,
+    variable: VariableInfo<Expression<Identifier<Span>, Span>, Span>,
     kind: crate::error::ElementKind,
     emitter: &mut chumsky::input::Emitter<PrismParserError<Span, Token>>,
 ) {
@@ -144,7 +154,13 @@ fn build_program_from_type_and_elements<'a>(
     elements: Vec<ProgramElement>,
     span: SimpleSpan,
     emitter: &mut chumsky::input::Emitter<PrismParserError<Span, Token>>,
-) -> prism_model::Model<(), Identifier<Span>, Identifier<Span>, Span> {
+) -> prism_model::Model<
+    (),
+    Identifier<Span>,
+    Expression<Identifier<Span>, Span>,
+    Identifier<Span>,
+    Span,
+> {
     let mut model_type = Option::None;
     let mut modules = ModuleManager::new();
     let mut renamed_modules = Vec::new();
@@ -292,17 +308,22 @@ fn build_program_from_type_and_elements<'a>(
 
 enum ProgramElement {
     ModelType(ModelType<Span>),
-    Const(prism_model::VariableInfo<Identifier<Span>, Span>),
-    Label(prism_model::Label<Identifier<Span>, Span>),
+    Const(prism_model::VariableInfo<Expression<Identifier<Span>, Span>, Span>),
+    Label(prism_model::Label<Expression<Identifier<Span>, Span>, Span>),
     Module(
-        prism_model::Module<Identifier<Span>, Identifier<Span>, Span>,
-        Vec<VariableInfo<Identifier<Span>, Span>>,
+        prism_model::Module<
+            Identifier<Span>,
+            Expression<Identifier<Span>, Span>,
+            Identifier<Span>,
+            Span,
+        >,
+        Vec<VariableInfo<Expression<Identifier<Span>, Span>, Span>>,
     ),
     RenamedModule(prism_model::RenamedModule<Span>),
-    GlobalVariable(prism_model::VariableInfo<Identifier<Span>, Span>),
-    Formula(prism_model::Formula<Identifier<Span>, Span>),
+    GlobalVariable(prism_model::VariableInfo<Expression<Identifier<Span>, Span>, Span>),
+    Formula(prism_model::Formula<Expression<Identifier<Span>, Span>, Span>),
     InitConstraint(prism_model::Expression<Identifier<Span>, Span>, Span),
-    Rewards(prism_model::Rewards<Identifier<Span>, Identifier<Span>, Span>),
+    Rewards(prism_model::Rewards<Identifier<Span>, Expression<Identifier<Span>, Span>, Span>),
 }
 
 fn program_element_parser<'a, 'b, I>() -> impl Parser<'a, I, ProgramElement, E<'a>>
@@ -354,7 +375,7 @@ where
 }
 
 fn const_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
+-> impl Parser<'a, I, prism_model::VariableInfo<Expression<Identifier<Span>, Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -387,7 +408,7 @@ where
         .as_context()
 }
 fn variable_domain_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::VariableRange<Identifier<Span>, Span>, E<'a>>
+-> impl Parser<'a, I, prism_model::VariableRange<Expression<Identifier<Span>, Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -415,7 +436,8 @@ where
         .as_context()
 }
 
-fn label_parser<'a, 'b, I>() -> impl Parser<'a, I, prism_model::Label<Identifier<Span>, Span>, E<'a>>
+fn label_parser<'a, 'b, I>()
+-> impl Parser<'a, I, prism_model::Label<Expression<Identifier<Span>, Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -430,7 +452,7 @@ where
 }
 
 fn formula_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::Formula<Identifier<Span>, Span>, E<'a>>
+-> impl Parser<'a, I, prism_model::Formula<Expression<Identifier<Span>, Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -448,8 +470,13 @@ fn module_parser<'a, 'b, I>() -> impl Parser<
     'a,
     I,
     (
-        prism_model::Module<Identifier<Span>, Identifier<Span>, Span>,
-        Vec<VariableInfo<Identifier<Span>, Span>>,
+        prism_model::Module<
+            Identifier<Span>,
+            Expression<Identifier<Span>, Span>,
+            Identifier<Span>,
+            Span,
+        >,
+        Vec<VariableInfo<Expression<Identifier<Span>, Span>, Span>>,
     ),
     E<'a>,
 >
@@ -473,8 +500,13 @@ fn create_module_from_name_and_elements(
     span: Span,
     _emitter: &mut chumsky::input::Emitter<PrismParserError<Span, Token>>,
 ) -> (
-    prism_model::Module<Identifier<Span>, Identifier<Span>, Span>,
-    Vec<VariableInfo<Identifier<Span>, Span>>,
+    prism_model::Module<
+        Identifier<Span>,
+        Expression<Identifier<Span>, Span>,
+        Identifier<Span>,
+        Span,
+    >,
+    Vec<VariableInfo<Expression<Identifier<Span>, Span>, Span>>,
 ) {
     let mut module = prism_model::Module::new(name, span);
     let mut variables = Vec::new();
@@ -572,8 +604,15 @@ where
 }
 
 enum ModuleElement {
-    Command(prism_model::Command<Identifier<Span>, Identifier<Span>, Span>),
-    Variable(prism_model::VariableInfo<Identifier<Span>, Span>),
+    Command(
+        prism_model::Command<
+            Identifier<Span>,
+            Expression<Identifier<Span>, Span>,
+            Identifier<Span>,
+            Span,
+        >,
+    ),
+    Variable(prism_model::VariableInfo<Expression<Identifier<Span>, Span>, Span>),
 }
 
 fn module_element_parser<'a, 'b, I>() -> impl Parser<'a, I, ModuleElement, E<'a>>
@@ -586,7 +625,7 @@ where
 }
 
 fn global_variable_declaration_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
+-> impl Parser<'a, I, prism_model::VariableInfo<Expression<Identifier<Span>, Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -612,7 +651,7 @@ where
 }
 
 fn variable_declaration_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::VariableInfo<Identifier<Span>, Span>, E<'a>>
+-> impl Parser<'a, I, prism_model::VariableInfo<Expression<Identifier<Span>, Span>, Span>, E<'a>>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -630,8 +669,12 @@ where
         .as_context()
 }
 
-fn rewards_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::Rewards<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+fn rewards_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    prism_model::Rewards<Identifier<Span>, Expression<Identifier<Span>, Span>, Span>,
+    E<'a>,
+>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -649,8 +692,12 @@ where
         .labelled("rewards structure")
         .as_context()
 }
-fn rewards_element_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::RewardsElement<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+fn rewards_element_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    prism_model::RewardsElement<Identifier<Span>, Expression<Identifier<Span>, Span>, Span>,
+    E<'a>,
+>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -686,8 +733,17 @@ where
         .as_context()
 }
 
-fn command_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::Command<Identifier<Span>, Identifier<Span>, Span>, E<'a>>
+fn command_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    prism_model::Command<
+        Identifier<Span>,
+        Expression<Identifier<Span>, Span>,
+        Identifier<Span>,
+        Span,
+    >,
+    E<'a>,
+>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -725,8 +781,12 @@ where
         .as_context()
 }
 
-fn update_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::Update<Identifier<Span>, Span>, E<'a>>
+fn update_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    prism_model::Update<Expression<Identifier<Span>, Span>, Identifier<Span>, Span>,
+    E<'a>,
+>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {
@@ -753,8 +813,12 @@ fn vec_from_head_and_tail<T>(head: T, mut tail: Vec<T>) -> Vec<T> {
     new_vec
 }
 
-fn assignment_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::Assignment<Identifier<Span>, Span>, E<'a>>
+fn assignment_parser<'a, 'b, I>() -> impl Parser<
+    'a,
+    I,
+    prism_model::Assignment<Expression<Identifier<Span>, Span>, Identifier<Span>, Span>,
+    E<'a>,
+>
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {

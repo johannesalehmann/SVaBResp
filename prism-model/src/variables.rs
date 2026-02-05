@@ -3,11 +3,11 @@ use crate::module::RenameRules;
 use crate::{Expression, Identifier};
 use std::fmt::{Display, Formatter};
 
-pub struct VariableManager<V, S: Clone> {
-    pub variables: Vec<VariableInfo<V, S>>,
+pub struct VariableManager<E, S: Clone> {
+    pub variables: Vec<VariableInfo<E, S>>,
 }
 
-impl<V, S: Clone> VariableManager<V, S> {
+impl<E, S: Clone> VariableManager<E, S> {
     pub fn new() -> Self {
         Self {
             variables: Vec::new(),
@@ -16,7 +16,7 @@ impl<V, S: Clone> VariableManager<V, S> {
 
     pub fn add_variable(
         &mut self,
-        variable_info: VariableInfo<V, S>,
+        variable_info: VariableInfo<E, S>,
     ) -> Result<VariableReference, VariableAddError> {
         if let Some(existing_variable) = self.get_reference(&variable_info.name) {
             Err(VariableAddError::VariableExists {
@@ -46,11 +46,40 @@ impl<V, S: Clone> VariableManager<V, S> {
         None
     }
 
-    pub fn get(&self, reference: &VariableReference) -> Option<&VariableInfo<V, S>> {
+    pub fn get(&self, reference: &VariableReference) -> Option<&VariableInfo<E, S>> {
         self.variables.get(reference.index)
     }
+}
 
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> VariableManager<V, S2> {
+impl<E: Display, S: Clone> VariableManager<E, S> {
+    pub fn format_as_consts(&self) -> PrintableVariableManager<'_, E, S> {
+        PrintableVariableManager {
+            vm: &self,
+            display_kind: VariablePrintingStyle::Const,
+            filter: VariableFilter::Constant,
+        }
+    }
+    pub fn format_as_global_vars(&self) -> PrintableVariableManager<'_, E, S> {
+        PrintableVariableManager {
+            vm: &self,
+            display_kind: VariablePrintingStyle::GlobalVar,
+            filter: VariableFilter::GlobalVar,
+        }
+    }
+    pub fn format_as_local_vars(&self, module: usize) -> PrintableVariableManager<'_, E, S> {
+        PrintableVariableManager {
+            vm: &self,
+            display_kind: VariablePrintingStyle::LocalVar,
+            filter: VariableFilter::LocalVar(module),
+        }
+    }
+}
+
+impl<V, S: Clone> VariableManager<Expression<V, S>, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> VariableManager<Expression<V, S2>, S2> {
         VariableManager {
             variables: self
                 .variables
@@ -59,36 +88,14 @@ impl<V, S: Clone> VariableManager<V, S> {
                 .collect(),
         }
     }
-
-    pub fn format_as_consts(&self) -> PrintableVariableManager<'_, V, S> {
-        PrintableVariableManager {
-            vm: &self,
-            display_kind: VariablePrintingStyle::Const,
-            filter: VariableFilter::Constant,
-        }
-    }
-    pub fn format_as_global_vars(&self) -> PrintableVariableManager<'_, V, S> {
-        PrintableVariableManager {
-            vm: &self,
-            display_kind: VariablePrintingStyle::GlobalVar,
-            filter: VariableFilter::GlobalVar,
-        }
-    }
-    pub fn format_as_local_vars(&self, module: usize) -> PrintableVariableManager<'_, V, S> {
-        PrintableVariableManager {
-            vm: &self,
-            display_kind: VariablePrintingStyle::LocalVar,
-            filter: VariableFilter::LocalVar(module),
-        }
-    }
 }
-impl<S: Clone> VariableManager<Identifier<S>, S> {
+impl<S: Clone> VariableManager<Expression<Identifier<S>, S>, S> {
     pub fn add_renamed(
         &mut self,
         old_module_index: usize,
         new_module_index: usize,
         rename_rules: &RenameRules<S>,
-    ) -> Result<VariableManager<Identifier<S>, S>, MissingVariableRenaming<S>> {
+    ) -> Result<VariableManager<Expression<Identifier<S>, S>, S>, MissingVariableRenaming<S>> {
         let variables = Vec::with_capacity(self.variables.len());
         for i in 0..self.variables.len() {
             let variable = &self.variables[i];
@@ -146,19 +153,19 @@ impl std::fmt::Debug for VariableAddError {
     }
 }
 
-pub struct VariableInfo<V, S: Clone> {
+pub struct VariableInfo<E, S: Clone> {
     pub is_constant: bool,
     pub scope: Option<usize>,
-    pub range: VariableRange<V, S>,
+    pub range: VariableRange<E, S>,
     pub name: Identifier<S>,
-    pub initial_value: Option<Expression<V, S>>,
+    pub initial_value: Option<E>,
     pub span: S,
 }
 
-impl<V, S: Clone> VariableInfo<V, S> {
+impl<E, S: Clone> VariableInfo<E, S> {
     pub fn new(
         name: Identifier<S>,
-        range: VariableRange<V, S>,
+        range: VariableRange<E, S>,
         is_constant: bool,
         scope: Option<usize>,
         span: S,
@@ -175,10 +182,10 @@ impl<V, S: Clone> VariableInfo<V, S> {
 
     pub fn with_initial_value(
         name: Identifier<S>,
-        range: VariableRange<V, S>,
+        range: VariableRange<E, S>,
         is_constant: bool,
         scope: Option<usize>,
-        initial_value: Expression<V, S>,
+        initial_value: E,
         span: S,
     ) -> Self {
         Self {
@@ -193,10 +200,10 @@ impl<V, S: Clone> VariableInfo<V, S> {
 
     pub fn with_optional_initial_value(
         name: Identifier<S>,
-        range: VariableRange<V, S>,
+        range: VariableRange<E, S>,
         is_constant: bool,
         scope: Option<usize>,
-        initial_value: Option<Expression<V, S>>,
+        initial_value: Option<E>,
         span: S,
     ) -> Self {
         Self {
@@ -208,8 +215,12 @@ impl<V, S: Clone> VariableInfo<V, S> {
             scope,
         }
     }
-
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> VariableInfo<V, S2> {
+}
+impl<V, S: Clone> VariableInfo<Expression<V, S>, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> VariableInfo<Expression<V, S2>, S2> {
         VariableInfo {
             is_constant: self.is_constant,
             scope: self.scope,
@@ -222,24 +233,14 @@ impl<V, S: Clone> VariableInfo<V, S> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum VariableRange<V, S: Clone> {
-    BoundedInt {
-        min: Expression<V, S>,
-        max: Expression<V, S>,
-        span: S,
-    },
-    UnboundedInt {
-        span: S,
-    },
-    Boolean {
-        span: S,
-    },
-    Float {
-        span: S,
-    },
+pub enum VariableRange<E, S: Clone> {
+    BoundedInt { min: E, max: E, span: S },
+    UnboundedInt { span: S },
+    Boolean { span: S },
+    Float { span: S },
 }
 
-impl<V, S: Clone> VariableRange<V, S> {
+impl<E, S: Clone> VariableRange<E, S> {
     pub fn is_legal_for_constant(&self) -> bool {
         match self {
             VariableRange::BoundedInt { .. } => false,
@@ -274,8 +275,13 @@ impl<V, S: Clone> VariableRange<V, S> {
             VariableRange::Float { span } => span,
         }
     }
+}
 
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> VariableRange<V, S2> {
+impl<V, S: Clone> VariableRange<Expression<V, S>, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> VariableRange<Expression<V, S2>, S2> {
         match self {
             VariableRange::BoundedInt { min, max, span } => VariableRange::BoundedInt {
                 min: min.map_span(map),
@@ -288,7 +294,7 @@ impl<V, S: Clone> VariableRange<V, S> {
         }
     }
 }
-impl<S: Clone> VariableRange<Identifier<S>, S> {
+impl<S: Clone> VariableRange<Expression<Identifier<S>, S>, S> {
     pub fn renamed(&self, rename_rules: &RenameRules<S>) -> Self {
         match self {
             VariableRange::BoundedInt { min, max, span } => VariableRange::BoundedInt {
@@ -306,8 +312,9 @@ impl<S: Clone> VariableRange<Identifier<S>, S> {
 
     pub fn replace_identifiers_by_variable_indices(
         &self,
-        variable_manager: &VariableManager<Identifier<S>, S>,
-    ) -> Result<VariableRange<VariableReference, S>, Vec<UnknownVariableError<S>>> {
+        variable_manager: &VariableManager<Expression<Identifier<S>, S>, S>,
+    ) -> Result<VariableRange<Expression<VariableReference, S>, S>, Vec<UnknownVariableError<S>>>
+    {
         match self {
             VariableRange::BoundedInt { min, max, span } => {
                 let mut errors = Vec::new();
@@ -342,7 +349,7 @@ impl<S: Clone> VariableRange<Identifier<S>, S> {
     }
 }
 
-impl<V: Display, S: Clone> Display for VariableRange<V, S> {
+impl<E: Display, S: Clone> Display for VariableRange<E, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             VariableRange::BoundedInt { min, max, .. } => {
@@ -409,13 +416,13 @@ impl VariableFilter {
     }
 }
 
-pub struct PrintableVariableManager<'a, V, S: Clone> {
-    vm: &'a VariableManager<V, S>,
+pub struct PrintableVariableManager<'a, E: Display, S: Clone> {
+    vm: &'a VariableManager<E, S>,
     display_kind: VariablePrintingStyle,
     filter: VariableFilter,
 }
 
-impl<'a, V: Display, S: Clone> Display for PrintableVariableManager<'a, V, S> {
+impl<'a, E: Display, S: Clone> Display for PrintableVariableManager<'a, E, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for variable in &self.vm.variables {
             if !self.filter.accepts(variable) {

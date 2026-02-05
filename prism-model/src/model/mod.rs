@@ -12,26 +12,26 @@ use crate::rewards::RewardsManager;
 use crate::{Expression, LabelManager, ModuleManager, VariableManager};
 use std::fmt::{Display, Formatter};
 
-pub struct Model<AM, A, V, S: Clone> {
+pub struct Model<AM, A, E, V, S: Clone> {
     pub model_type: ModelType<S>,
 
-    pub variable_manager: VariableManager<V, S>,
-    pub formulas: FormulaManager<V, S>,
+    pub variable_manager: VariableManager<E, S>,
+    pub formulas: FormulaManager<E, S>,
 
     pub action_manager: AM,
 
-    pub modules: ModuleManager<A, V, S>,
+    pub modules: ModuleManager<A, E, V, S>,
     pub renamed_modules: Vec<RenamedModule<S>>,
 
-    pub init_constraint: Option<Expression<V, S>>,
+    pub init_constraint: Option<E>,
 
-    pub labels: LabelManager<V, S>,
-    pub rewards: RewardsManager<A, V, S>,
+    pub labels: LabelManager<E, S>,
+    pub rewards: RewardsManager<A, E, S>,
 
     pub span: S,
 }
 
-impl<AM: Default, A, V, S: Clone> Model<AM, A, V, S> {
+impl<AM: Default, A, E, V, S: Clone> Model<AM, A, E, V, S> {
     pub fn new(model_type: ModelType<S>, span: S) -> Self {
         Self {
             model_type,
@@ -49,14 +49,14 @@ impl<AM: Default, A, V, S: Clone> Model<AM, A, V, S> {
 
     pub fn from_components(
         model_type: ModelType<S>,
-        variable_manager: VariableManager<V, S>,
-        formulas: FormulaManager<V, S>,
+        variable_manager: VariableManager<E, S>,
+        formulas: FormulaManager<E, S>,
         action_manager: AM,
-        modules: ModuleManager<A, V, S>,
+        modules: ModuleManager<A, E, V, S>,
         renamed_modules: Vec<RenamedModule<S>>,
-        init_constraint: Option<Expression<V, S>>,
-        labels: LabelManager<V, S>,
-        rewards: RewardsManager<A, V, S>,
+        init_constraint: Option<E>,
+        labels: LabelManager<E, S>,
+        rewards: RewardsManager<A, E, S>,
         span: S,
     ) -> Self {
         Self {
@@ -72,8 +72,12 @@ impl<AM: Default, A, V, S: Clone> Model<AM, A, V, S> {
             span,
         }
     }
-
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Model<AM, A, V, S2> {
+}
+impl<AM, A, V, S: Clone> Model<AM, A, Expression<V, S>, V, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> Model<AM, A, Expression<V, S2>, V, S2> {
         Model {
             model_type: self.model_type.map_span(map),
             variable_manager: self.variable_manager.map_span(map),
@@ -133,7 +137,7 @@ impl<S> Display for ModelType<S> {
     }
 }
 
-impl<AM, A: Display, V: Display, S: Clone> Display for Model<AM, A, V, S> {
+impl<AM, A: Display, E: Display, V: Display, S: Clone> Display for Model<AM, A, E, V, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.model_type)?;
         writeln!(f, "")?;

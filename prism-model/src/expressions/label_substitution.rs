@@ -2,7 +2,7 @@ use crate::{Expression, Identifier, IdentityMapExpression};
 
 pub struct LabelSubstitutionVisitor<'a, S: Clone> {
     pub label_name: &'a Identifier<S>,
-    pub expression: &'a crate::Expression<crate::Identifier<S>, S>,
+    pub expression: &'a Expression<Identifier<S>, S>,
 }
 
 impl<'a, S: Clone> crate::expressions::identity_map::Private for LabelSubstitutionVisitor<'a, S> {}

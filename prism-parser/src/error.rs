@@ -1,7 +1,8 @@
+use crate::Span;
 use chumsky::error::{Error, LabelError, RichPattern};
 use chumsky::input::Input;
 use chumsky::util::MaybeRef;
-use prism_model::Identifier;
+use prism_model::{Expression, Identifier};
 
 #[derive(Debug, PartialEq)]
 pub enum PrismParserError<'a, S: Clone, T> {
@@ -33,7 +34,7 @@ pub enum PrismParserValidationError<S: Clone> {
         duplicate_occurrence_inner: S,
     },
     IllegalConstType {
-        illegal_type: prism_model::VariableRange<Identifier<S>, S>,
+        illegal_type: prism_model::VariableRange<Expression<Identifier<Span>, Span>, S>,
         span: S,
     },
     DuplicateElement {

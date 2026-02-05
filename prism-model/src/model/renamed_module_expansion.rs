@@ -1,7 +1,7 @@
 use crate::module::AddModuleError;
-use crate::{Identifier, Module};
+use crate::{Expression, Identifier, Module};
 
-impl<S: Clone> super::Model<(), Identifier<S>, Identifier<S>, S> {
+impl<S: Clone> super::Model<(), Identifier<S>, Expression<Identifier<S>, S>, Identifier<S>, S> {
     pub fn expand_renamed_models(&mut self) -> Result<(), ModuleExpansionError<S>> {
         let renamed_modules = std::mem::replace(&mut self.renamed_modules, Vec::new());
         for renamed_module in renamed_modules {

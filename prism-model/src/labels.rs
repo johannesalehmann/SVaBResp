@@ -1,16 +1,16 @@
 use crate::{Expression, Identifier};
 use std::fmt::{Display, Formatter};
 
-pub struct LabelManager<V, S: Clone> {
-    pub labels: Vec<Label<V, S>>,
+pub struct LabelManager<E, S: Clone> {
+    pub labels: Vec<Label<E, S>>,
 }
 
-impl<V, S: Clone> LabelManager<V, S> {
+impl<E, S: Clone> LabelManager<E, S> {
     pub fn new() -> Self {
         Self { labels: Vec::new() }
     }
 
-    pub fn add_label(&mut self, label: Label<V, S>) -> Result<(), AddLabelError> {
+    pub fn add_label(&mut self, label: Label<E, S>) -> Result<(), AddLabelError> {
         for (index, other_label) in self.labels.iter().enumerate() {
             if other_label.name == label.name {
                 return Err(AddLabelError::LabelExists { index });
@@ -20,7 +20,7 @@ impl<V, S: Clone> LabelManager<V, S> {
         Ok(())
     }
 
-    pub fn get(&self, index: usize) -> Option<&Label<V, S>> {
+    pub fn get(&self, index: usize) -> Option<&Label<E, S>> {
         self.labels.get(index)
     }
 
@@ -32,15 +32,20 @@ impl<V, S: Clone> LabelManager<V, S> {
         }
         None
     }
+}
 
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> LabelManager<V, S2> {
+impl<V, S: Clone> LabelManager<Expression<V, S>, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> LabelManager<Expression<V, S2>, S2> {
         LabelManager {
             labels: self.labels.into_iter().map(|l| l.map_span(map)).collect(),
         }
     }
 }
 
-impl<V: Display, S: Clone> Display for LabelManager<V, S> {
+impl<E: Display, S: Clone> Display for LabelManager<E, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for formula in &self.labels {
             writeln!(f, "{}", formula)?;
@@ -57,22 +62,23 @@ pub enum AddLabelError {
     LabelExists { index: usize },
 }
 
-pub struct Label<V, S: Clone> {
+pub struct Label<E, S: Clone> {
     pub name: Identifier<S>,
-    pub condition: Expression<V, S>,
+    pub condition: E,
     pub span: S,
 }
 
-impl<V, S: Clone> Label<V, S> {
-    pub fn new(name: Identifier<S>, condition: Expression<V, S>, span: S) -> Self {
+impl<E, S: Clone> Label<E, S> {
+    pub fn new(name: Identifier<S>, condition: E, span: S) -> Self {
         Self {
             name,
             condition,
             span,
         }
     }
-
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Label<V, S2> {
+}
+impl<V, S: Clone> Label<Expression<V, S>, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Label<Expression<V, S2>, S2> {
         Label {
             name: self.name.map_span(map),
             condition: self.condition.map_span(map),

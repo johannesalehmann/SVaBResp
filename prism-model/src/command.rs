@@ -1,17 +1,17 @@
+use crate::Identifier;
 use crate::expressions::Expression;
 use crate::module::RenameRules;
-use crate::Identifier;
 use std::fmt::{Display, Formatter};
 
-pub struct Command<A, V, S: Clone> {
+pub struct Command<A, E, V, S: Clone> {
     pub action: Option<A>,
-    pub guard: Expression<V, S>,
-    pub updates: Vec<Update<V, S>>,
+    pub guard: E,
+    pub updates: Vec<Update<E, V, S>>,
     pub span: S,
 }
 
-impl<A, V, S: Clone> Command<A, V, S> {
-    pub fn new(action: Option<A>, guard: Expression<V, S>, span: S) -> Self {
+impl<A, E, V, S: Clone> Command<A, E, V, S> {
+    pub fn new(action: Option<A>, guard: E, span: S) -> Self {
         Self {
             action,
             guard,
@@ -22,8 +22,8 @@ impl<A, V, S: Clone> Command<A, V, S> {
 
     pub fn with_updates(
         action: Option<A>,
-        guard: Expression<V, S>,
-        updates: Vec<Update<V, S>>,
+        guard: E,
+        updates: Vec<Update<E, V, S>>,
         span: S,
     ) -> Self {
         Self {
@@ -33,8 +33,13 @@ impl<A, V, S: Clone> Command<A, V, S> {
             span,
         }
     }
+}
 
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Command<A, V, S2> {
+impl<A, V, S: Clone> Command<A, Expression<V, S>, V, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> Command<A, Expression<V, S2>, V, S2> {
         Command {
             action: self.action,
             guard: self.guard.map_span(map),
@@ -44,7 +49,7 @@ impl<A, V, S: Clone> Command<A, V, S> {
     }
 }
 
-impl<S: Clone> Command<Identifier<S>, Identifier<S>, S> {
+impl<S: Clone> Command<Identifier<S>, Expression<Identifier<S>, S>, Identifier<S>, S> {
     pub fn renamed(&self, rename_rules: &RenameRules<S>) -> Self {
         Self {
             action: self.action.as_ref().map(|a| a.renamed(rename_rules)),
@@ -59,7 +64,7 @@ impl<S: Clone> Command<Identifier<S>, Identifier<S>, S> {
     }
 }
 
-impl<A: Display, V: Display, S: Clone> Display for Command<A, V, S> {
+impl<A: Display, E: Display, V: Display, S: Clone> Display for Command<A, E, V, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "[")?;
         if let Some(action) = &self.action {
@@ -84,14 +89,14 @@ impl<A: Display, V: Display, S: Clone> Display for Command<A, V, S> {
     }
 }
 
-pub struct Update<V, S: Clone> {
-    pub probability: Expression<V, S>,
-    pub assignments: Vec<Assignment<V, S>>,
+pub struct Update<E, V, S: Clone> {
+    pub probability: E,
+    pub assignments: Vec<Assignment<E, V, S>>,
     pub span: S,
 }
 
-impl<V, S: Clone> Update<V, S> {
-    pub fn new(probability: Expression<V, S>, span: S) -> Self {
+impl<E, V, S: Clone> Update<E, V, S> {
+    pub fn new(probability: E, span: S) -> Self {
         Self {
             probability,
             assignments: Vec::new(),
@@ -99,8 +104,8 @@ impl<V, S: Clone> Update<V, S> {
         }
     }
     pub fn with_assignments(
-        probability: Expression<V, S>,
-        assignments: Vec<Assignment<V, S>>,
+        probability: E,
+        assignments: Vec<Assignment<E, V, S>>,
         span: S,
     ) -> Self {
         Self {
@@ -109,8 +114,9 @@ impl<V, S: Clone> Update<V, S> {
             span,
         }
     }
-
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Update<V, S2> {
+}
+impl<V, S: Clone> Update<Expression<V, S>, V, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Update<Expression<V, S2>, V, S2> {
         let mut update = Update::new(self.probability.map_span(map), map(self.span));
         for assignment in self.assignments {
             update.assignments.push(assignment.map_span(map));
@@ -119,7 +125,7 @@ impl<V, S: Clone> Update<V, S> {
     }
 }
 
-impl<S: Clone> Update<Identifier<S>, S> {
+impl<S: Clone> Update<Expression<Identifier<S>, S>, Identifier<S>, S> {
     pub fn renamed(&self, rename_rules: &RenameRules<S>) -> Self {
         Self {
             probability: self.probability.renamed(rename_rules),
@@ -133,14 +139,17 @@ impl<S: Clone> Update<Identifier<S>, S> {
     }
 }
 
-impl<V: Display, S: Clone> Display for Update<V, S> {
+impl<E: Display, V: Display, S: Clone> Display for Update<E, V, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self.probability {
-            Expression::Int(1, _) => {}
-            e => {
-                write!(f, "{} : ", e)?;
-            }
-        }
+        // This would produce nicer output, but require E to provide some way of inspecting its
+        // value, e.g. by requiring a separate IsOne trait.
+        // match &self.probability {
+        //     Expression::Int(1, _) => {}
+        //     e => {
+        //         write!(f, "{} : ", e)?;
+        //     }
+        // }
+        write!(f, "{} : ", self.probability)?;
 
         let mut is_first = true;
         for assignment in &self.assignments {
@@ -155,15 +164,15 @@ impl<V: Display, S: Clone> Display for Update<V, S> {
     }
 }
 
-pub struct Assignment<V, S: Clone> {
+pub struct Assignment<E, V, S: Clone> {
     pub target: V,
-    pub value: Expression<V, S>,
+    pub value: E,
     pub target_span: S,
     pub span: S,
 }
 
-impl<V, S: Clone> Assignment<V, S> {
-    pub fn new(target: V, value: Expression<V, S>, target_span: S, span: S) -> Self {
+impl<E, V, S: Clone> Assignment<E, V, S> {
+    pub fn new(target: V, value: E, target_span: S, span: S) -> Self {
         Self {
             target,
             value,
@@ -171,8 +180,12 @@ impl<V, S: Clone> Assignment<V, S> {
             span,
         }
     }
-
-    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(self, map: &F) -> Assignment<V, S2> {
+}
+impl<V, S: Clone> Assignment<Expression<V, S>, V, S> {
+    pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
+        self,
+        map: &F,
+    ) -> Assignment<Expression<V, S2>, V, S2> {
         Assignment {
             target: self.target,
             value: self.value.map_span(map),
@@ -181,7 +194,7 @@ impl<V, S: Clone> Assignment<V, S> {
         }
     }
 }
-impl<S: Clone> Assignment<Identifier<S>, S> {
+impl<S: Clone> Assignment<Expression<Identifier<S>, S>, Identifier<S>, S> {
     pub fn renamed(&self, rename_rules: &RenameRules<S>) -> Self {
         Self {
             target: self.target.renamed(rename_rules),
@@ -192,7 +205,7 @@ impl<S: Clone> Assignment<Identifier<S>, S> {
     }
 }
 
-impl<V: Display, S: Clone> Display for Assignment<V, S> {
+impl<E: Display, V: Display, S: Clone> Display for Assignment<E, V, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}'={}", self.target, self.value)
     }

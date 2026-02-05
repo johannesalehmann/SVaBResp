@@ -11,12 +11,16 @@ impl<V, S: Clone> StateSpecifier for Expression<V, S> {}
 impl<V, S: Clone> ProbabilitySpecifier for Expression<V, S> {}
 
 pub trait SubstitutableProperty<S: Clone> {
-    fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>);
+    fn substitute_labels(
+        &mut self,
+        default_span: S,
+        labels: &LabelManager<Expression<Identifier<S>, S>, S>,
+    );
 
     fn substitute_formulas(
         &mut self,
         default_span: S,
-        formulas: &FormulaManager<Identifier<S>, S>,
+        formulas: &FormulaManager<Expression<Identifier<S>, S>, S>,
     ) -> Result<(), CyclicDependency<S>>;
 
     fn replace_identifiers_by_variable_indices<R>(
@@ -30,7 +34,11 @@ pub trait SubstitutableProperty<S: Clone> {
 impl<S: Clone> SubstitutableProperty<S>
     for Property<Expression<Identifier<S>, S>, Expression<Identifier<S>, S>>
 {
-    fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
+    fn substitute_labels(
+        &mut self,
+        default_span: S,
+        labels: &LabelManager<Expression<Identifier<S>, S>, S>,
+    ) {
         self.path.substitute_labels(default_span.clone(), labels);
         self.operator
             .constraint
@@ -39,7 +47,7 @@ impl<S: Clone> SubstitutableProperty<S>
     fn substitute_formulas(
         &mut self,
         default_span: S,
-        formulas: &FormulaManager<Identifier<S>, S>,
+        formulas: &FormulaManager<Expression<Identifier<S>, S>, S>,
     ) -> Result<(), CyclicDependency<S>> {
         self.path
             .substitute_formulas(default_span.clone(), formulas)?;
@@ -70,7 +78,7 @@ impl<S: Clone> SubstitutableProperty<S>
             })?;
         let operator = ProbabilityOperator {
             kind: self.operator.kind,
-            constraint: constraint,
+            constraint,
         };
 
         Ok(Property { operator, path })
@@ -78,11 +86,15 @@ impl<S: Clone> SubstitutableProperty<S>
 }
 
 pub trait SubstitutablePath<S: Clone> {
-    fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>);
+    fn substitute_labels(
+        &mut self,
+        default_span: S,
+        labels: &LabelManager<Expression<Identifier<S>, S>, S>,
+    );
     fn substitute_formulas(
         &mut self,
         default_span: S,
-        formulas: &FormulaManager<Identifier<S>, S>,
+        formulas: &FormulaManager<Expression<Identifier<S>, S>, S>,
     ) -> Result<(), CyclicDependency<S>>;
 
     fn replace_identifiers_by_variable_indices<R>(
@@ -92,7 +104,11 @@ pub trait SubstitutablePath<S: Clone> {
 }
 
 impl<S: Clone> SubstitutablePath<S> for Path<Expression<Identifier<S>, S>> {
-    fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
+    fn substitute_labels(
+        &mut self,
+        default_span: S,
+        labels: &LabelManager<Expression<Identifier<S>, S>, S>,
+    ) {
         match self {
             Path::Eventually(e) => e.substitute_labels(default_span, labels),
             Path::Generally(e) => e.substitute_labels(default_span, labels),
@@ -102,7 +118,7 @@ impl<S: Clone> SubstitutablePath<S> for Path<Expression<Identifier<S>, S>> {
     fn substitute_formulas(
         &mut self,
         default_span: S,
-        formulas: &FormulaManager<Identifier<S>, S>,
+        formulas: &FormulaManager<Expression<Identifier<S>, S>, S>,
     ) -> Result<(), CyclicDependency<S>> {
         match self {
             Path::Eventually(e) => e.substitute_formulas(default_span, formulas),

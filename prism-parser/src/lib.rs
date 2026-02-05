@@ -5,7 +5,6 @@ mod parser;
 use chumsky::prelude::*;
 pub use error::{PrismParserError, PrismParserValidationError};
 pub use lexer::{Span, Token};
-use prism_model::VariableReference;
 use std::borrow::Cow;
 
 pub struct ParseResult<'a, O> {
@@ -16,14 +15,20 @@ pub struct ParseResult<'a, O> {
 pub struct ParseResults<'a, 'b> {
     pub model: ParseResult<
         'a,
-        prism_model::Model<(), prism_model::Identifier<Span>, prism_model::VariableReference, Span>,
+        prism_model::Model<
+            (),
+            prism_model::Identifier<Span>,
+            prism_model::Expression<prism_model::VariableReference, Span>,
+            prism_model::VariableReference,
+            Span,
+        >,
     >,
     pub properties: Vec<
         ParseResult<
             'b,
             probabilistic_properties::Property<
-                prism_model::Expression<VariableReference, Span>,
-                prism_model::Expression<VariableReference, Span>,
+                prism_model::Expression<prism_model::VariableReference, Span>,
+                prism_model::Expression<prism_model::VariableReference, Span>,
             >,
         >,
     >,

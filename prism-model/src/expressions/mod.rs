@@ -124,7 +124,11 @@ impl<V, S: Clone> Expression<V, S> {
     }
 }
 impl<S: Clone> Expression<Identifier<S>, S> {
-    pub fn substitute_labels(&mut self, default_span: S, labels: &LabelManager<Identifier<S>, S>) {
+    pub fn substitute_labels(
+        &mut self,
+        default_span: S,
+        labels: &LabelManager<Expression<Identifier<S>, S>, S>,
+    ) {
         for label in &labels.labels {
             let mut visitor = LabelSubstitutionVisitor {
                 label_name: &label.name,
@@ -138,7 +142,7 @@ impl<S: Clone> Expression<Identifier<S>, S> {
     pub fn substitute_formulas(
         &mut self,
         default_span: S,
-        formulas: &FormulaManager<Identifier<S>, S>,
+        formulas: &FormulaManager<Expression<Identifier<S>, S>, S>,
     ) -> Result<(), CyclicDependency<S>> {
         let order = formulas.get_formula_replacement_ordering()?;
 
