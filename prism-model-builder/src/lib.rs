@@ -1,17 +1,21 @@
 mod expressions;
+mod model_in_progress;
+mod synchronised_actions;
 mod variables;
 
 use crate::expressions::{Evaluator, TreeWalkingEvaluator, ValuationSource, VariableType};
+use crate::model_in_progress::ModelInProgress;
+use crate::synchronised_actions::{SynchronisedAction, SynchronisedActions};
 use crate::variables::{ConstAndVarValuationSource, ModelVariableInfo};
 use log::info;
 use prism_model::{
-    Expression, Identifier, Model, Update, VariableManager, VariableRange, VariableReference,
+    Command, Expression, Identifier, Model, Update, VariableManager, VariableRange,
+    VariableReference,
 };
 use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
 use probabilistic_models::{
-    Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, Distribution,
-    InitialStates, InitialStatesBuilder, MdpType, ModelTypes, Predecessors, PredecessorsBuilder,
-    ProbabilisticModel, State, Successor, Valuation, ValuationBuilder,
+    Action, AtomicProposition, AtomicPropositions, Builder, Distribution, MdpType, ModelTypes,
+    PredecessorsBuilder, ProbabilisticModel, Successor, Valuation, ValuationBuilder,
 };
 use probabilistic_models::{DistributionBuilder, Predecessor};
 use std::collections::HashMap;
@@ -19,9 +23,9 @@ use std::collections::HashMap;
 pub fn build_model<S: Clone, M: ModelTypes>(
     model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     atomic_propositions: &[Expression<VariableReference, S>],
-    const_values: &HashMap<String, UserProvidedConstValue>,
+    user_provided_consts: &HashMap<String, UserProvidedConstValue>,
 ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
-    ExplicitModelBuilder::<M>::run(model, atomic_propositions, const_values)
+    ExplicitModelBuilder::<M>::run(model, atomic_propositions, user_provided_consts)
 }
 pub fn build_properties<
     S: Clone,
@@ -29,9 +33,9 @@ pub fn build_properties<
 >(
     model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     properties: I,
-    const_values: &HashMap<String, UserProvidedConstValue>,
+    user_provided_consts: &HashMap<String, UserProvidedConstValue>,
 ) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
-    ExplicitModelBuilder::<MdpType>::build_property(model, properties, const_values)
+    ExplicitModelBuilder::<MdpType>::build_property(model, properties, user_provided_consts)
 }
 
 pub enum UserProvidedConstValue {
@@ -40,19 +44,10 @@ pub enum UserProvidedConstValue {
     Float(f64),
 }
 
-pub struct StateInProgress<M: ModelTypes> {
-    pub valuation: M::Valuation,
-    pub actions: <M::ActionCollection as ActionCollection<M::Distribution>>::Builder,
-    pub atomic_propositions: M::AtomicPropositions,
-    pub predecessors: <M::Predecessors as Predecessors>::Builder,
-}
 pub struct ExplicitModelBuilder<M: ModelTypes> {
-    states: Vec<StateInProgress<M>>,
-    valuation_to_state: HashMap<M::Valuation, usize>,
+    model_in_progress: ModelInProgress<M>,
     open_states: Vec<usize>,
     variable_info: variables::ModelVariableInfo<M::Valuation>,
-    action_names: Vec<String>,
-    action_name_indices: HashMap<String, usize>,
 }
 
 impl<M: ModelTypes> ExplicitModelBuilder<M> {
@@ -92,50 +87,28 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
     pub fn run<S: Clone>(
         model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
-        const_values: &HashMap<String, UserProvidedConstValue>,
+        user_provided_consts: &HashMap<String, UserProvidedConstValue>,
     ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
         let start_time = std::time::Instant::now();
-        let variable_info = variables::ModelVariableInfo::new(model, const_values)?;
+        let variable_info = variables::ModelVariableInfo::new(model, user_provided_consts)?;
 
         let synchronised_actions = SynchronisedActions::from_prism(model);
 
         let mut builder = Self {
-            states: Vec::new(),
-            valuation_to_state: HashMap::new(),
+            model_in_progress: ModelInProgress::new(atomic_propositions.len()),
             open_states: Vec::new(),
             variable_info,
-            action_names: Vec::new(),
-            action_name_indices: HashMap::new(),
         };
 
-        let initial_states = builder.create_initial_states(model, atomic_propositions.len())?;
+        builder.create_initial_states(model)?;
 
         while let Some(state) = builder.open_states.pop() {
             builder.process_state(state, &model, atomic_propositions, &synchronised_actions)?;
         }
 
-        let mut initial_states_builder = M::InitialStates::get_builder();
-        for initial_state in initial_states {
-            initial_states_builder.add_by_index(initial_state)
-        }
-        let initial_states = initial_states_builder.finish();
-
-        let mut result = ProbabilisticModel::new(
-            initial_states,
-            builder.variable_info.valuation_context,
-            atomic_propositions.len(),
-        );
-        result.action_names = builder.action_names;
-        for state_in_progress in builder.states.into_iter() {
-            let state = State {
-                valuation: state_in_progress.valuation,
-                actions: state_in_progress.actions.finish(),
-                atomic_propositions: state_in_progress.atomic_propositions,
-                owner: <M::Owners as probabilistic_models::Owners>::default_owner(),
-                predecessors: state_in_progress.predecessors.finish(),
-            };
-            result.states.push(state);
-        }
+        let result = builder
+            .model_in_progress
+            .into_model(builder.variable_info.valuation_context);
 
         info!(
             "Model built in {:?} ({} states)",
@@ -145,43 +118,12 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         Ok(result)
     }
 
-    fn get_unnamed_action_name_index(&mut self) -> usize {
-        self.get_action_name_index("unnamed")
-    }
-
-    fn get_action_name_index(&mut self, name: &str) -> usize {
-        if let Some(&index) = self.action_name_indices.get(name) {
-            index
-        } else {
-            let index = self.action_names.len();
-            self.action_names.push(name.to_string());
-            self.action_name_indices.insert(name.to_string(), index);
-            index
-        }
-    }
-
-    fn get_or_add_state(
-        &mut self,
-        valuation: M::Valuation,
-        atomic_proposition_len: usize,
-    ) -> usize {
-        let index = self.valuation_to_state.get(&valuation);
+    fn get_or_add_state(&mut self, valuation: M::Valuation) -> usize {
+        let index = self.model_in_progress.get_state_index(&valuation);
         match index {
-            Some(&index) => index,
+            Some(index) => index,
             None => {
-                let index = self.states.len();
-                let action_builder: <M::ActionCollection as ActionCollection<M::Distribution>>::Builder =
-                    M::ActionCollection::get_builder();
-                let atomic_propositions =
-                    <M::AtomicPropositions>::get_empty(atomic_proposition_len);
-                let predecessors = <M::Predecessors as Predecessors>::Builder::create();
-                self.valuation_to_state.insert(valuation.clone(), index);
-                self.states.push(StateInProgress {
-                    valuation,
-                    actions: action_builder,
-                    atomic_propositions,
-                    predecessors,
-                });
+                let index = self.model_in_progress.add_state(valuation);
                 self.open_states.push(index);
                 index
             }
@@ -198,7 +140,6 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         self.evaluate_atomic_propositions(state, atomic_propositions);
 
         let mut action_index = 0;
-
         for module_index in 0..model.modules.modules.len() {
             let module = &model.modules.modules[module_index];
             for command_index in 0..module.commands.len() {
@@ -206,193 +147,230 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                 if command.action.is_some() {
                     continue; // Synchronising actions are handled separately
                 }
-                let valuation = &self.states[state].valuation;
-                let val_source = self.variable_info.get_valuation_source(valuation);
-                let guard =
-                    TreeWalkingEvaluator::new().evaluate_as_bool(&command.guard, &val_source);
-                if guard {
-                    let mut distribution = <M::Distribution as Distribution>::get_builder();
-
-                    for update_index in 0..command.updates.len() {
-                        let valuation = &self.states[state].valuation;
-                        let val_source = self.variable_info.get_valuation_source(valuation);
-
-                        let update = &command.updates[update_index];
-                        let probability = TreeWalkingEvaluator::new()
-                            .evaluate_as_float(&update.probability, &val_source);
-                        let new_valuation = self.apply_assignments(
-                            &model.variable_manager,
-                            valuation,
-                            &val_source,
-                            &[&update],
-                        );
-
-                        let index = self.get_or_add_state(new_valuation, atomic_propositions.len());
-                        distribution.add_successor(Successor { probability, index });
-
-                        self.states[index].predecessors.add(Predecessor {
-                            from: state,
-                            action_index,
-                            probability,
-                        });
-                    }
-
-                    let action_name_index = self.get_unnamed_action_name_index();
-                    let successors = distribution.finish();
-                    if successors.number_of_successors() == 0 {
-                        println!(
-                            "State {} a local action with zero successors",
-                            self.states[state]
-                                .valuation
-                                .displayable(&self.variable_info.valuation_context)
-                        )
-                    }
-                    self.states[state].actions.add_action(Action {
-                        successors,
-                        action_name_index,
-                    });
-                    action_index += 1;
-                }
+                self.process_nonsynchronised_command(state, &model, &mut action_index, &command);
             }
         }
 
-        for synchronised_action in &synchronised_actions.actions {
-            let action_name_index = self.get_action_name_index(&synchronised_action.name);
+        for synchronised_action in synchronised_actions {
+            self.process_synchronising_action(
+                state,
+                &model,
+                &mut action_index,
+                &synchronised_action,
+            );
+        }
 
-            let valuation = &self.states[state].valuation;
-            let val_source = self.variable_info.get_valuation_source(valuation);
+        Ok(())
+    }
 
-            let mut satisfied_guards_indices = Vec::new();
-            let mut all_satisfied = true;
-            for action_module in &synchronised_action.participating_modules {
-                let module = &model.modules.modules[action_module.module_index];
-                let mut module_info = Vec::new();
-                for &command_index in &action_module.command_indices {
-                    let command = &module.commands[command_index];
-                    let guard =
-                        TreeWalkingEvaluator::new().evaluate_as_bool(&command.guard, &val_source);
-                    if guard {
-                        module_info.push(command_index);
-                    }
-                }
-                if module_info.is_empty() {
-                    all_satisfied = false;
-                }
-                satisfied_guards_indices.push(module_info);
-            }
+    fn process_nonsynchronised_command<S: Clone>(
+        &mut self,
+        state: usize,
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        action_index: &mut usize,
+        command: &Command<Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+    ) {
+        let valuation = &self.model_in_progress.get_state(state).valuation;
+        let val_source = self.variable_info.get_valuation_source(valuation);
+        let guard = TreeWalkingEvaluator::new().evaluate_as_bool(&command.guard, &val_source);
+        if guard {
+            let mut distribution = <M::Distribution as Distribution>::get_builder();
 
-            let n = satisfied_guards_indices.len();
+            for update_index in 0..command.updates.len() {
+                let valuation = &self.model_in_progress.get_state(state).valuation;
+                let val_source = self.variable_info.get_valuation_source(valuation);
 
-            if n == 0 {
-                panic!(
-                    "Synchronised actions with zero associated modules are not yet supported (but they should be impossible to create anyways)"
+                let update = &command.updates[update_index];
+                let probability =
+                    TreeWalkingEvaluator::new().evaluate_as_float(&update.probability, &val_source);
+                let new_valuation = self.apply_assignments(
+                    &model.variable_manager,
+                    valuation,
+                    &val_source,
+                    &[&update],
                 );
+
+                let index = self.get_or_add_state(new_valuation);
+                distribution.add_successor(Successor { probability, index });
+
+                self.model_in_progress
+                    .get_state_mut(index)
+                    .predecessors
+                    .add(Predecessor {
+                        from: state,
+                        action_index: *action_index,
+                        probability,
+                    });
             }
 
-            if all_satisfied {
-                let modules = &synchronised_action.participating_modules;
-                let mut indices = vec![0; n];
-                while indices[0] < satisfied_guards_indices[0].len() {
-                    let mut command_indices = Vec::with_capacity(n);
+            let action_name_index = self.model_in_progress.get_unnamed_action_name_index();
+            let successors = distribution.finish();
+            if successors.number_of_successors() == 0 {
+                println!(
+                    "State {} a local action with zero successors",
+                    self.model_in_progress
+                        .get_state(state)
+                        .valuation
+                        .displayable(&self.variable_info.valuation_context)
+                )
+            }
+            self.model_in_progress
+                .get_state_mut(state)
+                .actions
+                .add_action(Action {
+                    successors,
+                    action_name_index,
+                });
+            *action_index += 1;
+        }
+    }
+
+    fn process_synchronising_action<S: Clone>(
+        &mut self,
+        state: usize,
+        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        action_index: &mut usize,
+        synchronised_action: &&SynchronisedAction,
+    ) {
+        let action_name_index = self
+            .model_in_progress
+            .get_action_name_index(&synchronised_action.name);
+
+        let valuation = &self.model_in_progress.get_state(state).valuation;
+        let val_source = self.variable_info.get_valuation_source(valuation);
+
+        let mut satisfied_guards_indices = Vec::new();
+        let mut all_satisfied = true;
+        for action_module in &synchronised_action.participating_modules {
+            let module = &model.modules.modules[action_module.module_index];
+            let mut module_info = Vec::new();
+            for &command_index in &action_module.command_indices {
+                let command = &module.commands[command_index];
+                let guard =
+                    TreeWalkingEvaluator::new().evaluate_as_bool(&command.guard, &val_source);
+                if guard {
+                    module_info.push(command_index);
+                }
+            }
+            if module_info.is_empty() {
+                all_satisfied = false;
+            }
+            satisfied_guards_indices.push(module_info);
+        }
+
+        let n = satisfied_guards_indices.len();
+
+        if n == 0 {
+            panic!(
+                "Synchronised actions with zero associated modules are not yet supported (but they should be impossible to create anyways)"
+            );
+        }
+
+        if all_satisfied {
+            let modules = &synchronised_action.participating_modules;
+            let mut indices = vec![0; n];
+            while indices[0] < satisfied_guards_indices[0].len() {
+                let mut command_indices = Vec::with_capacity(n);
+                for i in 0..n {
+                    command_indices.push(satisfied_guards_indices[i][indices[i]]);
+                }
+
+                let mut update_indices = vec![0; n];
+
+                let mut distribution = <M::Distribution as Distribution>::get_builder();
+
+                while update_indices[0]
+                    < model.modules.modules[modules[0].module_index].commands[command_indices[0]]
+                        .updates
+                        .len()
+                        .max(1)
+                // max(1) is required because a synchronising action may have an empty update ("true")
+                {
+                    let valuation = &self.model_in_progress.get_state(state).valuation;
+                    let val_source = self.variable_info.get_valuation_source(valuation);
+                    let mut updates = Vec::new();
                     for i in 0..n {
-                        command_indices.push(satisfied_guards_indices[i][indices[i]]);
+                        let command = &model.modules.modules[modules[i].module_index].commands
+                            [command_indices[i]];
+                        if command.updates.len() > 0 {
+                            updates.push(&command.updates[update_indices[i]]);
+                        }
+                    }
+                    let new_valuation = self.apply_assignments(
+                        &model.variable_manager,
+                        valuation,
+                        &val_source,
+                        &updates[..],
+                    );
+
+                    let mut probability = 1.0;
+
+                    for i in 0..n {
+                        let command = &model.modules.modules[modules[i].module_index].commands
+                            [command_indices[i]];
+                        if command.updates.len() > 0 {
+                            let ith_expression = &command.updates[update_indices[i]].probability;
+                            let ith_probability = TreeWalkingEvaluator::new()
+                                .evaluate_as_float(ith_expression, &val_source);
+                            probability *= ith_probability;
+                        }
                     }
 
-                    let mut update_indices = vec![0; n];
-
-                    let mut distribution = <M::Distribution as Distribution>::get_builder();
-
-                    while update_indices[0]
-                        < model.modules.modules[modules[0].module_index].commands
-                            [command_indices[0]]
-                            .updates
-                            .len()
-                            .max(1)
-                    // max(1) is required because a synchronising action may have an empty update ("true")
-                    {
-                        let valuation = &self.states[state].valuation;
-                        let val_source = self.variable_info.get_valuation_source(valuation);
-                        let mut updates = Vec::new();
-                        for i in 0..n {
-                            let command = &model.modules.modules[modules[i].module_index].commands
-                                [command_indices[i]];
-                            if command.updates.len() > 0 {
-                                updates.push(&command.updates[update_indices[i]]);
-                            }
-                        }
-                        let new_valuation = self.apply_assignments(
-                            &model.variable_manager,
-                            valuation,
-                            &val_source,
-                            &updates[..],
-                        );
-
-                        let mut probability = 1.0;
-
-                        for i in 0..n {
-                            let command = &model.modules.modules[modules[i].module_index].commands
-                                [command_indices[i]];
-                            if command.updates.len() > 0 {
-                                let ith_expression =
-                                    &command.updates[update_indices[i]].probability;
-                                let ith_probability = TreeWalkingEvaluator::new()
-                                    .evaluate_as_float(ith_expression, &val_source);
-                                probability *= ith_probability;
-                            }
-                        }
-
-                        let index = self.get_or_add_state(new_valuation, atomic_propositions.len());
-                        distribution.add_successor(Successor { probability, index });
-                        self.states[index].predecessors.add(Predecessor {
+                    let index = self.get_or_add_state(new_valuation);
+                    distribution.add_successor(Successor { probability, index });
+                    self.model_in_progress
+                        .get_state_mut(index)
+                        .predecessors
+                        .add(Predecessor {
                             from: state,
-                            action_index,
+                            action_index: *action_index,
                             probability,
                         });
 
-                        for i in (0..n).rev() {
-                            if update_indices[i] + 1
-                                < model.modules.modules[modules[i].module_index].commands
-                                    [command_indices[i]]
-                                    .updates
-                                    .len()
-                            {
-                                update_indices[i] += 1;
-                                for j in i + 1..n {
-                                    update_indices[j] = 0;
-                                }
-                                break;
-                            } else {
-                                if i == 0 {
-                                    update_indices[0] += 1;
-                                }
-                            }
-                        }
-                    }
-
-                    self.states[state].actions.add_action(Action {
-                        successors: distribution.finish(),
-                        action_name_index,
-                    });
-                    action_index += 1;
-
                     for i in (0..n).rev() {
-                        if indices[i] + 1 < satisfied_guards_indices[i].len() {
-                            indices[i] += 1;
+                        if update_indices[i] + 1
+                            < model.modules.modules[modules[i].module_index].commands
+                                [command_indices[i]]
+                                .updates
+                                .len()
+                        {
+                            update_indices[i] += 1;
                             for j in i + 1..n {
-                                indices[j] = 0;
+                                update_indices[j] = 0;
                             }
                             break;
                         } else {
                             if i == 0 {
-                                indices[0] += 1;
+                                update_indices[0] += 1;
                             }
+                        }
+                    }
+                }
+
+                self.model_in_progress
+                    .get_state_mut(state)
+                    .actions
+                    .add_action(Action {
+                        successors: distribution.finish(),
+                        action_name_index,
+                    });
+                *action_index += 1;
+
+                for i in (0..n).rev() {
+                    if indices[i] + 1 < satisfied_guards_indices[i].len() {
+                        indices[i] += 1;
+                        for j in i + 1..n {
+                            indices[j] = 0;
+                        }
+                        break;
+                    } else {
+                        if i == 0 {
+                            indices[0] += 1;
                         }
                     }
                 }
             }
         }
-
-        Ok(())
     }
 
     fn evaluate_atomic_propositions<S: Clone>(
@@ -400,7 +378,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         state_index: usize,
         atomic_propositions: &[Expression<VariableReference, S>],
     ) {
-        let state = &mut self.states[state_index];
+        let state = &mut self.model_in_progress.get_state_mut(state_index);
         let val_source = self.variable_info.get_valuation_source(&state.valuation);
         for (i, atomic_proposition) in atomic_propositions.iter().enumerate() {
             let is_true =
@@ -463,8 +441,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
     fn create_initial_states<S: Clone>(
         &mut self,
         model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
-        atomic_proposition_len: usize,
-    ) -> Result<Vec<usize>, ModelBuildingError> {
+    ) -> Result<(), ModelBuildingError> {
         if model.init_constraint.is_some() {
             panic!("Init constraints are not yet supported by the model builder");
         }
@@ -526,9 +503,11 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
 
         let valuation = valuation_builder.finish();
 
-        let index = self.get_or_add_state(valuation, atomic_proposition_len);
+        let index = self.get_or_add_state(valuation);
 
-        Ok(vec![index])
+        self.model_in_progress.add_initial_state(index);
+
+        Ok(())
     }
 
     #[allow(unused)]
@@ -568,59 +547,3 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
 
 #[derive(Debug)]
 pub enum ModelBuildingError {}
-
-pub struct SynchronisedActions {
-    actions: Vec<SynchronisedAction>,
-}
-
-pub struct SynchronisedAction {
-    participating_modules: Vec<SynchronisedActionModule>,
-    name: String,
-}
-
-pub struct SynchronisedActionModule {
-    module_index: usize,
-    command_indices: Vec<usize>,
-}
-
-impl SynchronisedActions {
-    pub fn from_prism<S: Clone>(
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
-    ) -> Self {
-        let mut actions: HashMap<String, SynchronisedAction> = HashMap::new();
-
-        for (module_index, module) in model.modules.modules.iter().enumerate() {
-            let mut module_actions: HashMap<String, SynchronisedActionModule> = HashMap::new();
-            for (command_index, command) in module.commands.iter().enumerate() {
-                if let Some(action) = &command.action {
-                    if let Some(module_action) = module_actions.get_mut(&action.name) {
-                        module_action.command_indices.push(command_index);
-                    } else {
-                        module_actions.insert(
-                            action.name.clone(),
-                            SynchronisedActionModule {
-                                module_index,
-                                command_indices: vec![command_index],
-                            },
-                        );
-                    }
-                }
-            }
-            for (action_name, module_action) in module_actions {
-                if let Some(action) = actions.get_mut(&action_name) {
-                    action.participating_modules.push(module_action);
-                } else {
-                    let synchronised_action_into = SynchronisedAction {
-                        name: action_name.clone(),
-                        participating_modules: vec![module_action],
-                    };
-                    actions.insert(action_name, synchronised_action_into);
-                }
-            }
-        }
-
-        SynchronisedActions {
-            actions: actions.into_iter().map(|(_, a)| a).collect(),
-        }
-    }
-}
