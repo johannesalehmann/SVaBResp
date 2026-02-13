@@ -3,7 +3,7 @@ mod tree_walking_enumerator;
 
 pub use tree_walking_enumerator::TreeWalkingEvaluator;
 
-use prism_model::{Expression, VariableReference};
+use prism_model::{Expression, VariableRange, VariableReference};
 
 pub trait Evaluator {
     fn create() -> Self;
@@ -36,4 +36,15 @@ pub enum VariableType {
     Int,
     Bool,
     Float,
+}
+
+impl VariableType {
+    pub fn from_range<E, S: Clone>(range: &VariableRange<E, S>) -> Self {
+        match range {
+            VariableRange::BoundedInt { .. } => VariableType::Int,
+            VariableRange::UnboundedInt { .. } => VariableType::Int,
+            VariableRange::Boolean { .. } => VariableType::Bool,
+            VariableRange::Float { .. } => VariableType::Float,
+        }
+    }
 }

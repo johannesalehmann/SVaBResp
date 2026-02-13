@@ -1,4 +1,4 @@
-use prism_model_builder::ConstValue;
+use prism_model_builder::UserProvidedConstValue;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
@@ -24,7 +24,7 @@ impl Display for ConstParsingError {
 
 pub fn parse_const_assignments(
     assignments: &str,
-) -> Result<HashMap<String, ConstValue>, ConstParsingError> {
+) -> Result<HashMap<String, UserProvidedConstValue>, ConstParsingError> {
     let mut result = HashMap::new();
 
     if assignments.trim().is_empty() {
@@ -35,11 +35,11 @@ pub fn parse_const_assignments(
         if let Some((lhs, rhs)) = assignment.split_once("=") {
             let name = lhs.trim().to_string();
             let value = if let Ok(i) = rhs.parse::<i64>() {
-                ConstValue::Int(i)
+                UserProvidedConstValue::Int(i)
             } else if let Ok(f) = rhs.parse::<f64>() {
-                ConstValue::Float(f)
+                UserProvidedConstValue::Float(f)
             } else if let Ok(b) = rhs.parse::<bool>() {
-                ConstValue::Bool(b)
+                UserProvidedConstValue::Bool(b)
             } else {
                 return Err(ConstParsingError::InvalidValue {
                     name,

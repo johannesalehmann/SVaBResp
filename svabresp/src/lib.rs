@@ -7,7 +7,7 @@ pub mod shapley;
 pub mod state_based;
 pub use responsibility_task::*;
 
-pub use prism_model_builder::ConstValue;
+pub use prism_model_builder::UserProvidedConstValue;
 
 use chumsky::span::SimpleSpan;
 use prism_model::{Expression, Identifier, VariableReference};

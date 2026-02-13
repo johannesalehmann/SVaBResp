@@ -1,30 +1,27 @@
 mod expressions;
+mod variables;
 
-use crate::expressions::{Evaluator, ValuationSource, VariableType};
+use crate::expressions::{Evaluator, TreeWalkingEvaluator, ValuationSource, VariableType};
+use crate::variables::{ConstAndVarValuationSource, ModelVariableInfo};
 use log::info;
 use prism_model::{
     Expression, Identifier, Model, Update, VariableManager, VariableRange, VariableReference,
 };
 use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
 use probabilistic_models::{
-    Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, ContextBuilder,
-    Distribution, InitialStates, InitialStatesBuilder, MdpType, ModelTypes, Predecessors,
-    PredecessorsBuilder, ProbabilisticModel, State, Successor, Valuation, ValuationBuilder,
+    Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, Distribution,
+    InitialStates, InitialStatesBuilder, MdpType, ModelTypes, Predecessors, PredecessorsBuilder,
+    ProbabilisticModel, State, Successor, Valuation, ValuationBuilder,
 };
 use probabilistic_models::{DistributionBuilder, Predecessor};
 use std::collections::HashMap;
-use std::marker::PhantomData;
 
 pub fn build_model<S: Clone, M: ModelTypes>(
     model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     atomic_propositions: &[Expression<VariableReference, S>],
-    const_values: &HashMap<String, ConstValue>,
+    const_values: &HashMap<String, UserProvidedConstValue>,
 ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
-    ExplicitModelBuilder::<M, DefaultModelBuilderTypes>::run(
-        model,
-        atomic_propositions,
-        const_values,
-    )
+    ExplicitModelBuilder::<M>::run(model, atomic_propositions, const_values)
 }
 pub fn build_properties<
     S: Clone,
@@ -32,28 +29,15 @@ pub fn build_properties<
 >(
     model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     properties: I,
-    const_values: &HashMap<String, ConstValue>,
+    const_values: &HashMap<String, UserProvidedConstValue>,
 ) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
-    ExplicitModelBuilder::<MdpType, DefaultModelBuilderTypes>::build_property(
-        model,
-        properties,
-        const_values,
-    )
+    ExplicitModelBuilder::<MdpType>::build_property(model, properties, const_values)
 }
 
-pub enum ConstValue {
+pub enum UserProvidedConstValue {
     Int(i64),
     Bool(bool),
     Float(f64),
-}
-
-pub trait ModelBuilderTypes {
-    type ExpressionEvaluator: Evaluator;
-}
-
-pub struct DefaultModelBuilderTypes {}
-impl ModelBuilderTypes for DefaultModelBuilderTypes {
-    type ExpressionEvaluator = expressions::TreeWalkingEvaluator;
 }
 
 pub struct StateInProgress<M: ModelTypes> {
@@ -62,44 +46,36 @@ pub struct StateInProgress<M: ModelTypes> {
     pub atomic_propositions: M::AtomicPropositions,
     pub predecessors: <M::Predecessors as Predecessors>::Builder,
 }
-pub struct ExplicitModelBuilder<M: ModelTypes, B: ModelBuilderTypes> {
-    phantom_data: PhantomData<B>,
+pub struct ExplicitModelBuilder<M: ModelTypes> {
     states: Vec<StateInProgress<M>>,
     valuation_to_state: HashMap<M::Valuation, usize>,
     open_states: Vec<usize>,
-    valuation_map: ValuationMap,
-    consts: ConstValuations,
-    variable_bounds: VariableBounds,
-    variable_types: VariableTypes,
-    valuation_context: <M::Valuation as Valuation>::ContextType,
+    variable_info: variables::ModelVariableInfo<M::Valuation>,
     action_names: Vec<String>,
     action_name_indices: HashMap<String, usize>,
 }
 
-impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
+impl<M: ModelTypes> ExplicitModelBuilder<M> {
     pub fn build_property<
         S: Clone,
         I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
     >(
         model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         properties: I,
-        const_values: &HashMap<String, ConstValue>,
+        user_provided_consts: &HashMap<String, UserProvidedConstValue>,
     ) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
-        let (valuation_map, consts) =
-            Self::prepare_valuation_map_and_consts(&model.variable_manager, const_values)?;
-        let const_value_source: ConstOnlyEvaluator<'_, '_, B::ExpressionEvaluator> =
-            ConstOnlyEvaluator {
-                valuation_map: &valuation_map,
-                const_values: &consts,
-                phantom_data: Default::default(),
-            };
+        let variable_info: variables::ModelVariableInfo<M::Valuation> =
+            variables::ModelVariableInfo::new(model, user_provided_consts)?;
+
+        let const_valuation_source = variable_info.get_const_only_valuation_source();
+
         let mut result = Vec::new();
         for property in properties {
             let constraint = property
                 .operator
                 .constraint
                 .map_probability_specifier_with_result(|p| {
-                    Ok(B::ExpressionEvaluator::create().evaluate_as_float(&p, &const_value_source))
+                    Ok(TreeWalkingEvaluator::new().evaluate_as_float(&p, &const_valuation_source))
                 })?;
 
             result.push(Property {
@@ -116,29 +92,18 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     pub fn run<S: Clone>(
         model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
-        const_values: &HashMap<String, ConstValue>,
+        const_values: &HashMap<String, UserProvidedConstValue>,
     ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
         let start_time = std::time::Instant::now();
-        let (valuation_map, consts) =
-            Self::prepare_valuation_map_and_consts(&model.variable_manager, const_values)?;
-        let variable_bounds =
-            Self::prepare_variable_bounds(&model.variable_manager, &consts, &valuation_map)?;
-        let variable_types = Self::prepare_variable_types(&model.variable_manager);
-        let valuation_context =
-            Self::prepare_valuation_context(model, &valuation_map, &variable_bounds);
+        let variable_info = variables::ModelVariableInfo::new(model, const_values)?;
 
         let synchronised_actions = SynchronisedActions::from_prism(model);
 
         let mut builder = Self {
-            phantom_data: Default::default(),
             states: Vec::new(),
             valuation_to_state: HashMap::new(),
             open_states: Vec::new(),
-            valuation_map,
-            consts,
-            variable_bounds,
-            variable_types,
-            valuation_context,
+            variable_info,
             action_names: Vec::new(),
             action_name_indices: HashMap::new(),
         };
@@ -157,7 +122,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
 
         let mut result = ProbabilisticModel::new(
             initial_states,
-            builder.valuation_context,
+            builder.variable_info.valuation_context,
             atomic_propositions.len(),
         );
         result.action_names = builder.action_names;
@@ -178,166 +143,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             result.states.len()
         );
         Ok(result)
-    }
-
-    fn prepare_valuation_map_and_consts<S: Clone>(
-        variables: &VariableManager<Expression<VariableReference, S>, S>,
-        const_values: &HashMap<String, ConstValue>,
-    ) -> Result<(ValuationMap, ConstValuations), ModelBuildingError> {
-        let mut valuation_map = ValuationMap {
-            entries: Vec::new(),
-        };
-        let mut const_valuations = ConstValuations {
-            valuations: Vec::new(),
-        };
-        for var in &variables.variables {
-            if var.is_constant {
-                valuation_map
-                    .entries
-                    .push(ValuationMapEntry::Const(const_valuations.valuations.len()));
-
-                if let Some(value) = const_values.get(&var.name.name) {
-                    match (&var.range, value) {
-                        (VariableRange::BoundedInt { .. }, ConstValue::Int(i)) => {
-                            const_valuations.valuations.push(ConstValuation::Int(*i))
-                        }
-                        (VariableRange::UnboundedInt { .. }, ConstValue::Int(i)) => {
-                            const_valuations.valuations.push(ConstValuation::Int(*i))
-                        }
-                        (VariableRange::Boolean { .. }, ConstValue::Bool(b)) => {
-                            const_valuations.valuations.push(ConstValuation::Bool(*b))
-                        }
-                        (VariableRange::Float { .. }, ConstValue::Float(f)) => {
-                            const_valuations.valuations.push(ConstValuation::Float(*f))
-                        }
-                        _ => panic!("Incompatible value assigned to constant"),
-                    }
-                } else {
-                    let const_value_source: ConstRecursiveEvaluator<
-                        '_,
-                        '_,
-                        S,
-                        B::ExpressionEvaluator,
-                    > = ConstRecursiveEvaluator {
-                        variables,
-                        const_values,
-                        phantom_data: Default::default(),
-                    };
-                    let evaluator = B::ExpressionEvaluator::create();
-                    let initial = var
-                        .initial_value
-                        .as_ref()
-                        .expect("Consts must have an initial value expression");
-                    match var.range {
-                        VariableRange::BoundedInt { .. } | VariableRange::UnboundedInt { .. } => {
-                            let value = evaluator.evaluate_as_int(initial, &const_value_source);
-                            const_valuations.valuations.push(ConstValuation::Int(value));
-                        }
-                        VariableRange::Boolean { .. } => {
-                            let value = evaluator.evaluate_as_bool(initial, &const_value_source);
-                            const_valuations
-                                .valuations
-                                .push(ConstValuation::Bool(value));
-                        }
-                        VariableRange::Float { .. } => {
-                            let value = evaluator.evaluate_as_float(initial, &const_value_source);
-                            const_valuations
-                                .valuations
-                                .push(ConstValuation::Float(value));
-                        }
-                    }
-                }
-            } else {
-                valuation_map.entries.push(ValuationMapEntry::Var(
-                    valuation_map.entries.len() - const_valuations.valuations.len(),
-                ))
-            }
-        }
-        Ok((valuation_map, const_valuations))
-    }
-
-    fn prepare_variable_bounds<S: Clone>(
-        variables: &VariableManager<Expression<VariableReference, S>, S>,
-        consts: &ConstValuations,
-        valuation_map: &ValuationMap,
-    ) -> Result<VariableBounds, ModelBuildingError> {
-        let const_value_source: ConstOnlyEvaluator<'_, '_, B::ExpressionEvaluator> =
-            ConstOnlyEvaluator {
-                valuation_map: &valuation_map,
-                const_values: &consts,
-                phantom_data: Default::default(),
-            };
-
-        let mut bounds = Vec::new();
-        for (i, variable) in variables.variables.iter().enumerate() {
-            if let ValuationMapEntry::Var(_) = valuation_map.entries[i] {
-                bounds.push(match &variable.range {
-                    VariableRange::BoundedInt { min, max, .. } => {
-                        let min = B::ExpressionEvaluator::create()
-                            .evaluate_as_int(min, &const_value_source);
-                        let max = B::ExpressionEvaluator::create()
-                            .evaluate_as_int(max, &const_value_source);
-                        Some((min, max))
-                    }
-                    _ => None,
-                });
-            }
-        }
-
-        Ok(VariableBounds { bounds })
-    }
-
-    fn prepare_variable_types<S: Clone>(
-        variables: &VariableManager<Expression<VariableReference, S>, S>,
-    ) -> VariableTypes {
-        let mut variable_types = VariableTypes { types: Vec::new() };
-        for variable in variables.variables.iter() {
-            if !variable.is_constant {
-                match variable.range {
-                    VariableRange::BoundedInt { .. } => {
-                        variable_types.types.push(VariableType::Int)
-                    }
-                    VariableRange::UnboundedInt { .. } => {
-                        variable_types.types.push(VariableType::Int)
-                    }
-                    VariableRange::Boolean { .. } => variable_types.types.push(VariableType::Bool),
-                    VariableRange::Float { .. } => variable_types.types.push(VariableType::Float),
-                }
-            }
-        }
-        variable_types
-    }
-
-    fn prepare_valuation_context<S: Clone>(
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
-        valuation_map: &ValuationMap,
-        variable_bounds: &VariableBounds,
-    ) -> <<M as ModelTypes>::Valuation as Valuation>::ContextType {
-        let mut context_builder = M::Valuation::get_context_builder();
-        for (i, var) in model.variable_manager.variables.iter().enumerate() {
-            if let ValuationMapEntry::Var(var_index) = &valuation_map.entries[i] {
-                match &var.range {
-                    VariableRange::BoundedInt { .. } => {
-                        if let Some((min, max)) = variable_bounds.bounds[*var_index] {
-                            context_builder.register_bounded_int(var.name.name.clone(), min, max);
-                        } else {
-                            panic!("Variable bounds and valuation map are inconsistent");
-                        }
-                    }
-                    VariableRange::UnboundedInt { .. } => {
-                        context_builder.register_unbounded_int(var.name.name.clone())
-                    }
-                    VariableRange::Boolean { .. } => {
-                        context_builder.register_bool(var.name.name.clone())
-                    }
-                    VariableRange::Float { .. } => {
-                        context_builder.register_float(var.name.name.clone())
-                    }
-                }
-            }
-        }
-        let context = context_builder.finish();
-        context
     }
 
     fn get_unnamed_action_name_index(&mut self) -> usize {
@@ -402,27 +207,18 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     continue; // Synchronising actions are handled separately
                 }
                 let valuation = &self.states[state].valuation;
-                let val_source = ConstsAndVars::new(
-                    &self.valuation_map,
-                    &self.consts,
-                    &self.variable_types,
-                    valuation,
-                );
+                let val_source = self.variable_info.get_valuation_source(valuation);
                 let guard =
-                    B::ExpressionEvaluator::create().evaluate_as_bool(&command.guard, &val_source);
+                    TreeWalkingEvaluator::new().evaluate_as_bool(&command.guard, &val_source);
                 if guard {
                     let mut distribution = <M::Distribution as Distribution>::get_builder();
 
                     for update_index in 0..command.updates.len() {
                         let valuation = &self.states[state].valuation;
-                        let val_source = ConstsAndVars::new(
-                            &self.valuation_map,
-                            &self.consts,
-                            &self.variable_types,
-                            valuation,
-                        );
+                        let val_source = self.variable_info.get_valuation_source(valuation);
+
                         let update = &command.updates[update_index];
-                        let probability = B::ExpressionEvaluator::create()
+                        let probability = TreeWalkingEvaluator::new()
                             .evaluate_as_float(&update.probability, &val_source);
                         let new_valuation = self.apply_assignments(
                             &model.variable_manager,
@@ -448,7 +244,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                             "State {} a local action with zero successors",
                             self.states[state]
                                 .valuation
-                                .displayable(&self.valuation_context)
+                                .displayable(&self.variable_info.valuation_context)
                         )
                     }
                     self.states[state].actions.add_action(Action {
@@ -464,22 +260,17 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             let action_name_index = self.get_action_name_index(&synchronised_action.name);
 
             let valuation = &self.states[state].valuation;
-            let val_source = ConstsAndVars::new(
-                &self.valuation_map,
-                &self.consts,
-                &self.variable_types,
-                valuation,
-            );
+            let val_source = self.variable_info.get_valuation_source(valuation);
 
-            let mut satisfied_guards_indicies = Vec::new();
+            let mut satisfied_guards_indices = Vec::new();
             let mut all_satisfied = true;
             for action_module in &synchronised_action.participating_modules {
                 let module = &model.modules.modules[action_module.module_index];
                 let mut module_info = Vec::new();
                 for &command_index in &action_module.command_indices {
                     let command = &module.commands[command_index];
-                    let guard = B::ExpressionEvaluator::create()
-                        .evaluate_as_bool(&command.guard, &val_source);
+                    let guard =
+                        TreeWalkingEvaluator::new().evaluate_as_bool(&command.guard, &val_source);
                     if guard {
                         module_info.push(command_index);
                     }
@@ -487,10 +278,10 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                 if module_info.is_empty() {
                     all_satisfied = false;
                 }
-                satisfied_guards_indicies.push(module_info);
+                satisfied_guards_indices.push(module_info);
             }
 
-            let n = satisfied_guards_indicies.len();
+            let n = satisfied_guards_indices.len();
 
             if n == 0 {
                 panic!(
@@ -501,10 +292,10 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
             if all_satisfied {
                 let modules = &synchronised_action.participating_modules;
                 let mut indices = vec![0; n];
-                while indices[0] < satisfied_guards_indicies[0].len() {
+                while indices[0] < satisfied_guards_indices[0].len() {
                     let mut command_indices = Vec::with_capacity(n);
                     for i in 0..n {
-                        command_indices.push(satisfied_guards_indicies[i][indices[i]]);
+                        command_indices.push(satisfied_guards_indices[i][indices[i]]);
                     }
 
                     let mut update_indices = vec![0; n];
@@ -520,12 +311,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     // max(1) is required because a synchronising action may have an empty update ("true")
                     {
                         let valuation = &self.states[state].valuation;
-                        let val_source = ConstsAndVars::new(
-                            &self.valuation_map,
-                            &self.consts,
-                            &self.variable_types,
-                            valuation,
-                        );
+                        let val_source = self.variable_info.get_valuation_source(valuation);
                         let mut updates = Vec::new();
                         for i in 0..n {
                             let command = &model.modules.modules[modules[i].module_index].commands
@@ -549,7 +335,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                             if command.updates.len() > 0 {
                                 let ith_expression =
                                     &command.updates[update_indices[i]].probability;
-                                let ith_probability = B::ExpressionEvaluator::create()
+                                let ith_probability = TreeWalkingEvaluator::new()
                                     .evaluate_as_float(ith_expression, &val_source);
                                 probability *= ith_probability;
                             }
@@ -590,7 +376,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     action_index += 1;
 
                     for i in (0..n).rev() {
-                        if indices[i] + 1 < satisfied_guards_indicies[i].len() {
+                        if indices[i] + 1 < satisfied_guards_indices[i].len() {
                             indices[i] += 1;
                             for j in i + 1..n {
                                 indices[j] = 0;
@@ -615,15 +401,10 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         atomic_propositions: &[Expression<VariableReference, S>],
     ) {
         let state = &mut self.states[state_index];
-        let val_source = ConstsAndVars::new(
-            &self.valuation_map,
-            &self.consts,
-            &self.variable_types,
-            &state.valuation,
-        );
+        let val_source = self.variable_info.get_valuation_source(&state.valuation);
         for (i, atomic_proposition) in atomic_propositions.iter().enumerate() {
             let is_true =
-                B::ExpressionEvaluator::create().evaluate_as_bool(&atomic_proposition, &val_source);
+                TreeWalkingEvaluator::new().evaluate_as_bool(&atomic_proposition, &val_source);
             state.atomic_propositions.set_value(i, is_true);
         }
     }
@@ -632,22 +413,23 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         &self,
         variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
         valuation: &<M as ModelTypes>::Valuation,
-        val_source: &ConstsAndVars<<M as ModelTypes>::Valuation>,
+        val_source: &ConstAndVarValuationSource<<M as ModelTypes>::Valuation>,
         updates: &[&Update<Expression<VariableReference, S>, VariableReference, S>],
     ) -> <M as ModelTypes>::Valuation {
         let mut new_valuation = valuation.clone();
         for update in updates {
             for assignment in &update.assignments {
                 let target = variable_manager.get(&assignment.target).unwrap();
-                let target_index = match self.valuation_map.entries[assignment.target.index] {
-                    ValuationMapEntry::Const(_) => panic!("Cannot assign to constant"),
-                    ValuationMapEntry::Var(index) => index,
-                };
+                let target_index = self
+                    .variable_info
+                    .valuation_map
+                    .map_to_variable(assignment.target.index)
+                    .expect("Cannot assign to constant");
                 match target.range {
                     VariableRange::BoundedInt { .. } => {
-                        let value = B::ExpressionEvaluator::create()
+                        let value = TreeWalkingEvaluator::new()
                             .evaluate_as_int(&assignment.value, &val_source);
-                        let (min, max) = self.variable_bounds.bounds[target_index].unwrap();
+                        let (min, max) = self.variable_info.details[target_index].bounds.unwrap();
                         if value < min || value > max {
                             panic!(
                                 "Value exceeds variable bounds, bounds are ({}, {}), value is {}",
@@ -658,17 +440,17 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                         }
                     }
                     VariableRange::UnboundedInt { .. } => {
-                        let value = B::ExpressionEvaluator::create()
+                        let value = TreeWalkingEvaluator::new()
                             .evaluate_as_int(&assignment.value, &val_source);
                         new_valuation.set_unbounded_int(target_index, value);
                     }
                     VariableRange::Boolean { .. } => {
-                        let value = B::ExpressionEvaluator::create()
+                        let value = TreeWalkingEvaluator::new()
                             .evaluate_as_bool(&assignment.value, &val_source);
                         new_valuation.set_bool(target_index, value);
                     }
                     VariableRange::Float { .. } => {
-                        let value = B::ExpressionEvaluator::create()
+                        let value = TreeWalkingEvaluator::new()
                             .evaluate_as_float(&assignment.value, &val_source);
                         new_valuation.set_float(target_index, value);
                     }
@@ -686,28 +468,24 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
         if model.init_constraint.is_some() {
             panic!("Init constraints are not yet supported by the model builder");
         }
-        let const_value_source: ConstOnlyEvaluator<'_, '_, B::ExpressionEvaluator> =
-            ConstOnlyEvaluator {
-                valuation_map: &self.valuation_map,
-                const_values: &self.consts,
-                phantom_data: Default::default(),
-            };
+        let const_value_source = self.variable_info.get_const_only_valuation_source();
 
-        let mut valuation_builder = M::Valuation::get_builder(&self.valuation_context);
+        let mut valuation_builder =
+            M::Valuation::get_builder(&self.variable_info.valuation_context);
 
         for (i, variable) in model.variable_manager.variables.iter().enumerate() {
-            if let ValuationMapEntry::Var(index) = &self.valuation_map.entries[i] {
+            if let Some(index) = &self.variable_info.valuation_map.map_to_variable(i) {
                 match variable.range {
                     VariableRange::BoundedInt { .. } => match &variable.initial_value {
                         None => {
-                            if let Some((min, _)) = self.variable_bounds.bounds[*index] {
+                            if let Some((min, _)) = self.variable_info.details[*index].bounds {
                                 valuation_builder.add_bounded_int(min);
                             } else {
                                 panic!("Variable bounds list is inconsistent");
                             }
                         }
                         Some(initial) => {
-                            let value = B::ExpressionEvaluator::create()
+                            let value = TreeWalkingEvaluator::new()
                                 .evaluate_as_int(initial, &const_value_source);
                             valuation_builder.add_bounded_int(value);
                         }
@@ -715,7 +493,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                     VariableRange::UnboundedInt { .. } => match &variable.initial_value {
                         None => panic!("Unbounded int must have init expression"),
                         Some(initial) => {
-                            let value = B::ExpressionEvaluator::create()
+                            let value = TreeWalkingEvaluator::new()
                                 .evaluate_as_int(initial, &const_value_source);
                             valuation_builder.add_int(value);
                         }
@@ -725,7 +503,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                             valuation_builder.add_bool(false);
                         }
                         Some(initial) => {
-                            let value = B::ExpressionEvaluator::create()
+                            let value = TreeWalkingEvaluator::new()
                                 .evaluate_as_bool(initial, &const_value_source);
                             valuation_builder.add_bool(value);
                         }
@@ -737,7 +515,7 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
                             )
                         }
                         Some(initial) => {
-                            let value = B::ExpressionEvaluator::create()
+                            let value = TreeWalkingEvaluator::new()
                                 .evaluate_as_float(initial, &const_value_source);
                             valuation_builder.add_float(value);
                         }
@@ -756,13 +534,13 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
     #[allow(unused)]
     fn print_valuation<S: Clone>(
         valuation: &M::Valuation,
-        valuation_map: &ValuationMap,
+        variable_info: &ModelVariableInfo<M::Valuation>,
         model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     ) {
         print!("(");
         let mut first = true;
         for (i, var) in model.variable_manager.variables.iter().enumerate() {
-            if let ValuationMapEntry::Var(index) = valuation_map.entries[i] {
+            if let Some(index) = variable_info.valuation_map.map_to_variable(i) {
                 if !first {
                     print!(", ");
                 }
@@ -790,265 +568,6 @@ impl<M: ModelTypes, B: ModelBuilderTypes> ExplicitModelBuilder<M, B> {
 
 #[derive(Debug)]
 pub enum ModelBuildingError {}
-
-struct ConstsAndVars<'a, 'b, 'c, 'd, V: Valuation> {
-    map: &'a ValuationMap,
-    consts: &'b ConstValuations,
-    types: &'c VariableTypes,
-    variables: &'d V,
-}
-
-impl<'a, 'b, 'c, 'd, V: Valuation> ConstsAndVars<'a, 'b, 'c, 'd, V> {
-    pub fn new(
-        map: &'a ValuationMap,
-        consts: &'b ConstValuations,
-        types: &'c VariableTypes,
-        variables: &'d V,
-    ) -> Self {
-        Self {
-            map,
-            consts,
-            variables,
-            types,
-        }
-    }
-}
-
-impl<'a, 'b, 'c, 'd, V: Valuation> ValuationSource for &ConstsAndVars<'a, 'b, 'c, 'd, V> {
-    fn get_int(&self, index: VariableReference) -> i64 {
-        match self.map.entries[index.index] {
-            ValuationMapEntry::Const(i) => self.consts.valuations[i].as_int(),
-            ValuationMapEntry::Var(i) => self.variables.evaluate_bounded_int(i), // TODO: Also handle unbounded ints?
-        }
-    }
-
-    fn get_bool(&self, index: VariableReference) -> bool {
-        match self.map.entries[index.index] {
-            ValuationMapEntry::Const(i) => self.consts.valuations[i].as_bool(),
-            ValuationMapEntry::Var(i) => self.variables.evaluate_bool(i),
-        }
-    }
-
-    fn get_float(&self, index: VariableReference) -> f64 {
-        match self.map.entries[index.index] {
-            ValuationMapEntry::Const(i) => self.consts.valuations[i].as_float(),
-            ValuationMapEntry::Var(i) => self.variables.evaluate_float(i),
-        }
-    }
-
-    fn get_type(&self, index: VariableReference) -> VariableType {
-        match self.map.entries[index.index] {
-            ValuationMapEntry::Const(i) => match self.consts.valuations[i] {
-                ConstValuation::Int(_) => VariableType::Int,
-                ConstValuation::Bool(_) => VariableType::Bool,
-                ConstValuation::Float(_) => VariableType::Float,
-            },
-            ValuationMapEntry::Var(i) => self.types.types[i],
-        }
-    }
-}
-
-impl<'a, 'b, 'c, 'd, V: Valuation> ValuationSource for ConstsAndVars<'a, 'b, 'c, 'd, V> {
-    fn get_int(&self, index: VariableReference) -> i64 {
-        (&self).get_int(index)
-    }
-
-    fn get_bool(&self, index: VariableReference) -> bool {
-        (&self).get_bool(index)
-    }
-
-    fn get_float(&self, index: VariableReference) -> f64 {
-        (&self).get_float(index)
-    }
-
-    fn get_type(&self, index: VariableReference) -> VariableType {
-        (&self).get_type(index)
-    }
-}
-
-struct VariableBounds {
-    bounds: Vec<Option<(i64, i64)>>,
-}
-
-struct VariableTypes {
-    types: Vec<VariableType>,
-}
-
-struct ValuationMap {
-    entries: Vec<ValuationMapEntry>,
-}
-
-enum ValuationMapEntry {
-    Const(usize),
-    Var(usize),
-}
-
-struct ConstValuations {
-    valuations: Vec<ConstValuation>,
-}
-
-enum ConstValuation {
-    Int(i64),
-    Bool(bool),
-    Float(f64),
-}
-
-impl ConstValuation {
-    pub fn as_int(&self) -> i64 {
-        match self {
-            ConstValuation::Int(i) => *i,
-            _ => panic!("Cannot evaluate this value as integer"),
-        }
-    }
-
-    pub fn as_bool(&self) -> bool {
-        match self {
-            ConstValuation::Bool(b) => *b,
-            _ => panic!("Cannot evaluate this value as boolean"),
-        }
-    }
-
-    pub fn as_float(&self) -> f64 {
-        match self {
-            ConstValuation::Float(f) => *f,
-            _ => panic!("Cannot evaluate this value as float"),
-        }
-    }
-}
-
-struct ConstRecursiveEvaluator<'a, 'b, S: Clone, E: Evaluator> {
-    variables: &'a VariableManager<Expression<VariableReference, S>, S>,
-    const_values: &'b HashMap<String, ConstValue>,
-    phantom_data: PhantomData<E>,
-}
-
-impl<'a, 'b, S: Clone, E: Evaluator> ValuationSource for ConstRecursiveEvaluator<'a, 'b, S, E> {
-    fn get_int(&self, index: VariableReference) -> i64 {
-        let var = self.variables.get(&index).unwrap();
-        if !var.is_constant {
-            panic!("Const depends on non-constant value");
-        }
-        if let Some(value) = self.const_values.get(&var.name.name) {
-            match value {
-                ConstValue::Int(i) => *i,
-                ConstValue::Bool(_) => {
-                    panic!("Integer constant assigned boolean value")
-                }
-                ConstValue::Float(_) => {
-                    panic!("Integer constant assigned float value")
-                }
-            }
-        } else {
-            let inner_eval = E::create();
-            inner_eval.evaluate_as_int(
-                &var.initial_value
-                    .as_ref()
-                    .expect("Constant without initial value"),
-                self,
-            )
-        }
-    }
-
-    fn get_bool(&self, index: VariableReference) -> bool {
-        let var = self.variables.get(&index).unwrap();
-        if !var.is_constant {
-            panic!("Const depends on non-constant value");
-        }
-        if let Some(value) = self.const_values.get(&var.name.name) {
-            match value {
-                ConstValue::Int(_) => {
-                    panic!("Boolean constant assigned integer value")
-                }
-                ConstValue::Bool(b) => *b,
-                ConstValue::Float(_) => {
-                    panic!("Boolean constant assigned float value")
-                }
-            }
-        } else {
-            let inner_eval = E::create();
-            inner_eval.evaluate_as_bool(
-                &var.initial_value
-                    .as_ref()
-                    .expect("Constant without initial value"),
-                self,
-            )
-        }
-    }
-
-    fn get_float(&self, index: VariableReference) -> f64 {
-        let var = self.variables.get(&index).unwrap();
-        if !var.is_constant {
-            panic!("Const depends on non-constant value");
-        }
-        if let Some(value) = self.const_values.get(&var.name.name) {
-            match value {
-                ConstValue::Int(_) => {
-                    panic!("Float constant assigned integer value")
-                }
-                ConstValue::Bool(_) => {
-                    panic!("Float constant assigned boolean value")
-                }
-                ConstValue::Float(f) => *f,
-            }
-        } else {
-            let inner_eval = E::create();
-            inner_eval.evaluate_as_float(
-                &var.initial_value
-                    .as_ref()
-                    .expect("Constant without initial value"),
-                self,
-            )
-        }
-    }
-
-    fn get_type(&self, index: VariableReference) -> VariableType {
-        let var = self.variables.get(&index).unwrap();
-        match var.range {
-            VariableRange::BoundedInt { .. } => VariableType::Int,
-            VariableRange::UnboundedInt { .. } => VariableType::Int,
-            VariableRange::Boolean { .. } => VariableType::Bool,
-            VariableRange::Float { .. } => VariableType::Float,
-        }
-    }
-}
-
-struct ConstOnlyEvaluator<'a, 'b, E: Evaluator> {
-    valuation_map: &'a ValuationMap,
-    const_values: &'b ConstValuations,
-    phantom_data: PhantomData<E>,
-}
-
-impl<'a, 'b, E: Evaluator> ConstOnlyEvaluator<'a, 'b, E> {
-    fn get(&self, index: VariableReference) -> &ConstValuation {
-        match &self.valuation_map.entries[index.index] {
-            ValuationMapEntry::Const(c) => &self.const_values.valuations[*c],
-            ValuationMapEntry::Var(_) => {
-                panic!("Cannot evaluate non-static value here");
-            }
-        }
-    }
-}
-impl<'a, 'b, E: Evaluator> ValuationSource for ConstOnlyEvaluator<'a, 'b, E> {
-    fn get_int(&self, index: VariableReference) -> i64 {
-        self.get(index).as_int()
-    }
-
-    fn get_bool(&self, index: VariableReference) -> bool {
-        self.get(index).as_bool()
-    }
-
-    fn get_float(&self, index: VariableReference) -> f64 {
-        self.get(index).as_float()
-    }
-
-    fn get_type(&self, index: VariableReference) -> VariableType {
-        match self.get(index) {
-            ConstValuation::Int(_) => VariableType::Int,
-            ConstValuation::Bool(_) => VariableType::Bool,
-            ConstValuation::Float(_) => VariableType::Float,
-        }
-    }
-}
 
 pub struct SynchronisedActions {
     actions: Vec<SynchronisedAction>,

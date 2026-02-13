@@ -15,7 +15,7 @@ use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
-use prism_model_builder::ConstValue;
+use prism_model_builder::UserProvidedConstValue;
 use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
     AlgorithmCollection, BuechiAlgorithmCollection, GameAndSolverExternalOwners,
     ReachabilityAlgorithmCollection, SafetyAlgorithmCollection,
@@ -31,7 +31,7 @@ pub fn compute_for_prism<
     mut grouping_scheme: G,
     group_blocking_provider: B,
     shapley: &mut S,
-    constants: std::collections::HashMap<String, ConstValue>,
+    constants: std::collections::HashMap<String, UserProvidedConstValue>,
 ) -> S::Output<String> {
     trace!("Applying grouping scheme to PRISM model");
     grouping_scheme.transform_prism(&mut prism_model, &mut prism_property);
