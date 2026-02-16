@@ -46,22 +46,20 @@ pub fn compute_for_prism<
         vec![prism_property],
     );
 
-    trace!("Building properties");
-    let properties =
-        prism_model_builder::build_properties(&prism_model, properties.into_iter(), &constants)
-            .unwrap();
-
-    assert_eq!(properties.len(), 1);
-    let property = properties.into_iter().nth(0).unwrap();
-
     trace!("Building model");
-    let model = prism_model_builder::build_model::<_, MdpType<VectorPredecessors>>(
+    let builder_results = prism_model_builder::build_model::<_, MdpType<VectorPredecessors>, _>(
         &prism_model,
         &atomic_propositions[..],
+        properties.into_iter(),
         &constants,
     )
     .unwrap();
 
+    let properties = builder_results.properties;
+    assert_eq!(properties.len(), 1);
+    let property = properties.into_iter().nth(0).unwrap();
+
+    let model = builder_results.model;
     trace!("Transforming transition system into game");
     let mut game: probabilistic_models::TwoPlayerNonstochasticGame<VectorPredecessors> = model
         .into_iter()

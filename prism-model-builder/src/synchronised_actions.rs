@@ -1,4 +1,5 @@
-use prism_model::{Expression, Identifier, Model, VariableReference};
+use crate::expressions::stack_based_expressions::StackBasedExpression;
+use prism_model::{Identifier, Model, VariableReference};
 use std::collections::HashMap;
 
 pub struct SynchronisedActions {
@@ -26,7 +27,13 @@ pub struct SynchronisedActionModule {
 
 impl SynchronisedActions {
     pub fn from_prism<S: Clone>(
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        model: &Model<
+            (),
+            Identifier<S>,
+            StackBasedExpression<VariableReference>,
+            VariableReference,
+            S,
+        >,
     ) -> Self {
         let mut actions: HashMap<String, SynchronisedAction> = HashMap::new();
 

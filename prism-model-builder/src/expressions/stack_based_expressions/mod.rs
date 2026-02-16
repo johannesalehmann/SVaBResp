@@ -1,7 +1,10 @@
+#[cfg(test)]
+mod tests;
+
 use crate::expressions::ValuationSource;
 use prism_model::{Expression, VariableManager, VariableRange, VariableReference};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 enum ExpressionType {
     Int,
     Bool,
@@ -10,22 +13,28 @@ enum ExpressionType {
 
 pub struct StackBasedExpression<V> {
     operations: Vec<Operation<V>>,
+    expression_type: ExpressionType,
 }
 
-#[allow(unused)]
 impl StackBasedExpression<VariableReference> {
     pub fn from_expression<S: Clone>(
-        expression: Expression<VariableReference, S>,
-        variable_manager: VariableManager<VariableReference, S>,
+        expression: &Expression<VariableReference, S>,
+        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
     ) -> Self {
-        let _ = (expression, variable_manager);
-        unimplemented!();
+        let mut operations = Vec::new();
+        let expression_type =
+            Self::process_expression(expression, &mut operations, variable_manager);
+
+        Self {
+            operations,
+            expression_type,
+        }
     }
 
     fn process_expression<S: Clone>(
         expression: &Expression<VariableReference, S>,
         operations: &mut Vec<Operation<VariableReference>>,
-        variable_manager: &VariableManager<VariableReference, S>,
+        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
     ) -> ExpressionType {
         match expression {
             Expression::Int(i, _) => {
@@ -197,6 +206,8 @@ impl StackBasedExpression<VariableReference> {
                 arg2,
                 Operation::MultiplyInt,
                 Operation::MultiplyFloat,
+                ExpressionType::Int,
+                ExpressionType::Float,
                 operations,
                 variable_manager,
             ),
@@ -205,6 +216,8 @@ impl StackBasedExpression<VariableReference> {
                 arg2,
                 Operation::DivideInt,
                 Operation::DivideFloat,
+                ExpressionType::Float,
+                ExpressionType::Float,
                 operations,
                 variable_manager,
             ),
@@ -213,6 +226,8 @@ impl StackBasedExpression<VariableReference> {
                 arg2,
                 Operation::AddInt,
                 Operation::AddFloat,
+                ExpressionType::Int,
+                ExpressionType::Float,
                 operations,
                 variable_manager,
             ),
@@ -221,6 +236,8 @@ impl StackBasedExpression<VariableReference> {
                 arg2,
                 Operation::SubtractInt,
                 Operation::SubtractFloat,
+                ExpressionType::Int,
+                ExpressionType::Float,
                 operations,
                 variable_manager,
             ),
@@ -229,6 +246,8 @@ impl StackBasedExpression<VariableReference> {
                 arg2,
                 Operation::LessThanInt,
                 Operation::LessThanFloat,
+                ExpressionType::Bool,
+                ExpressionType::Bool,
                 operations,
                 variable_manager,
             ),
@@ -237,6 +256,8 @@ impl StackBasedExpression<VariableReference> {
                 arg2,
                 Operation::LessOrEqualInt,
                 Operation::LessOrEqualFloat,
+                ExpressionType::Bool,
+                ExpressionType::Bool,
                 operations,
                 variable_manager,
             ),
@@ -245,6 +266,8 @@ impl StackBasedExpression<VariableReference> {
                 arg2,
                 Operation::GreaterThanInt,
                 Operation::GreaterThanFloat,
+                ExpressionType::Bool,
+                ExpressionType::Bool,
                 operations,
                 variable_manager,
             ),
@@ -253,6 +276,8 @@ impl StackBasedExpression<VariableReference> {
                 arg2,
                 Operation::GreaterOrEqualInt,
                 Operation::GreaterOrEqualFloat,
+                ExpressionType::Bool,
+                ExpressionType::Bool,
                 operations,
                 variable_manager,
             ),
@@ -262,6 +287,9 @@ impl StackBasedExpression<VariableReference> {
                 Operation::EqualsInt,
                 Operation::EqualsFloat,
                 Operation::EqualsBool,
+                ExpressionType::Bool,
+                ExpressionType::Bool,
+                ExpressionType::Bool,
                 operations,
                 variable_manager,
             ),
@@ -271,6 +299,9 @@ impl StackBasedExpression<VariableReference> {
                 Operation::NotEqualsInt,
                 Operation::NotEqualsFloat,
                 Operation::NotEqualsBool,
+                ExpressionType::Bool,
+                ExpressionType::Bool,
+                ExpressionType::Bool,
                 operations,
                 variable_manager,
             ),
@@ -363,8 +394,10 @@ impl StackBasedExpression<VariableReference> {
         arg2: &Expression<VariableReference, S>,
         int_operation: Operation<VariableReference>,
         float_operation: Operation<VariableReference>,
+        int_type: ExpressionType,
+        float_type: ExpressionType,
         operations: &mut Vec<Operation<VariableReference>>,
-        variable_manager: &VariableManager<VariableReference, S>,
+        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
     ) -> ExpressionType {
         let mut ops2 = Vec::new();
         let type1 = Self::process_expression(arg1, operations, variable_manager);
@@ -379,10 +412,10 @@ impl StackBasedExpression<VariableReference> {
         }
         if type1 == ExpressionType::Float || type2 == ExpressionType::Float {
             operations.push(float_operation);
-            ExpressionType::Float
+            float_type
         } else if type1 == ExpressionType::Int && type2 == ExpressionType::Int {
             operations.push(int_operation);
-            ExpressionType::Int
+            int_type
         } else {
             panic!("The operation can only operate on ints and floats");
         }
@@ -394,8 +427,11 @@ impl StackBasedExpression<VariableReference> {
         int_operation: Operation<VariableReference>,
         float_operation: Operation<VariableReference>,
         bool_operation: Operation<VariableReference>,
+        int_type: ExpressionType,
+        float_type: ExpressionType,
+        bool_type: ExpressionType,
         operations: &mut Vec<Operation<VariableReference>>,
-        variable_manager: &VariableManager<VariableReference, S>,
+        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
     ) -> ExpressionType {
         let mut ops2 = Vec::new();
         let type1 = Self::process_expression(arg1, operations, variable_manager);
@@ -410,13 +446,13 @@ impl StackBasedExpression<VariableReference> {
         }
         if type1 == ExpressionType::Float || type2 == ExpressionType::Float {
             operations.push(float_operation);
-            ExpressionType::Float
+            float_type
         } else if type1 == ExpressionType::Int && type2 == ExpressionType::Int {
             operations.push(int_operation);
-            ExpressionType::Int
+            int_type
         } else if type1 == ExpressionType::Bool && type2 == ExpressionType::Bool {
             operations.push(bool_operation);
-            ExpressionType::Bool
+            bool_type
         } else {
             panic!(
                 "The operation can only operate on two booleans or on a combination of integers and floats"
@@ -424,7 +460,45 @@ impl StackBasedExpression<VariableReference> {
         }
     }
 
-    fn evaluate<VS: ValuationSource>(&self, valuations: &VS) {
+    pub fn evaluate_as_int<VS: ValuationSource>(&self, valuations: &VS) -> i64 {
+        let stack = self.evaluate(valuations);
+        if self.expression_type == ExpressionType::Int {
+            stack.ints[stack.ints.len() - 1]
+        } else {
+            panic!(
+                "Cannot evaluate expression of type {:?} as int",
+                self.expression_type
+            );
+        }
+    }
+
+    pub fn evaluate_as_float<VS: ValuationSource>(&self, valuations: &VS) -> f64 {
+        let stack = self.evaluate(valuations);
+        if self.expression_type == ExpressionType::Int {
+            stack.ints[stack.ints.len() - 1] as f64
+        } else if self.expression_type == ExpressionType::Float {
+            stack.floats[stack.floats.len() - 1]
+        } else {
+            panic!(
+                "Cannot evaluate expression of type {:?} as float",
+                self.expression_type
+            );
+        }
+    }
+
+    pub fn evaluate_as_bool<VS: ValuationSource>(&self, valuations: &VS) -> bool {
+        let stack = self.evaluate(valuations);
+        if self.expression_type == ExpressionType::Bool {
+            stack.bools[stack.bools.len() - 1]
+        } else {
+            panic!(
+                "Cannot evaluate expression of type {:?} as int",
+                self.expression_type
+            );
+        }
+    }
+
+    fn evaluate<VS: ValuationSource>(&self, valuations: &VS) -> EvaluationStack {
         let mut stack = EvaluationStack::new();
         for operation in &self.operations {
             match operation {
@@ -447,113 +521,113 @@ impl StackBasedExpression<VariableReference> {
                     stack.floats.push(i as f64);
                 }
                 Operation::MultiplyInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.ints.push(a * b);
                 }
                 Operation::MultiplyFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.floats.push(a * b);
                 }
                 Operation::DivideInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
-                    stack.ints.push(a / b);
+                    let a = stack.ints.pop().unwrap();
+                    stack.floats.push(a as f64 / b as f64);
                 }
                 Operation::DivideFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.floats.push(a / b);
                 }
                 Operation::AddInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.ints.push(a + b);
                 }
                 Operation::AddFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.floats.push(a + b);
                 }
                 Operation::SubtractInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.ints.push(a - b);
                 }
                 Operation::SubtractFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.floats.push(a - b);
                 }
                 Operation::LessThanInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.bools.push(a < b);
                 }
                 Operation::LessThanFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.bools.push(a < b);
                 }
                 Operation::LessOrEqualInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.bools.push(a <= b);
                 }
                 Operation::LessOrEqualFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.bools.push(a <= b);
                 }
                 Operation::GreaterThanInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.bools.push(a > b);
                 }
                 Operation::GreaterThanFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.bools.push(a > b);
                 }
                 Operation::GreaterOrEqualInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.bools.push(a >= b);
                 }
                 Operation::GreaterOrEqualFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.bools.push(a >= b);
                 }
                 Operation::EqualsInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.bools.push(a == b);
                 }
                 Operation::EqualsFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.bools.push(a == b);
                 }
                 Operation::EqualsBool => {
-                    let a = stack.bools.pop().unwrap();
                     let b = stack.bools.pop().unwrap();
+                    let a = stack.bools.pop().unwrap();
                     stack.bools.push(a == b);
                 }
                 Operation::NotEqualsInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.bools.push(a != b);
                 }
                 Operation::NotEqualsFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.bools.push(a != b);
                 }
                 Operation::NotEqualsBool => {
-                    let a = stack.bools.pop().unwrap();
                     let b = stack.bools.pop().unwrap();
+                    let a = stack.bools.pop().unwrap();
                     stack.bools.push(a != b);
                 }
                 Operation::NegateBool => {
@@ -561,29 +635,29 @@ impl StackBasedExpression<VariableReference> {
                     stack.bools[len - 1] = !stack.bools[len - 1];
                 }
                 Operation::Conjunction => {
-                    let a = stack.bools.pop().unwrap();
                     let b = stack.bools.pop().unwrap();
+                    let a = stack.bools.pop().unwrap();
                     stack.bools.push(a && b);
                 }
                 Operation::Disjunction => {
-                    let a = stack.bools.pop().unwrap();
                     let b = stack.bools.pop().unwrap();
+                    let a = stack.bools.pop().unwrap();
                     stack.bools.push(a || b);
                 }
                 Operation::IfAndOnlyIf => {
-                    let a = stack.bools.pop().unwrap();
                     let b = stack.bools.pop().unwrap();
+                    let a = stack.bools.pop().unwrap();
                     stack.bools.push(a == b);
                 }
                 Operation::Implies => {
-                    let a = stack.bools.pop().unwrap();
                     let b = stack.bools.pop().unwrap();
+                    let a = stack.bools.pop().unwrap();
                     stack.bools.push(!a || b);
                 }
                 Operation::TernaryInt => {
-                    let g = stack.bools.pop().unwrap();
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
+                    let g = stack.bools.pop().unwrap();
                     if g {
                         stack.ints.push(a);
                     } else {
@@ -591,9 +665,9 @@ impl StackBasedExpression<VariableReference> {
                     }
                 }
                 Operation::TernaryFloat => {
-                    let g = stack.bools.pop().unwrap();
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
+                    let g = stack.bools.pop().unwrap();
                     if g {
                         stack.floats.push(a);
                     } else {
@@ -601,9 +675,9 @@ impl StackBasedExpression<VariableReference> {
                     }
                 }
                 Operation::TernaryBool => {
-                    let g = stack.bools.pop().unwrap();
-                    let a = stack.bools.pop().unwrap();
                     let b = stack.bools.pop().unwrap();
+                    let a = stack.bools.pop().unwrap();
+                    let g = stack.bools.pop().unwrap();
                     if g {
                         stack.bools.push(a);
                     } else {
@@ -660,27 +734,29 @@ impl StackBasedExpression<VariableReference> {
                     stack.ints.push(rounded as i64);
                 }
                 Operation::PowInt => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.ints.push(a.pow(b as u32));
                 }
                 Operation::PowFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.floats.push(a.powf(b));
                 }
                 Operation::Mod => {
-                    let a = stack.ints.pop().unwrap();
                     let b = stack.ints.pop().unwrap();
+                    let a = stack.ints.pop().unwrap();
                     stack.ints.push(a.rem_euclid(b));
                 }
                 Operation::LogFloat => {
-                    let a = stack.floats.pop().unwrap();
                     let b = stack.floats.pop().unwrap();
+                    let a = stack.floats.pop().unwrap();
                     stack.floats.push(a.log(b));
                 }
             }
         }
+
+        stack
     }
 }
 
@@ -700,6 +776,7 @@ impl EvaluationStack {
     }
 }
 
+#[derive(Debug)]
 pub enum Operation<V> {
     PushInt(i64),
     PushFloat(f64),

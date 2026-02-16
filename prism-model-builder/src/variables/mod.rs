@@ -11,9 +11,10 @@ mod variable_details;
 use const_valuations::*;
 use valuation_map::*;
 
+use crate::expressions::stack_based_expressions::StackBasedExpression;
 use crate::variables::variable_details::VariableDetails;
 use crate::{ModelBuildingError, UserProvidedConstValue};
-use prism_model::{Expression, Identifier, Model, VariableRange, VariableReference};
+use prism_model::{Identifier, Model, VariableRange, VariableReference};
 use probabilistic_models::{ContextBuilder, Valuation};
 use std::collections::HashMap;
 
@@ -26,7 +27,13 @@ pub struct ModelVariableInfo<V: Valuation> {
 
 impl<V: Valuation> ModelVariableInfo<V> {
     pub fn new<S: Clone>(
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        model: &Model<
+            (),
+            Identifier<S>,
+            StackBasedExpression<VariableReference>,
+            VariableReference,
+            S,
+        >,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
     ) -> Result<Self, ModelBuildingError> {
         let variables = &model.variable_manager;
@@ -45,7 +52,13 @@ impl<V: Valuation> ModelVariableInfo<V> {
     }
 
     fn prepare_valuation_context<S: Clone>(
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        model: &Model<
+            (),
+            Identifier<S>,
+            StackBasedExpression<VariableReference>,
+            VariableReference,
+            S,
+        >,
         valuation_map: &ValuationMap,
         details: &VariableDetails,
     ) -> V::ContextType {

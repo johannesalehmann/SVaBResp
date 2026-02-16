@@ -123,6 +123,97 @@ impl<V, S: Clone> Expression<V, S> {
         }
     }
 }
+
+impl<V> Expression<V, ()> {
+    pub fn int(val: i64) -> Self {
+        Expression::Int(val, ())
+    }
+    pub fn float(val: f64) -> Self {
+        Expression::Float(val, ())
+    }
+    pub fn bool(val: bool) -> Self {
+        Expression::Bool(val, ())
+    }
+    pub fn var_or_const(id: V) -> Self {
+        Expression::VarOrConst(id, ())
+    }
+    pub fn label(id: V) -> Self {
+        Expression::Label(id, ())
+    }
+
+    pub fn function<A: Into<Vec<Self>>>(identifier: Identifier<()>, args: A) -> Self {
+        Expression::Function(identifier, args.into(), ())
+    }
+
+    pub fn negate_value(self) -> Self {
+        Expression::Minus(Box::new(self), ())
+    }
+
+    pub fn times(self, other: Self) -> Self {
+        Expression::Multiplication(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn divide_by(self, other: Self) -> Self {
+        Expression::Division(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn plus(self, other: Self) -> Self {
+        Expression::Addition(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn minus(self, other: Self) -> Self {
+        Expression::Subtraction(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn less_than(self, other: Self) -> Self {
+        Expression::LessThan(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn less_or_equal(self, other: Self) -> Self {
+        Expression::LessOrEqual(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn greater_than(self, other: Self) -> Self {
+        Expression::GreaterThan(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn greater_or_equal(self, other: Self) -> Self {
+        Expression::GreaterOrEqual(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn equals_to(self, other: Self) -> Self {
+        Expression::Equals(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn not_equals_to(self, other: Self) -> Self {
+        Expression::NotEquals(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn negate_bool(self) -> Self {
+        Expression::Negation(Box::new(self), ())
+    }
+
+    pub fn and(self, other: Self) -> Self {
+        Expression::Conjunction(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn or(self, other: Self) -> Self {
+        Expression::Disjunction(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn if_and_only_if(self, other: Self) -> Self {
+        Expression::IfAndOnlyIf(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn implies(self, other: Self) -> Self {
+        Expression::Implies(Box::new(self), Box::new(other), ())
+    }
+
+    pub fn ternary(self, branch_1: Self, branch_2: Self) -> Self {
+        Expression::Ternary(Box::new(self), Box::new(branch_1), Box::new(branch_2), ())
+    }
+}
+
 impl<S: Clone> Expression<Identifier<S>, S> {
     pub fn substitute_labels(
         &mut self,

@@ -1,7 +1,7 @@
 use crate::VariableRange;
 
 impl<AM: Default, A, E, V, S: Clone> super::Model<AM, A, E, V, S> {
-    pub fn transform_expression<F: Fn(&mut E)>(&mut self, f: F) {
+    pub fn map_expressions<F: Fn(&mut E)>(&mut self, f: F) {
         for variable in &mut self.variable_manager.variables {
             match &mut variable.range {
                 VariableRange::BoundedInt { min, max, .. } => {

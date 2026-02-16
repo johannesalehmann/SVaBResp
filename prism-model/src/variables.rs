@@ -232,7 +232,7 @@ impl<V, S: Clone> VariableInfo<Expression<V, S>, S> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum VariableRange<E, S: Clone> {
     BoundedInt { min: E, max: E, span: S },
     UnboundedInt { span: S },

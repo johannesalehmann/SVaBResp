@@ -3,45 +3,50 @@ mod model_in_progress;
 mod synchronised_actions;
 mod variables;
 
+use crate::expressions::stack_based_expressions::StackBasedExpression;
 use crate::expressions::{Evaluator, TreeWalkingEvaluator, ValuationSource, VariableType};
 use crate::model_in_progress::ModelInProgress;
 use crate::synchronised_actions::{SynchronisedAction, SynchronisedActions};
 use crate::variables::{ConstAndVarValuationSource, ModelVariableInfo};
-use log::info;
 use prism_model::{
     Command, Expression, Identifier, Model, Update, VariableManager, VariableRange,
     VariableReference,
 };
 use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
 use probabilistic_models::{
-    Action, AtomicProposition, AtomicPropositions, Builder, Distribution, MdpType, ModelTypes,
+    Action, AtomicProposition, AtomicPropositions, Builder, Distribution, ModelTypes,
     PredecessorsBuilder, ProbabilisticModel, Successor, Valuation, ValuationBuilder,
 };
 use probabilistic_models::{DistributionBuilder, Predecessor};
 use std::collections::HashMap;
 
-pub fn build_model<S: Clone, M: ModelTypes>(
-    model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
-    atomic_propositions: &[Expression<VariableReference, S>],
-    user_provided_consts: &HashMap<String, UserProvidedConstValue>,
-) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
-    ExplicitModelBuilder::<M>::run(model, atomic_propositions, user_provided_consts)
-}
-pub fn build_properties<
+pub fn build_model<
     S: Clone,
+    M: ModelTypes,
     I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
 >(
     model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+    atomic_propositions: &[Expression<VariableReference, S>],
     properties: I,
     user_provided_consts: &HashMap<String, UserProvidedConstValue>,
-) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
-    ExplicitModelBuilder::<MdpType>::build_property(model, properties, user_provided_consts)
+) -> Result<ModelBuildingOutput<M>, ModelBuildingError> {
+    ExplicitModelBuilder::<M>::build_model(
+        model,
+        atomic_propositions,
+        properties,
+        user_provided_consts,
+    )
 }
 
 pub enum UserProvidedConstValue {
     Int(i64),
     Bool(bool),
     Float(f64),
+}
+
+pub struct ModelBuildingOutput<M: ModelTypes> {
+    pub model: ProbabilisticModel<M>,
+    pub properties: Vec<Property<AtomicProposition, f64>>,
 }
 
 pub struct ExplicitModelBuilder<M: ModelTypes> {
@@ -51,17 +56,13 @@ pub struct ExplicitModelBuilder<M: ModelTypes> {
 }
 
 impl<M: ModelTypes> ExplicitModelBuilder<M> {
-    pub fn build_property<
+    fn build_properties<
         S: Clone,
         I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
     >(
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         properties: I,
-        user_provided_consts: &HashMap<String, UserProvidedConstValue>,
+        variable_info: &variables::ModelVariableInfo<M::Valuation>,
     ) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
-        let variable_info: variables::ModelVariableInfo<M::Valuation> =
-            variables::ModelVariableInfo::new(model, user_provided_consts)?;
-
         let const_valuation_source = variable_info.get_const_only_valuation_source();
 
         let mut result = Vec::new();
@@ -84,15 +85,25 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         Ok(result)
     }
 
-    pub fn run<S: Clone>(
+    pub fn build_model<
+        S: Clone,
+        I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
+    >(
         model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],
+        properties: I,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
-    ) -> Result<ProbabilisticModel<M>, ModelBuildingError> {
+    ) -> Result<ModelBuildingOutput<M>, ModelBuildingError> {
         let start_time = std::time::Instant::now();
-        let variable_info = variables::ModelVariableInfo::new(model, user_provided_consts)?;
+        let model = model.map_expressions_cloned(|e| {
+            StackBasedExpression::from_expression(e, &model.variable_manager)
+        });
 
-        let synchronised_actions = SynchronisedActions::from_prism(model);
+        let variable_info = variables::ModelVariableInfo::new(&model, user_provided_consts)?;
+
+        let properties = Self::build_properties(properties, &variable_info)?;
+
+        let synchronised_actions = SynchronisedActions::from_prism(&model);
 
         let mut builder = Self {
             model_in_progress: ModelInProgress::new(atomic_propositions.len()),
@@ -100,22 +111,22 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             variable_info,
         };
 
-        builder.create_initial_states(model)?;
+        builder.create_initial_states(&model)?;
 
         while let Some(state) = builder.open_states.pop() {
             builder.process_state(state, &model, atomic_propositions, &synchronised_actions)?;
         }
 
-        let result = builder
+        let model = builder
             .model_in_progress
             .into_model(builder.variable_info.valuation_context);
 
-        info!(
+        println!(
             "Model built in {:?} ({} states)",
             start_time.elapsed(),
-            result.states.len()
+            model.states.len()
         );
-        Ok(result)
+        Ok(ModelBuildingOutput { model, properties })
     }
 
     fn get_or_add_state(&mut self, valuation: M::Valuation) -> usize {
@@ -133,7 +144,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
     fn process_state<S: Clone>(
         &mut self,
         state: usize,
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        model: &Model<
+            (),
+            Identifier<S>,
+            StackBasedExpression<VariableReference>,
+            VariableReference,
+            S,
+        >,
         atomic_propositions: &[Expression<VariableReference, S>],
         synchronised_actions: &SynchronisedActions,
     ) -> Result<(), ModelBuildingError> {
@@ -147,14 +164,14 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                 if command.action.is_some() {
                     continue; // Synchronising actions are handled separately
                 }
-                self.process_nonsynchronised_command(state, &model, &mut action_index, &command);
+                self.process_nonsynchronised_command(state, model, &mut action_index, &command);
             }
         }
 
         for synchronised_action in synchronised_actions {
             self.process_synchronising_action(
                 state,
-                &model,
+                model,
                 &mut action_index,
                 &synchronised_action,
             );
@@ -166,13 +183,24 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
     fn process_nonsynchronised_command<S: Clone>(
         &mut self,
         state: usize,
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        model: &Model<
+            (),
+            Identifier<S>,
+            StackBasedExpression<VariableReference>,
+            VariableReference,
+            S,
+        >,
         action_index: &mut usize,
-        command: &Command<Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        command: &Command<
+            Identifier<S>,
+            StackBasedExpression<VariableReference>,
+            VariableReference,
+            S,
+        >,
     ) {
         let valuation = &self.model_in_progress.get_state(state).valuation;
         let val_source = self.variable_info.get_valuation_source(valuation);
-        let guard = TreeWalkingEvaluator::new().evaluate_as_bool(&command.guard, &val_source);
+        let guard = command.guard.evaluate_as_bool(&val_source);
         if guard {
             let mut distribution = <M::Distribution as Distribution>::get_builder();
 
@@ -181,8 +209,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                 let val_source = self.variable_info.get_valuation_source(valuation);
 
                 let update = &command.updates[update_index];
-                let probability =
-                    TreeWalkingEvaluator::new().evaluate_as_float(&update.probability, &val_source);
+                let probability = update.probability.evaluate_as_float(&val_source);
                 let new_valuation = self.apply_assignments(
                     &model.variable_manager,
                     valuation,
@@ -228,9 +255,15 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
     fn process_synchronising_action<S: Clone>(
         &mut self,
         state: usize,
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        model: &Model<
+            (),
+            Identifier<S>,
+            StackBasedExpression<VariableReference>,
+            VariableReference,
+            S,
+        >,
         action_index: &mut usize,
-        synchronised_action: &&SynchronisedAction,
+        synchronised_action: &SynchronisedAction,
     ) {
         let action_name_index = self
             .model_in_progress
@@ -246,8 +279,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             let mut module_info = Vec::new();
             for &command_index in &action_module.command_indices {
                 let command = &module.commands[command_index];
-                let guard =
-                    TreeWalkingEvaluator::new().evaluate_as_bool(&command.guard, &val_source);
+                let guard = command.guard.evaluate_as_bool(&val_source);
                 if guard {
                     module_info.push(command_index);
                 }
@@ -310,8 +342,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                             [command_indices[i]];
                         if command.updates.len() > 0 {
                             let ith_expression = &command.updates[update_indices[i]].probability;
-                            let ith_probability = TreeWalkingEvaluator::new()
-                                .evaluate_as_float(ith_expression, &val_source);
+                            let ith_probability = ith_expression.evaluate_as_float(&val_source);
                             probability *= ith_probability;
                         }
                     }
@@ -389,10 +420,10 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
 
     fn apply_assignments<S: Clone>(
         &self,
-        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
+        variable_manager: &VariableManager<StackBasedExpression<VariableReference>, S>,
         valuation: &<M as ModelTypes>::Valuation,
         val_source: &ConstAndVarValuationSource<<M as ModelTypes>::Valuation>,
-        updates: &[&Update<Expression<VariableReference, S>, VariableReference, S>],
+        updates: &[&Update<StackBasedExpression<VariableReference>, VariableReference, S>],
     ) -> <M as ModelTypes>::Valuation {
         let mut new_valuation = valuation.clone();
         for update in updates {
@@ -405,8 +436,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                     .expect("Cannot assign to constant");
                 match target.range {
                     VariableRange::BoundedInt { .. } => {
-                        let value = TreeWalkingEvaluator::new()
-                            .evaluate_as_int(&assignment.value, &val_source);
+                        let value = assignment.value.evaluate_as_int(&val_source);
                         let (min, max) = self.variable_info.details[target_index].bounds.unwrap();
                         if value < min || value > max {
                             panic!(
@@ -418,18 +448,15 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                         }
                     }
                     VariableRange::UnboundedInt { .. } => {
-                        let value = TreeWalkingEvaluator::new()
-                            .evaluate_as_int(&assignment.value, &val_source);
+                        let value = assignment.value.evaluate_as_int(&val_source);
                         new_valuation.set_unbounded_int(target_index, value);
                     }
                     VariableRange::Boolean { .. } => {
-                        let value = TreeWalkingEvaluator::new()
-                            .evaluate_as_bool(&assignment.value, &val_source);
+                        let value = assignment.value.evaluate_as_bool(&val_source);
                         new_valuation.set_bool(target_index, value);
                     }
                     VariableRange::Float { .. } => {
-                        let value = TreeWalkingEvaluator::new()
-                            .evaluate_as_float(&assignment.value, &val_source);
+                        let value = assignment.value.evaluate_as_float(&val_source);
                         new_valuation.set_float(target_index, value);
                     }
                 }
@@ -440,7 +467,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
 
     fn create_initial_states<S: Clone>(
         &mut self,
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        model: &Model<
+            (),
+            Identifier<S>,
+            StackBasedExpression<VariableReference>,
+            VariableReference,
+            S,
+        >,
     ) -> Result<(), ModelBuildingError> {
         if model.init_constraint.is_some() {
             panic!("Init constraints are not yet supported by the model builder");
@@ -462,16 +495,14 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                             }
                         }
                         Some(initial) => {
-                            let value = TreeWalkingEvaluator::new()
-                                .evaluate_as_int(initial, &const_value_source);
+                            let value = initial.evaluate_as_int(&const_value_source);
                             valuation_builder.add_bounded_int(value);
                         }
                     },
                     VariableRange::UnboundedInt { .. } => match &variable.initial_value {
                         None => panic!("Unbounded int must have init expression"),
                         Some(initial) => {
-                            let value = TreeWalkingEvaluator::new()
-                                .evaluate_as_int(initial, &const_value_source);
+                            let value = initial.evaluate_as_int(&const_value_source);
                             valuation_builder.add_int(value);
                         }
                     },
@@ -480,8 +511,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                             valuation_builder.add_bool(false);
                         }
                         Some(initial) => {
-                            let value = TreeWalkingEvaluator::new()
-                                .evaluate_as_bool(initial, &const_value_source);
+                            let value = initial.evaluate_as_bool(&const_value_source);
                             valuation_builder.add_bool(value);
                         }
                     },
@@ -492,8 +522,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                             )
                         }
                         Some(initial) => {
-                            let value = TreeWalkingEvaluator::new()
-                                .evaluate_as_float(initial, &const_value_source);
+                            let value = initial.evaluate_as_float(&const_value_source);
                             valuation_builder.add_float(value);
                         }
                     },

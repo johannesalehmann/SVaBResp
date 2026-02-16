@@ -38,11 +38,15 @@ fn checker() -> Result<(), ModelCheckerError> {
         &mut atomic_propositions,
         properties,
     );
-    let properties =
-        prism_model_builder::build_properties(&prism_model, properties.into_iter(), &constants)?;
+    let builder_output = prism_model_builder::build_model(
+        &prism_model,
+        &atomic_propositions[..],
+        properties.into_iter(),
+        &constants,
+    )?;
+    let model = builder_output.model;
+    let properties = builder_output.properties;
 
-    let model =
-        prism_model_builder::build_model(&prism_model, &atomic_propositions[..], &constants)?;
     for (i, property) in properties.iter().enumerate() {
         println!("Checking property {} of {}", i + 1, properties.len());
         tiny_pmc::checking::check(&model, property);

@@ -1,11 +1,14 @@
-use prism_model::{Expression, VariableManager, VariableReference};
+use crate::expressions::stack_based_expressions::StackBasedExpression;
+use prism_model::{VariableManager, VariableReference};
 
 pub struct ValuationMap {
     entries: Vec<ValuationMapEntry>,
 }
 
 impl ValuationMap {
-    pub fn new<S: Clone>(variables: &VariableManager<Expression<VariableReference, S>, S>) -> Self {
+    pub fn new<S: Clone>(
+        variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
+    ) -> Self {
         let mut entries = Vec::new();
 
         let mut variables_count = 0;

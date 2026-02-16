@@ -1,7 +1,8 @@
 mod formula_substitution;
 
-mod expression_map;
-mod expression_operation;
+mod map_expression_cloned;
+mod map_expression_into;
+mod map_expressions;
 mod renamed_module_expansion;
 mod variable_indexing;
 

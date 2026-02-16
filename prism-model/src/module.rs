@@ -125,6 +125,7 @@ impl<'a, 'b, A: Display, E: Display, V: Display, S: Clone> Display
     }
 }
 
+#[derive(Clone)]
 pub struct RenamedModule<S: Clone> {
     pub old_name: Identifier<S>,
     pub new_name: Identifier<S>,
@@ -179,6 +180,7 @@ impl<S: Clone> Display for RenamedModule<S> {
     }
 }
 
+#[derive(Clone)]
 pub struct RenameRules<S: Clone> {
     pub rules: Vec<RenameRule<S>>,
 }
@@ -198,6 +200,7 @@ impl<S: Clone> RenameRules<S> {
     }
 }
 
+#[derive(Clone)]
 pub struct RenameRule<S: Clone> {
     pub old_name: Identifier<S>,
     pub new_name: Identifier<S>,

@@ -93,6 +93,7 @@ impl<A: Display, E: Display, S: Clone> Display for Rewards<A, E, S> {
     }
 }
 
+#[derive(Clone)]
 pub enum RewardsTarget<A> {
     State,
     Action(Option<A>),

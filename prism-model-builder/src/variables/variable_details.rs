@@ -1,7 +1,8 @@
-use crate::expressions::{Evaluator, TreeWalkingEvaluator, VariableType};
+use crate::expressions::VariableType;
+use crate::expressions::stack_based_expressions::StackBasedExpression;
 use crate::variables::const_valuations::ConstValuations;
 use crate::variables::valuation_map::{ValuationMap, ValuationMapEntry};
-use prism_model::{Expression, VariableManager, VariableReference};
+use prism_model::{VariableManager, VariableReference};
 
 pub struct VariableDetail {
     pub bounds: Option<(i64, i64)>,
@@ -13,7 +14,7 @@ pub struct VariableDetails {
 }
 impl VariableDetails {
     pub fn new<S: Clone>(
-        variables: &VariableManager<Expression<VariableReference, S>, S>,
+        variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
         valuation_map: &ValuationMap,
         const_values: &ConstValuations,
     ) -> Self {
@@ -24,10 +25,8 @@ impl VariableDetails {
             if let ValuationMapEntry::Var(_) = valuation_map[i] {
                 let bounds = match &variable.range {
                     prism_model::VariableRange::BoundedInt { min, max, .. } => {
-                        let min = TreeWalkingEvaluator::create()
-                            .evaluate_as_int(min, &const_value_source);
-                        let max = TreeWalkingEvaluator::create()
-                            .evaluate_as_int(max, &const_value_source);
+                        let min = min.evaluate_as_int(&const_value_source);
+                        let max = max.evaluate_as_int(&const_value_source);
                         Some((min, max))
                     }
                     _ => None,
