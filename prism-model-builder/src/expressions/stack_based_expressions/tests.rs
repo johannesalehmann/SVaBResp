@@ -33,7 +33,7 @@ impl ValuationSource for MockValueSource {
 
 #[test]
 fn const_int() {
-    let expr = StackBasedExpression::from_expression(
+    let expr = StackBasedExpression::from_expression::<_, ()>(
         &Expression::int(12).minus(Expression::float(3.4)),
         &VariableManager::new(),
     );

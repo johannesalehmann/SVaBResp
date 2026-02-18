@@ -37,9 +37,9 @@ impl<V> StackBasedExpression<V> {
 }
 
 impl StackBasedExpression<VariableReference> {
-    pub fn from_expression<S: Clone>(
+    pub fn from_expression<S: Clone, E>(
         expression: &Expression<VariableReference, S>,
-        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
+        variable_manager: &VariableManager<E, S>,
     ) -> Self {
         let mut operations = Vec::new();
         let expression_type =
@@ -51,10 +51,10 @@ impl StackBasedExpression<VariableReference> {
         }
     }
 
-    fn process_expression<S: Clone>(
+    fn process_expression<S: Clone, E>(
         expression: &Expression<VariableReference, S>,
         operations: &mut Vec<Operation<VariableReference>>,
-        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
+        variable_manager: &VariableManager<E, S>,
     ) -> ExpressionType {
         match expression {
             Expression::Int(i, _) => {
@@ -409,7 +409,7 @@ impl StackBasedExpression<VariableReference> {
         }
     }
 
-    fn int_or_float_operation<S: Clone>(
+    fn int_or_float_operation<S: Clone, E>(
         arg1: &Expression<VariableReference, S>,
         arg2: &Expression<VariableReference, S>,
         int_operation: Operation<VariableReference>,
@@ -417,7 +417,7 @@ impl StackBasedExpression<VariableReference> {
         int_type: ExpressionType,
         float_type: ExpressionType,
         operations: &mut Vec<Operation<VariableReference>>,
-        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
+        variable_manager: &VariableManager<E, S>,
     ) -> ExpressionType {
         let mut ops2 = Vec::new();
         let type1 = Self::process_expression(arg1, operations, variable_manager);
@@ -441,7 +441,7 @@ impl StackBasedExpression<VariableReference> {
         }
     }
 
-    fn int_float_or_bool_operation<S: Clone>(
+    fn int_float_or_bool_operation<S: Clone, E>(
         arg1: &Expression<VariableReference, S>,
         arg2: &Expression<VariableReference, S>,
         int_operation: Operation<VariableReference>,
@@ -451,7 +451,7 @@ impl StackBasedExpression<VariableReference> {
         float_type: ExpressionType,
         bool_type: ExpressionType,
         operations: &mut Vec<Operation<VariableReference>>,
-        variable_manager: &VariableManager<Expression<VariableReference, S>, S>,
+        variable_manager: &VariableManager<E, S>,
     ) -> ExpressionType {
         let mut ops2 = Vec::new();
         let type1 = Self::process_expression(arg1, operations, variable_manager);

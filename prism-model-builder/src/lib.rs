@@ -149,12 +149,23 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
     ) -> Result<ModelBuildingOutput<M>, ModelBuildingError> {
         let start_time = std::time::Instant::now();
+
         let mut sub_expression_manager = SubExpressionManager::new();
         let model = model.map_expressions_cloned(|e| {
             let stack = StackBasedExpression::from_expression(e, &model.variable_manager);
             let sub_expression = sub_expression_manager.add_sub_expression(stack);
             sub_expression
         });
+
+        let atomic_propositions = atomic_propositions
+            .iter()
+            .map(|ap| {
+                let stack = StackBasedExpression::from_expression(ap, &model.variable_manager);
+                let sub_expression = sub_expression_manager.add_sub_expression(stack);
+                sub_expression
+            })
+            .collect::<Vec<_>>();
+
         let sub_expression_cache = SubExpressionManagerWithCache::new(sub_expression_manager);
         let context = sub_expression_cache.create_context();
         let mut expression_context = ExpressionContext {
@@ -185,7 +196,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             builder.process_state(
                 state,
                 &model,
-                atomic_propositions,
+                &atomic_propositions,
                 &synchronised_actions,
                 &mut expression_context,
             )?;
@@ -225,7 +236,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             VariableReference,
             S,
         >,
-        atomic_propositions: &[Expression<VariableReference, S>],
+        atomic_propositions: &[StackBasedExpression<VariableReference>],
         synchronised_actions: &SynchronisedActions,
         expression_context: &mut ExpressionContext<SE>,
     ) -> Result<(), ModelBuildingError> {
@@ -496,18 +507,17 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn evaluate_atomic_propositions<S: Clone, SE: SubExpressionProvider>(
+    fn evaluate_atomic_propositions<SE: SubExpressionProvider>(
         &mut self,
         state_index: usize,
-        atomic_propositions: &[Expression<VariableReference, S>],
+        atomic_propositions: &[StackBasedExpression<VariableReference>],
         expression_context: &mut ExpressionContext<SE>,
     ) {
         // TODO: Switch to stack-based expressions
         let state = &mut self.model_in_progress.get_state_mut(state_index);
         let val_source = self.variable_info.get_valuation_source(&state.valuation);
         for (i, atomic_proposition) in atomic_propositions.iter().enumerate() {
-            let is_true =
-                TreeWalkingEvaluator::new().evaluate_as_bool(&atomic_proposition, &val_source);
+            let is_true = expression_context.evaluate_bool(atomic_proposition, &val_source);
             state.atomic_propositions.set_value(i, is_true);
         }
     }
