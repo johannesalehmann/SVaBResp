@@ -1,6 +1,6 @@
-use crate::UserProvidedConstValue;
 use crate::expressions::ValuationSource;
-use crate::expressions::stack_based_expressions::StackBasedExpression;
+use crate::expressions::stack_based_expressions::{StackBasedExpression, SubExpressionProvider};
+use crate::{ExpressionContext, UserProvidedConstValue};
 use prism_model::{VariableManager, VariableReference};
 use std::collections::HashMap;
 
@@ -9,9 +9,10 @@ pub struct ConstValuations {
 }
 
 impl ConstValuations {
-    pub fn new<S: Clone>(
+    pub fn new<S: Clone, SE: SubExpressionProvider>(
         variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
+        expression_context: &mut ExpressionContext<SE>,
     ) -> Self {
         let mut valuations = Vec::new();
         for var in &variables.variables {
@@ -20,21 +21,28 @@ impl ConstValuations {
                     variables,
                     user_provided_consts,
                     &var,
+                    expression_context,
                 ));
             }
         }
         Self { valuations }
     }
 
-    fn compute_initial_const_value<S: Clone>(
+    fn compute_initial_const_value<S: Clone, SE: SubExpressionProvider>(
         variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
         var: &prism_model::VariableInfo<StackBasedExpression<VariableReference>, S>,
+        expression_context: &mut ExpressionContext<SE>,
     ) -> ConstValuation {
         if let Some(value) = user_provided_consts.get(&var.name.name) {
             Self::process_user_initial_value(&var, value)
         } else {
-            Self::evaluate_initial_expression(variables, user_provided_consts, var)
+            Self::evaluate_initial_expression(
+                variables,
+                user_provided_consts,
+                var,
+                expression_context,
+            )
         }
     }
 
@@ -60,10 +68,11 @@ impl ConstValuations {
         }
     }
 
-    fn evaluate_initial_expression<S: Clone>(
+    fn evaluate_initial_expression<S: Clone, SE: SubExpressionProvider>(
         variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
         var: &prism_model::VariableInfo<StackBasedExpression<VariableReference>, S>,
+        expression_context: &mut ExpressionContext<SE>,
     ) -> ConstValuation {
         let value_source = ConstRecursiveEvaluator::new(variables, user_provided_consts);
         let initial = var
@@ -73,13 +82,13 @@ impl ConstValuations {
         use crate::VariableRange;
         match var.range {
             VariableRange::BoundedInt { .. } | VariableRange::UnboundedInt { .. } => {
-                ConstValuation::Int(initial.evaluate_as_int(&value_source))
+                ConstValuation::Int(expression_context.evaluate_int(initial, &value_source))
             }
             VariableRange::Boolean { .. } => {
-                ConstValuation::Bool(initial.evaluate_as_bool(&value_source))
+                ConstValuation::Bool(expression_context.evaluate_bool(initial, &value_source))
             }
             VariableRange::Float { .. } => {
-                ConstValuation::Float(initial.evaluate_as_float(&value_source))
+                ConstValuation::Float(expression_context.evaluate_float(initial, &value_source))
             }
         }
     }

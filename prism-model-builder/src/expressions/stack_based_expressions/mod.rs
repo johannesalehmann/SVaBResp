@@ -1,11 +1,19 @@
+mod sub_expression_cache;
+
+mod sub_expression_manager;
+pub use sub_expression_manager::{
+    SubExpressionManager, SubExpressionManagerWithCache, SubExpressionProvider,
+};
+
 #[cfg(test)]
 mod tests;
 
 use crate::expressions::ValuationSource;
+use crate::expressions::stack_based_expressions::sub_expression_manager::EmptySubexpressionProvider;
 use prism_model::{Expression, VariableManager, VariableRange, VariableReference};
 
-#[derive(PartialEq, Debug)]
-enum ExpressionType {
+#[derive(PartialEq, Debug, Copy, Clone)]
+pub enum ExpressionType {
     Int,
     Bool,
     Float,
@@ -14,6 +22,18 @@ enum ExpressionType {
 pub struct StackBasedExpression<V> {
     operations: Vec<Operation<V>>,
     expression_type: ExpressionType,
+}
+
+impl<V> StackBasedExpression<V> {
+    pub fn with_sub_expression(
+        sub_expression_index: usize,
+        expression_type: ExpressionType,
+    ) -> Self {
+        Self {
+            operations: vec![Operation::SubExpression(sub_expression_index)],
+            expression_type,
+        }
+    }
 }
 
 impl StackBasedExpression<VariableReference> {
@@ -462,6 +482,41 @@ impl StackBasedExpression<VariableReference> {
 
     pub fn evaluate_as_int<VS: ValuationSource>(&self, valuations: &VS) -> i64 {
         let stack = self.evaluate(valuations);
+        self.extract_int_from_stack(&stack)
+    }
+    pub fn evaluate_as_int_with_stack<VS: ValuationSource>(
+        &self,
+        valuations: &VS,
+        stack: &mut EvaluationStack,
+    ) -> i64 {
+        stack.clear();
+        self.evaluate_with_stack(valuations, stack);
+        self.extract_int_from_stack(stack)
+    }
+    pub fn evaluate_as_int_with_sub_expressions<VS: ValuationSource, SE: SubExpressionProvider>(
+        &self,
+        valuations: &VS,
+        sub_expressions: &SE,
+    ) -> i64 {
+        let stack = self.evaluate_with_sub_expressions(valuations, sub_expressions);
+        self.extract_int_from_stack(&stack)
+    }
+    pub fn evaluate_as_int_with_stack_and_sub_expressions<
+        VS: ValuationSource,
+        SE: SubExpressionProvider,
+    >(
+        &self,
+        valuations: &VS,
+        sub_expressions: &SE,
+        stack: &mut EvaluationStack,
+        context: &mut SE::EvaluationContext,
+    ) -> i64 {
+        stack.clear();
+        self.evaluate_with_stack_and_sub_expressions(valuations, sub_expressions, stack, context);
+        self.extract_int_from_stack(stack)
+    }
+
+    fn extract_int_from_stack(&self, stack: &EvaluationStack) -> i64 {
         if self.expression_type == ExpressionType::Int {
             stack.ints[stack.ints.len() - 1]
         } else {
@@ -474,10 +529,48 @@ impl StackBasedExpression<VariableReference> {
 
     pub fn evaluate_as_float<VS: ValuationSource>(&self, valuations: &VS) -> f64 {
         let stack = self.evaluate(valuations);
-        if self.expression_type == ExpressionType::Int {
-            stack.ints[stack.ints.len() - 1] as f64
-        } else if self.expression_type == ExpressionType::Float {
+        self.extract_float_from_stack(&stack)
+    }
+    pub fn evaluate_as_float_with_stack<VS: ValuationSource>(
+        &self,
+        valuations: &VS,
+        stack: &mut EvaluationStack,
+    ) -> f64 {
+        stack.clear();
+        self.evaluate_with_stack(valuations, stack);
+        self.extract_float_from_stack(stack)
+    }
+    pub fn evaluate_as_float_with_sub_expressions<
+        VS: ValuationSource,
+        SE: SubExpressionProvider,
+    >(
+        &self,
+        valuations: &VS,
+        sub_expressions: &SE,
+    ) -> f64 {
+        let stack = self.evaluate_with_sub_expressions(valuations, sub_expressions);
+        self.extract_float_from_stack(&stack)
+    }
+    pub fn evaluate_as_float_with_stack_and_sub_expressions<
+        VS: ValuationSource,
+        SE: SubExpressionProvider,
+    >(
+        &self,
+        valuations: &VS,
+        sub_expressions: &SE,
+        stack: &mut EvaluationStack,
+        context: &mut SE::EvaluationContext,
+    ) -> f64 {
+        stack.clear();
+        self.evaluate_with_stack_and_sub_expressions(valuations, sub_expressions, stack, context);
+        self.extract_float_from_stack(stack)
+    }
+
+    fn extract_float_from_stack(&self, stack: &EvaluationStack) -> f64 {
+        if self.expression_type == ExpressionType::Float {
             stack.floats[stack.floats.len() - 1]
+        } else if self.expression_type == ExpressionType::Int {
+            stack.ints[stack.ints.len() - 1] as f64
         } else {
             panic!(
                 "Cannot evaluate expression of type {:?} as float",
@@ -488,18 +581,98 @@ impl StackBasedExpression<VariableReference> {
 
     pub fn evaluate_as_bool<VS: ValuationSource>(&self, valuations: &VS) -> bool {
         let stack = self.evaluate(valuations);
+        self.extract_bool_from_stack(&stack)
+    }
+    pub fn evaluate_as_bool_with_stack<VS: ValuationSource>(
+        &self,
+        valuations: &VS,
+        stack: &mut EvaluationStack,
+    ) -> bool {
+        stack.clear();
+        self.evaluate_with_stack(valuations, stack);
+        self.extract_bool_from_stack(stack)
+    }
+    pub fn evaluate_as_bool_with_sub_expressions<VS: ValuationSource, SE: SubExpressionProvider>(
+        &self,
+        valuations: &VS,
+        sub_expressions: &SE,
+    ) -> bool {
+        let stack = self.evaluate_with_sub_expressions(valuations, sub_expressions);
+        self.extract_bool_from_stack(&stack)
+    }
+    pub fn evaluate_as_bool_with_stack_and_sub_expressions<
+        VS: ValuationSource,
+        SE: SubExpressionProvider,
+    >(
+        &self,
+        valuations: &VS,
+        sub_expressions: &SE,
+        stack: &mut EvaluationStack,
+        context: &mut SE::EvaluationContext,
+    ) -> bool {
+        stack.clear();
+        self.evaluate_with_stack_and_sub_expressions(valuations, sub_expressions, stack, context);
+        self.extract_bool_from_stack(stack)
+    }
+
+    fn extract_bool_from_stack(&self, stack: &EvaluationStack) -> bool {
         if self.expression_type == ExpressionType::Bool {
             stack.bools[stack.bools.len() - 1]
         } else {
             panic!(
-                "Cannot evaluate expression of type {:?} as int",
+                "Cannot evaluate expression of type {:?} as bool",
                 self.expression_type
             );
         }
     }
 
-    fn evaluate<VS: ValuationSource>(&self, valuations: &VS) -> EvaluationStack {
+    pub fn evaluate<VS: ValuationSource>(&self, valuations: &VS) -> EvaluationStack {
         let mut stack = EvaluationStack::new();
+        self.evaluate_with_stack_and_sub_expressions(
+            valuations,
+            &EmptySubexpressionProvider::new(),
+            &mut stack,
+            &mut (),
+        );
+        stack
+    }
+    pub fn evaluate_with_stack<VS: ValuationSource>(
+        &self,
+        valuations: &VS,
+        stack: &mut EvaluationStack,
+    ) {
+        stack.clear();
+        self.evaluate_with_stack_and_sub_expressions(
+            valuations,
+            &EmptySubexpressionProvider::new(),
+            stack,
+            &mut (),
+        )
+    }
+
+    fn evaluate_with_sub_expressions<VS: ValuationSource, SE: SubExpressionProvider>(
+        &self,
+        valuations: &VS,
+        sub_expressions: &SE,
+    ) -> EvaluationStack {
+        let mut stack = EvaluationStack::new();
+        let mut context = sub_expressions.create_context();
+        self.evaluate_with_stack_and_sub_expressions(
+            valuations,
+            sub_expressions,
+            &mut stack,
+            &mut context,
+        );
+        stack
+    }
+
+    fn evaluate_with_stack_and_sub_expressions<VS: ValuationSource, SE: SubExpressionProvider>(
+        &self,
+        valuations: &VS,
+        sub_expressions: &SE,
+        stack: &mut EvaluationStack,
+        context: &mut SE::EvaluationContext,
+    ) {
         for operation in &self.operations {
             match operation {
                 Operation::PushInt(i) => stack.ints.push(*i),
@@ -753,13 +926,25 @@ impl StackBasedExpression<VariableReference> {
                     let a = stack.floats.pop().unwrap();
                     stack.floats.push(a.log(b));
                 }
+                Operation::SubExpression(index) => {
+                    match sub_expressions.get_sub_expression_type(*index, context) {
+                        ExpressionType::Int => stack
+                            .ints
+                            .push(sub_expressions.evaluate_as_int(*index, valuations, context)),
+                        ExpressionType::Bool => stack
+                            .bools
+                            .push(sub_expressions.evaluate_as_bool(*index, valuations, context)),
+                        ExpressionType::Float => stack
+                            .floats
+                            .push(sub_expressions.evaluate_as_float(*index, valuations, context)),
+                    }
+                }
             }
         }
-
-        stack
     }
 }
 
+#[derive(Clone)]
 pub struct EvaluationStack {
     ints: Vec<i64>,
     floats: Vec<f64>,
@@ -773,6 +958,16 @@ impl EvaluationStack {
             floats: Vec::new(),
             bools: Vec::new(),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.ints.clear();
+        self.floats.clear();
+        self.bools.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ints.is_empty() && self.floats.is_empty() && self.bools.is_empty()
     }
 }
 
@@ -834,4 +1029,6 @@ pub enum Operation<V> {
     PowFloat,
     Mod,
     LogFloat,
+
+    SubExpression(usize),
 }

@@ -11,9 +11,9 @@ mod variable_details;
 use const_valuations::*;
 use valuation_map::*;
 
-use crate::expressions::stack_based_expressions::StackBasedExpression;
+use crate::expressions::stack_based_expressions::{StackBasedExpression, SubExpressionProvider};
 use crate::variables::variable_details::VariableDetails;
-use crate::{ModelBuildingError, UserProvidedConstValue};
+use crate::{ExpressionContext, ModelBuildingError, UserProvidedConstValue};
 use prism_model::{Identifier, Model, VariableRange, VariableReference};
 use probabilistic_models::{ContextBuilder, Valuation};
 use std::collections::HashMap;
@@ -26,7 +26,7 @@ pub struct ModelVariableInfo<V: Valuation> {
 }
 
 impl<V: Valuation> ModelVariableInfo<V> {
-    pub fn new<S: Clone>(
+    pub fn new<S: Clone, SE: SubExpressionProvider>(
         model: &Model<
             (),
             Identifier<S>,
@@ -35,12 +35,19 @@ impl<V: Valuation> ModelVariableInfo<V> {
             S,
         >,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
+        expression_context: &mut ExpressionContext<SE>,
     ) -> Result<Self, ModelBuildingError> {
         let variables = &model.variable_manager;
 
         let valuation_map = ValuationMap::new(variables);
-        let const_valuations = ConstValuations::new(variables, user_provided_consts);
-        let details = VariableDetails::new(variables, &valuation_map, &const_valuations);
+        let const_valuations =
+            ConstValuations::new(variables, user_provided_consts, expression_context);
+        let details = VariableDetails::new(
+            variables,
+            &valuation_map,
+            &const_valuations,
+            expression_context,
+        );
         let valuation_context = Self::prepare_valuation_context(model, &valuation_map, &details);
 
         Ok(Self {

@@ -3,7 +3,10 @@ mod model_in_progress;
 mod synchronised_actions;
 mod variables;
 
-use crate::expressions::stack_based_expressions::StackBasedExpression;
+use crate::expressions::stack_based_expressions::{
+    EvaluationStack, StackBasedExpression, SubExpressionManager, SubExpressionManagerWithCache,
+    SubExpressionProvider,
+};
 use crate::expressions::{Evaluator, TreeWalkingEvaluator, ValuationSource, VariableType};
 use crate::model_in_progress::ModelInProgress;
 use crate::synchronised_actions::{SynchronisedAction, SynchronisedActions};
@@ -47,6 +50,57 @@ pub enum UserProvidedConstValue {
 pub struct ModelBuildingOutput<M: ModelTypes> {
     pub model: ProbabilisticModel<M>,
     pub properties: Vec<Property<AtomicProposition, f64>>,
+}
+
+pub struct ExpressionContext<'a, SE: SubExpressionProvider> {
+    sub_expressions: &'a SE,
+    stack: EvaluationStack,
+    context: SE::EvaluationContext,
+}
+
+impl<'a, SE: SubExpressionProvider> ExpressionContext<'a, SE> {
+    pub fn reset_context(&mut self) {
+        self.sub_expressions.reset_context(&mut self.context);
+    }
+
+    pub fn evaluate_int<V: ValuationSource>(
+        &mut self,
+        expression: &StackBasedExpression<VariableReference>,
+        valuations: &V,
+    ) -> i64 {
+        expression.evaluate_as_int_with_stack_and_sub_expressions(
+            valuations,
+            self.sub_expressions,
+            &mut self.stack,
+            &mut self.context,
+        )
+    }
+
+    pub fn evaluate_float<V: ValuationSource>(
+        &mut self,
+        expression: &StackBasedExpression<VariableReference>,
+        valuations: &V,
+    ) -> f64 {
+        expression.evaluate_as_float_with_stack_and_sub_expressions(
+            valuations,
+            self.sub_expressions,
+            &mut self.stack,
+            &mut self.context,
+        )
+    }
+
+    pub fn evaluate_bool<V: ValuationSource>(
+        &mut self,
+        expression: &StackBasedExpression<VariableReference>,
+        valuations: &V,
+    ) -> bool {
+        expression.evaluate_as_bool_with_stack_and_sub_expressions(
+            valuations,
+            self.sub_expressions,
+            &mut self.stack,
+            &mut self.context,
+        )
+    }
 }
 
 pub struct ExplicitModelBuilder<M: ModelTypes> {
@@ -95,11 +149,25 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
     ) -> Result<ModelBuildingOutput<M>, ModelBuildingError> {
         let start_time = std::time::Instant::now();
+        let mut sub_expression_manager = SubExpressionManager::new();
         let model = model.map_expressions_cloned(|e| {
-            StackBasedExpression::from_expression(e, &model.variable_manager)
+            let stack = StackBasedExpression::from_expression(e, &model.variable_manager);
+            let sub_expression = sub_expression_manager.add_sub_expression(stack);
+            sub_expression
         });
+        let sub_expression_cache = SubExpressionManagerWithCache::new(sub_expression_manager);
+        let context = sub_expression_cache.create_context();
+        let mut expression_context = ExpressionContext {
+            sub_expressions: &sub_expression_cache,
+            stack: EvaluationStack::new(),
+            context,
+        };
 
-        let variable_info = variables::ModelVariableInfo::new(&model, user_provided_consts)?;
+        let variable_info = variables::ModelVariableInfo::new(
+            &model,
+            user_provided_consts,
+            &mut expression_context,
+        )?;
 
         let properties = Self::build_properties(properties, &variable_info)?;
 
@@ -111,10 +179,16 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             variable_info,
         };
 
-        builder.create_initial_states(&model)?;
+        builder.create_initial_states(&model, &mut expression_context)?;
 
         while let Some(state) = builder.open_states.pop() {
-            builder.process_state(state, &model, atomic_propositions, &synchronised_actions)?;
+            builder.process_state(
+                state,
+                &model,
+                atomic_propositions,
+                &synchronised_actions,
+                &mut expression_context,
+            )?;
         }
 
         let model = builder
@@ -141,7 +215,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn process_state<S: Clone>(
+    fn process_state<S: Clone, SE: SubExpressionProvider>(
         &mut self,
         state: usize,
         model: &Model<
@@ -153,8 +227,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         >,
         atomic_propositions: &[Expression<VariableReference, S>],
         synchronised_actions: &SynchronisedActions,
+        expression_context: &mut ExpressionContext<SE>,
     ) -> Result<(), ModelBuildingError> {
-        self.evaluate_atomic_propositions(state, atomic_propositions);
+        expression_context
+            .sub_expressions
+            .reset_context(&mut expression_context.context);
+
+        self.evaluate_atomic_propositions(state, atomic_propositions, expression_context);
 
         let mut action_index = 0;
         for module_index in 0..model.modules.modules.len() {
@@ -164,7 +243,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                 if command.action.is_some() {
                     continue; // Synchronising actions are handled separately
                 }
-                self.process_nonsynchronised_command(state, model, &mut action_index, &command);
+                self.process_nonsynchronised_command(
+                    state,
+                    model,
+                    &mut action_index,
+                    &command,
+                    expression_context,
+                );
             }
         }
 
@@ -174,13 +259,14 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                 model,
                 &mut action_index,
                 &synchronised_action,
+                expression_context,
             );
         }
 
         Ok(())
     }
 
-    fn process_nonsynchronised_command<S: Clone>(
+    fn process_nonsynchronised_command<S: Clone, SE: SubExpressionProvider>(
         &mut self,
         state: usize,
         model: &Model<
@@ -197,10 +283,11 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             VariableReference,
             S,
         >,
+        expression_context: &mut ExpressionContext<SE>,
     ) {
         let valuation = &self.model_in_progress.get_state(state).valuation;
         let val_source = self.variable_info.get_valuation_source(valuation);
-        let guard = command.guard.evaluate_as_bool(&val_source);
+        let guard = expression_context.evaluate_bool(&command.guard, &val_source);
         if guard {
             let mut distribution = <M::Distribution as Distribution>::get_builder();
 
@@ -209,12 +296,14 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                 let val_source = self.variable_info.get_valuation_source(valuation);
 
                 let update = &command.updates[update_index];
-                let probability = update.probability.evaluate_as_float(&val_source);
+                let probability =
+                    expression_context.evaluate_float(&update.probability, &val_source);
                 let new_valuation = self.apply_assignments(
                     &model.variable_manager,
                     valuation,
                     &val_source,
                     &[&update],
+                    expression_context,
                 );
 
                 let index = self.get_or_add_state(new_valuation);
@@ -252,7 +341,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn process_synchronising_action<S: Clone>(
+    fn process_synchronising_action<S: Clone, SE: SubExpressionProvider>(
         &mut self,
         state: usize,
         model: &Model<
@@ -264,6 +353,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         >,
         action_index: &mut usize,
         synchronised_action: &SynchronisedAction,
+        expression_context: &mut ExpressionContext<SE>,
     ) {
         let action_name_index = self
             .model_in_progress
@@ -279,7 +369,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             let mut module_info = Vec::new();
             for &command_index in &action_module.command_indices {
                 let command = &module.commands[command_index];
-                let guard = command.guard.evaluate_as_bool(&val_source);
+                let guard = expression_context.evaluate_bool(&command.guard, &val_source);
                 if guard {
                     module_info.push(command_index);
                 }
@@ -333,6 +423,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                         valuation,
                         &val_source,
                         &updates[..],
+                        expression_context,
                     );
 
                     let mut probability = 1.0;
@@ -342,7 +433,8 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                             [command_indices[i]];
                         if command.updates.len() > 0 {
                             let ith_expression = &command.updates[update_indices[i]].probability;
-                            let ith_probability = ith_expression.evaluate_as_float(&val_source);
+                            let ith_probability =
+                                expression_context.evaluate_float(ith_expression, &val_source);
                             probability *= ith_probability;
                         }
                     }
@@ -404,11 +496,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn evaluate_atomic_propositions<S: Clone>(
+    fn evaluate_atomic_propositions<S: Clone, SE: SubExpressionProvider>(
         &mut self,
         state_index: usize,
         atomic_propositions: &[Expression<VariableReference, S>],
+        expression_context: &mut ExpressionContext<SE>,
     ) {
+        // TODO: Switch to stack-based expressions
         let state = &mut self.model_in_progress.get_state_mut(state_index);
         let val_source = self.variable_info.get_valuation_source(&state.valuation);
         for (i, atomic_proposition) in atomic_propositions.iter().enumerate() {
@@ -418,12 +512,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn apply_assignments<S: Clone>(
+    fn apply_assignments<S: Clone, SE: SubExpressionProvider>(
         &self,
         variable_manager: &VariableManager<StackBasedExpression<VariableReference>, S>,
         valuation: &<M as ModelTypes>::Valuation,
         val_source: &ConstAndVarValuationSource<<M as ModelTypes>::Valuation>,
         updates: &[&Update<StackBasedExpression<VariableReference>, VariableReference, S>],
+        expression_context: &mut ExpressionContext<SE>,
     ) -> <M as ModelTypes>::Valuation {
         let mut new_valuation = valuation.clone();
         for update in updates {
@@ -436,7 +531,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                     .expect("Cannot assign to constant");
                 match target.range {
                     VariableRange::BoundedInt { .. } => {
-                        let value = assignment.value.evaluate_as_int(&val_source);
+                        let value = expression_context.evaluate_int(&assignment.value, &val_source);
                         let (min, max) = self.variable_info.details[target_index].bounds.unwrap();
                         if value < min || value > max {
                             panic!(
@@ -448,15 +543,17 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                         }
                     }
                     VariableRange::UnboundedInt { .. } => {
-                        let value = assignment.value.evaluate_as_int(&val_source);
+                        let value = expression_context.evaluate_int(&assignment.value, &val_source);
                         new_valuation.set_unbounded_int(target_index, value);
                     }
                     VariableRange::Boolean { .. } => {
-                        let value = assignment.value.evaluate_as_bool(&val_source);
+                        let value =
+                            expression_context.evaluate_bool(&assignment.value, &val_source);
                         new_valuation.set_bool(target_index, value);
                     }
                     VariableRange::Float { .. } => {
-                        let value = assignment.value.evaluate_as_float(&val_source);
+                        let value =
+                            expression_context.evaluate_float(&assignment.value, &val_source);
                         new_valuation.set_float(target_index, value);
                     }
                 }
@@ -465,7 +562,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         new_valuation
     }
 
-    fn create_initial_states<S: Clone>(
+    fn create_initial_states<S: Clone, SE: SubExpressionProvider>(
         &mut self,
         model: &Model<
             (),
@@ -474,6 +571,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             VariableReference,
             S,
         >,
+        expression_context: &mut ExpressionContext<SE>,
     ) -> Result<(), ModelBuildingError> {
         if model.init_constraint.is_some() {
             panic!("Init constraints are not yet supported by the model builder");
@@ -495,14 +593,16 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                             }
                         }
                         Some(initial) => {
-                            let value = initial.evaluate_as_int(&const_value_source);
+                            let value =
+                                expression_context.evaluate_int(initial, &const_value_source);
                             valuation_builder.add_bounded_int(value);
                         }
                     },
                     VariableRange::UnboundedInt { .. } => match &variable.initial_value {
                         None => panic!("Unbounded int must have init expression"),
                         Some(initial) => {
-                            let value = initial.evaluate_as_int(&const_value_source);
+                            let value =
+                                expression_context.evaluate_int(initial, &const_value_source);
                             valuation_builder.add_int(value);
                         }
                     },
@@ -511,7 +611,8 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                             valuation_builder.add_bool(false);
                         }
                         Some(initial) => {
-                            let value = initial.evaluate_as_bool(&const_value_source);
+                            let value =
+                                expression_context.evaluate_bool(initial, &const_value_source);
                             valuation_builder.add_bool(value);
                         }
                     },
@@ -522,7 +623,8 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                             )
                         }
                         Some(initial) => {
-                            let value = initial.evaluate_as_float(&const_value_source);
+                            let value =
+                                expression_context.evaluate_float(initial, &const_value_source);
                             valuation_builder.add_float(value);
                         }
                     },
@@ -559,7 +661,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                         print!("{}", valuation.evaluate_bounded_int(index))
                     }
                     VariableRange::UnboundedInt { .. } => {
-                        print!("{}", valuation.evaluate_bounded_int(index))
+                        print!("{}", valuation.evaluate_unbounded_int(index))
                     }
                     VariableRange::Boolean { .. } => {
                         print!("{}", valuation.evaluate_bool(index))

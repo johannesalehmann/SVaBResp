@@ -2,7 +2,7 @@ use probabilistic_models::{
     ActionCollection, AtomicPropositions, Builder, InitialStates, InitialStatesBuilder, ModelTypes,
     Predecessors, PredecessorsBuilder, ProbabilisticModel, State,
 };
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 pub struct StateInProgress<M: ModelTypes> {
     pub valuation: M::Valuation,
@@ -13,12 +13,12 @@ pub struct StateInProgress<M: ModelTypes> {
 
 pub struct ModelInProgress<M: ModelTypes> {
     states: Vec<StateInProgress<M>>,
-    valuation_to_state: HashMap<M::Valuation, usize>,
+    valuation_to_state: FxHashMap<M::Valuation, usize>,
 
     initial_states: Vec<usize>,
 
     action_names: Vec<String>,
-    action_name_indices: HashMap<String, usize>,
+    action_name_indices: FxHashMap<String, usize>,
 
     atomic_proposition_count: usize,
 }
@@ -27,12 +27,12 @@ impl<M: ModelTypes> ModelInProgress<M> {
     pub fn new(atomic_proposition_count: usize) -> Self {
         Self {
             states: Vec::new(),
-            valuation_to_state: HashMap::new(),
+            valuation_to_state: FxHashMap::default(),
 
             initial_states: Vec::new(),
 
             action_names: Vec::new(),
-            action_name_indices: HashMap::new(),
+            action_name_indices: FxHashMap::default(),
 
             atomic_proposition_count,
         }

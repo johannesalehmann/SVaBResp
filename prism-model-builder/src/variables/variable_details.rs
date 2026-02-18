@@ -1,5 +1,6 @@
+use crate::ExpressionContext;
 use crate::expressions::VariableType;
-use crate::expressions::stack_based_expressions::StackBasedExpression;
+use crate::expressions::stack_based_expressions::{StackBasedExpression, SubExpressionProvider};
 use crate::variables::const_valuations::ConstValuations;
 use crate::variables::valuation_map::{ValuationMap, ValuationMapEntry};
 use prism_model::{VariableManager, VariableReference};
@@ -13,10 +14,11 @@ pub struct VariableDetails {
     details: Vec<VariableDetail>,
 }
 impl VariableDetails {
-    pub fn new<S: Clone>(
+    pub fn new<S: Clone, SE: SubExpressionProvider>(
         variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
         valuation_map: &ValuationMap,
         const_values: &ConstValuations,
+        expression_context: &mut ExpressionContext<SE>,
     ) -> Self {
         let mut details = Vec::new();
         let const_value_source = super::ConstOnlyValuationSource::new(valuation_map, const_values);
@@ -25,8 +27,8 @@ impl VariableDetails {
             if let ValuationMapEntry::Var(_) = valuation_map[i] {
                 let bounds = match &variable.range {
                     prism_model::VariableRange::BoundedInt { min, max, .. } => {
-                        let min = min.evaluate_as_int(&const_value_source);
-                        let max = max.evaluate_as_int(&const_value_source);
+                        let min = expression_context.evaluate_int(min, &const_value_source);
+                        let max = expression_context.evaluate_int(max, &const_value_source);
                         Some((min, max))
                     }
                     _ => None,
