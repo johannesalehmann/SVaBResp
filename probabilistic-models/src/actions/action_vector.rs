@@ -4,6 +4,29 @@ pub struct ActionVector<D: Distribution> {
     actions: Vec<Action<D>>,
 }
 
+impl<D: Distribution> ActionVector<D> {
+    pub fn new() -> Self {
+        ActionVector {
+            actions: Vec::new(),
+        }
+    }
+
+    pub fn with_actions(actions: Vec<Action<D>>) -> Self {
+        Self { actions }
+    }
+
+    pub fn add_action(&mut self, action: Action<D>) {
+        self.actions.push(action)
+    }
+
+    pub fn actions(&self) -> &[Action<D>] {
+        &self.actions
+    }
+    pub fn actions_mut(&mut self) -> &mut Vec<Action<D>> {
+        &mut self.actions
+    }
+}
+
 impl<D: Distribution> super::ActionCollection<D> for ActionVector<D> {
     type Builder = Builder<D>;
     type Iter<'a>

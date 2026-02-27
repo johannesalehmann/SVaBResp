@@ -1,3 +1,4 @@
+mod mecs;
 mod sccs;
 mod value_iteration;
 

@@ -1,24 +1,40 @@
+use crate::mdp::mecs;
+use crate::mdp::sccs::{Scc, SccList};
 use probabilistic_models::{
-    ActionCollection, AtomicPropositions, Distribution, ProbabilisticModel,
+    ActionCollection, ActionVector, AtomicPropositions, Distribution, DistributionVector,
+    Predecessor, ProbabilisticModel, VectorPredecessors,
 };
 
-pub fn optimistic_value_iteration<M: probabilistic_models::ModelTypes>(
-    model: &ProbabilisticModel<M>,
+pub fn optimistic_value_iteration<
+    M: probabilistic_models::ModelTypes<
+            Predecessors = VectorPredecessors,
+            Distribution = DistributionVector,
+            ActionCollection = ActionVector<DistributionVector>,
+        >,
+>(
+    mut model: ProbabilisticModel<M>,
     objective_ap_index: usize,
     mut eps: f64,
 ) {
     let start_time = std::time::Instant::now();
 
+    let mecs = mecs::compute_mecs(&mut model);
+    let winning_mecs = winning_mecs(&mecs, objective_ap_index, &model);
+    mecs.collapse_mecs(&mut model);
+
     let mut data = vec![StateData::new(); model.states.len()];
     let mut upper_bound = vec![0.0; model.states.len()];
-    let excluded = handle_reachability_objective(model, objective_ap_index, &mut data);
+    let excluded =
+        handle_reachability_objective(&model, objective_ap_index, &mecs, &winning_mecs, &mut data);
 
-    let sccs = crate::mdp::sccs::compute_sccs(model, &excluded[..]);
+    let sccs: SccList =
+        crate::mdp::sccs::compute_sccs(&model, &super::sccs::ExclusionList::new(&excluded[..]));
+    let sccs = sccs.compute_dependencies(&model);
     let order = sccs.get_reverse_topological_order();
 
     loop {
         print!("eps={}:", eps);
-        value_iteration_internal(model, &mut data, eps, &sccs, &order[..]);
+        value_iteration_internal(&model, &mut data, eps, &sccs, &order[..]);
 
         let factor = 1.0 + 2.0 * eps;
         for i in 0..model.states.len() {
@@ -27,7 +43,7 @@ pub fn optimistic_value_iteration<M: probabilistic_models::ModelTypes>(
                 v => (v * factor).min(1.0),
             }
         }
-        let is_upper_bound = is_upper_bound(model, &upper_bound[..], &sccs);
+        let is_upper_bound = is_upper_bound(&model, &upper_bound[..], &sccs);
         match is_upper_bound {
             BoundCheckResult::UpperBound => {
                 println!(" Upper bound candidate verified!");
@@ -62,20 +78,33 @@ pub fn optimistic_value_iteration<M: probabilistic_models::ModelTypes>(
     );
 }
 
-pub fn value_iteration<M: probabilistic_models::ModelTypes>(
-    model: &ProbabilisticModel<M>,
+pub fn value_iteration<
+    M: probabilistic_models::ModelTypes<
+            Predecessors = VectorPredecessors,
+            Distribution = DistributionVector,
+            ActionCollection = ActionVector<DistributionVector>,
+        >,
+>(
+    mut model: ProbabilisticModel<M>,
     objective_ap_index: usize,
     eps: f64,
 ) {
     let start_time = std::time::Instant::now();
 
-    let mut data = vec![StateData::new(); model.states.len()];
-    let excluded = handle_reachability_objective(model, objective_ap_index, &mut data);
+    let mecs = mecs::compute_mecs(&mut model);
+    let winning_mecs = winning_mecs(&mecs, objective_ap_index, &model);
+    mecs.collapse_mecs(&mut model);
 
-    let sccs = crate::mdp::sccs::compute_sccs(model, &excluded[..]);
+    let mut data = vec![StateData::new(); model.states.len()];
+    let excluded =
+        handle_reachability_objective(&model, objective_ap_index, &mecs, &winning_mecs, &mut data);
+
+    let sccs: SccList =
+        crate::mdp::sccs::compute_sccs(&model, &super::sccs::ExclusionList::new(&excluded[..]));
+    let sccs = sccs.compute_dependencies(&model);
     let order = sccs.get_reverse_topological_order();
 
-    value_iteration_internal(model, &mut data, eps, &sccs, &order[..]);
+    value_iteration_internal(&model, &mut data, eps, &sccs, &order[..]);
 
     println!(
         "Value iteration finished in {:?}: {}",
@@ -87,6 +116,8 @@ pub fn value_iteration<M: probabilistic_models::ModelTypes>(
 fn handle_reachability_objective<M: probabilistic_models::ModelTypes>(
     model: &ProbabilisticModel<M>,
     objective_ap_index: usize,
+    mecs: &mecs::Mecs,
+    winning_mecs: &[usize],
     data: &mut Vec<StateData>,
 ) -> Vec<usize> {
     let mut excluded = Vec::new();
@@ -96,20 +127,51 @@ fn handle_reachability_objective<M: probabilistic_models::ModelTypes>(
             excluded.push(i);
         }
     }
+
+    for &winning_mec in winning_mecs {
+        let state_index = mecs.identified_mec_state_index(winning_mec);
+        if data[state_index].value != 1.0 {
+            data[state_index].value = 1.0;
+            excluded.push(state_index);
+        }
+    }
     excluded
 }
 
-fn value_iteration_internal<M: probabilistic_models::ModelTypes>(
+fn winning_mecs<M: probabilistic_models::ModelTypes>(
+    mecs: &mecs::Mecs,
+    objective_ap_index: usize,
+    model: &ProbabilisticModel<M>,
+) -> Vec<usize> {
+    let mut is_accepting = vec![false; mecs.len()];
+
+    for (state_index, state) in model.states.iter().enumerate() {
+        if let Some(mec_index) = mecs.mec_of_state(state_index) {
+            if state.atomic_propositions.get_value(objective_ap_index) {
+                is_accepting[mec_index] = true;
+            }
+        }
+    }
+
+    is_accepting
+        .into_iter()
+        .enumerate()
+        .filter(|(_, acc)| *acc)
+        .map(|(i, _)| i)
+        .collect()
+}
+
+fn value_iteration_internal<M: probabilistic_models::ModelTypes, SCC: Scc>(
     model: &ProbabilisticModel<M>,
     data: &mut Vec<StateData>,
     eps: f64,
-    sccs: &crate::mdp::sccs::Sccs,
+    sccs: &crate::mdp::sccs::SccList<SCC>,
     scc_order: &[usize],
 ) {
     for &scc in scc_order {
         loop {
             let mut largest_change: f64 = 0.0;
-            for &state_index in &sccs.sccs[scc].members {
+            for &state_index in sccs.sccs[scc].get_members() {
                 let state = &model.states[state_index];
 
                 let mut best_value = 0.0;
@@ -145,15 +207,15 @@ fn value_iteration_internal<M: probabilistic_models::ModelTypes>(
     }
 }
 
-fn is_upper_bound<M: probabilistic_models::ModelTypes>(
+fn is_upper_bound<M: probabilistic_models::ModelTypes, S: Scc>(
     model: &ProbabilisticModel<M>,
     upper_bound: &[f64],
-    sccs: &crate::mdp::sccs::Sccs,
+    sccs: &crate::mdp::sccs::SccList<S>,
 ) -> BoundCheckResult {
     let mut all_decreasing = true;
     let mut all_increasing = true;
     for scc in &sccs.sccs {
-        for &state_index in &scc.members {
+        for &state_index in scc.get_members() {
             let state = &model.states[state_index];
 
             let mut best_value = 0.0;

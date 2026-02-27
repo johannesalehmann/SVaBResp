@@ -46,24 +46,24 @@ pub struct ProbabilisticModel<M: ModelTypes> {
 impl<M: ModelTypes> std::fmt::Debug for ProbabilisticModel<M> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for state in &self.states {
-            write!(
+            writeln!(
                 f,
                 "{}",
                 state.valuation.displayable(&self.valuation_context)
             )?;
             for i in 0..self.atomic_proposition_count {
                 if state.atomic_propositions.get_value(i) {
-                    write!(f, "    Fulfils atomic proposition {}", i)?;
+                    writeln!(f, "    Fulfils atomic proposition {}", i)?;
                 }
             }
             for action in state.actions.iter() {
-                write!(
+                writeln!(
                     f,
                     "    Action `{}`",
                     self.action_names[action.action_name_index]
                 )?;
                 for target in action.successors.iter() {
-                    write!(
+                    writeln!(
                         f,
                         "        {} -> {}",
                         target.probability,

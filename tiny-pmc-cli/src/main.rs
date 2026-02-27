@@ -47,10 +47,13 @@ fn checker() -> Result<(), ModelCheckerError> {
     let model = builder_output.model;
     let properties = builder_output.properties;
 
-    for (i, property) in properties.iter().enumerate() {
-        println!("Checking property {} of {}", i + 1, properties.len());
-        tiny_pmc::checking::check(&model, property);
+    if properties.len() > 1 {
+        panic!("Checking multiple properties is temporarily unsupported");
     }
+    // for (i, property) in properties.iter().enumerate() {
+    println!("Checking property {} of {}", 0 + 1, properties.len());
+    tiny_pmc::checking::check(model, &properties[0]);
+    // }
 
     println!("Finished in {:?}", start_time.elapsed());
     Ok(())

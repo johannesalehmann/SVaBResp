@@ -4,6 +4,26 @@ pub struct DistributionVector {
     successors: Vec<Successor>,
 }
 
+impl DistributionVector {
+    pub fn new() -> Self {
+        Self {
+            successors: Vec::new(),
+        }
+    }
+
+    pub fn with_successors(successors: Vec<Successor>) -> Self {
+        Self { successors }
+    }
+
+    pub fn successors(&self) -> &[Successor] {
+        &self.successors
+    }
+
+    pub fn successors_mut(&mut self) -> &mut Vec<Successor> {
+        &mut self.successors
+    }
+}
+
 impl super::Distribution for DistributionVector {
     type Builder = Builder;
     type Iter<'a>
