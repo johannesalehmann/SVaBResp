@@ -161,6 +161,13 @@ fn lexer<'a>()
 -> impl Parser<'a, &'a str, Vec<Spanned<Token>>, extra::Err<PrismParserError<'a, Span, char>>> {
     let float = text::int(10)
         .then(just('.').then(text::digits(10)))
+        .then(
+            just('e')
+                .then(just('-').or_not())
+                .then(just('0').repeated())
+                .then(text::int(10))
+                .or_not(),
+        )
         .to_slice()
         .from_str()
         .unwrapped()
@@ -230,8 +237,8 @@ fn lexer<'a>()
         "double" => Token::Double,
         "bool" => Token::Bool,
 
-        "PMax" => Token::PMax,
-        "PMin" => Token::PMin,
+        "PMax" | "Pmax" => Token::PMax,
+        "PMin" | "Pmin" => Token::PMin,
         "P" => Token::P,
 
         "F" => Token::Finally,
