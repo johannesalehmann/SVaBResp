@@ -189,6 +189,16 @@ impl Mecs {
         self.mec_count
     }
 
+    pub fn count_states_in_mecs(&self) -> usize {
+        let mut count = 0;
+        for state in &self.state_info {
+            if let Some(state) = state {
+                count += 1;
+            }
+        }
+        count
+    }
+
     pub fn mec_of_state(&self, state_index: usize) -> Option<usize> {
         self.state_info[state_index]
             .as_ref()
