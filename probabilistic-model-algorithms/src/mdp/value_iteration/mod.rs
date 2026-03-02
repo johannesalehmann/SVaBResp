@@ -35,23 +35,24 @@ pub fn optimistic_value_iteration<
     let initial_eps = eps;
 
     loop {
-        print!("eps={}:", eps);
+        println!("eps={}:", eps);
         value_iteration_internal(&model, &mut data, eps, &sccs, &order[..]);
 
-        let factor = 1.0 + 2.0 * initial_eps;
         for i in 0..model.states.len() {
             upper_bound[i] = match data[i].value {
                 0.0 => 0.0,
-                v => (v * factor).min(1.0),
+                v => (v + initial_eps).min(1.0),
             }
+            // upper_bound[i] = match data[i].value {
+            //     v => (v * (1.0 + initial_eps)).min(1.0),
+            // }
         }
 
-        let is_upper_bound =
-            verify_optimistic(&mut model, &mut eps, &mut data, &mut upper_bound, &sccs);
+        let is_upper_bound = verify_optimistic(&mut model, eps, &mut data, &mut upper_bound, &sccs);
 
         match is_upper_bound {
             OptimisticValueIterationResult::UpperBoundVerified => {
-                println!(" Upper bound candidate verified!");
+                println!("Upper bound candidate verified!");
                 for i in 0..model.states.len() {
                     if i == 0 {
                         println!(
@@ -84,16 +85,14 @@ fn verify_optimistic<
         >,
 >(
     model: &mut ProbabilisticModel<M>,
-    eps: &mut f64,
-    mut data: &mut Vec<StateData>,
+    eps: f64,
+    data: &mut Vec<StateData>,
     upper_bound: &mut Vec<f64>,
     sccs: &SccList<SccWithDependencies>,
 ) -> OptimisticValueIterationResult {
-    let verification_steps = (1.0 / *eps).max(1.0) as usize;
-    println!("Verifying in {} steps", verification_steps);
+    let verification_steps = (1.0 / eps).max(1.0) as usize;
     let mut error: f64 = 0.0;
     for _ in 0..verification_steps {
-        //println!("  Step!");
         let mut all_up = true;
         let mut all_down = true;
         error = 0.0;
