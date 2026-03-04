@@ -3,8 +3,8 @@ use sub_mdp::*;
 
 use crate::mdp::sccs::StateToSccMap;
 use probabilistic_models::{
-    ActionCollection, ActionVector, Builder, Distribution, DistributionVector, ModelTypes,
-    Predecessors, ProbabilisticModel,
+    ActionCollection, ActionVector, Distribution, DistributionVector, ModelTypes, Predecessors,
+    ProbabilisticModel,
 };
 
 pub fn compute_mecs<M: ModelTypes>(model: &ProbabilisticModel<M>) -> Mecs {
@@ -131,11 +131,8 @@ impl Mecs {
         &self,
         model: &mut ProbabilisticModel<M>,
     ) {
-        let mec_states = self.identified_mec_state_index.iter().cloned();
-        let all_states = (0..model.states.len()).into_iter();
-
         let mut mec_actions = Vec::new();
-        for mec in 0..self.mec_count {
+        for _ in 0..self.mec_count {
             mec_actions.push(ActionVector::new())
         }
 
@@ -192,7 +189,7 @@ impl Mecs {
     pub fn count_states_in_mecs(&self) -> usize {
         let mut count = 0;
         for state in &self.state_info {
-            if let Some(state) = state {
+            if let Some(_) = state {
                 count += 1;
             }
         }
@@ -203,5 +200,16 @@ impl Mecs {
         self.state_info[state_index]
             .as_ref()
             .map(|info| info.mec_index)
+    }
+
+    pub fn enabled_actions(&self, state_index: usize) -> impl Iterator<Item = usize> {
+        self.state_info[state_index]
+            .as_ref()
+            .expect("Cannot retrieve enabled actions for a state that is not enabled")
+            .enabled_actions
+            .iter()
+            .enumerate()
+            .filter(|(_, enabled)| **enabled)
+            .map(|(i, _)| i)
     }
 }

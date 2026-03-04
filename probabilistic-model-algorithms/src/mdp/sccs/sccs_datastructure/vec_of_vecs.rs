@@ -75,6 +75,7 @@ impl super::BuildableScc for SccList<SccWithoutDependencies> {
     type BuilderType = SccListBuilder;
 
     fn builder<M: ModelTypes>(model: &ProbabilisticModel<M>) -> Self::BuilderType {
+        let _ = model;
         SccListBuilder {
             result: SccList { sccs: Vec::new() },
         }

@@ -90,9 +90,10 @@ fn verify_optimistic<
     upper_bound: &mut Vec<f64>,
     sccs: &SccList<SccWithDependencies>,
 ) -> OptimisticValueIterationResult {
+    let start_time = std::time::Instant::now();
     let verification_steps = (1.0 / eps).max(1.0) as usize;
     let mut error: f64 = 0.0;
-    for _ in 0..verification_steps {
+    for i in 0..verification_steps {
         let mut all_up = true;
         let mut all_down = true;
         error = 0.0;
@@ -130,14 +131,17 @@ fn verify_optimistic<
                 }
 
                 if new_upper_value < new_lower_value {
+                    println!("Crossed in {} steps and {:?}", i, start_time.elapsed());
                     return OptimisticValueIterationResult::UpperBoundRefuted { error };
                 }
             }
         }
 
         if all_down {
+            println!("Verified in {} steps and {:?}", i, start_time.elapsed());
             return OptimisticValueIterationResult::UpperBoundVerified;
         } else if all_up {
+            println!("Refuted in {} steps and {:?}", i, start_time.elapsed());
             return OptimisticValueIterationResult::UpperBoundRefuted { error };
         }
     }
@@ -276,61 +280,6 @@ fn value_iteration_internal<M: probabilistic_models::ModelTypes, SCC: Scc>(
             }
         }
     }
-}
-
-fn is_upper_bound<M: probabilistic_models::ModelTypes, S: Scc>(
-    model: &ProbabilisticModel<M>,
-    upper_bound: &[f64],
-    sccs: &crate::mdp::sccs::SccList<S>,
-) -> BoundCheckResult {
-    let mut all_decreasing = true;
-    let mut all_increasing = true;
-    for scc in &sccs.sccs {
-        for &state_index in scc.get_members() {
-            println!("\n\nState");
-            let state = &model.states[state_index];
-
-            let mut best_value = 0.0;
-
-            for action in state.actions.iter() {
-                print!("Action {}: ", action.action_name_index);
-                let distribution = &action.successors;
-                let mut value = 0.0;
-                for successor in distribution.iter() {
-                    print!(
-                        "{} * {} ",
-                        successor.probability, upper_bound[successor.index]
-                    );
-                    value += successor.probability * upper_bound[successor.index];
-                }
-                println!("= {}", value);
-                if value >= best_value {
-                    best_value = value;
-                }
-            }
-            if best_value < upper_bound[state_index] {
-                all_increasing = false;
-            } else if best_value > upper_bound[state_index] {
-                println!(
-                    "Not all transitions are decreasing, {} > {}",
-                    best_value, upper_bound[state_index]
-                );
-                all_decreasing = false;
-            }
-        }
-    }
-    match (all_decreasing, all_increasing) {
-        (true, true) => BoundCheckResult::UpperBound, // Only happens when the model is empty or when the bound is exactly the true value for all states
-        (true, false) => BoundCheckResult::UpperBound,
-        (false, true) => BoundCheckResult::LowerBound,
-        (false, false) => BoundCheckResult::Neither,
-    }
-}
-
-enum BoundCheckResult {
-    UpperBound,
-    LowerBound,
-    Neither,
 }
 
 #[derive(Copy, Clone)]

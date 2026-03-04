@@ -3,26 +3,7 @@ mod tree_walking_enumerator;
 
 pub use tree_walking_enumerator::TreeWalkingEvaluator;
 
-use prism_model::{Expression, VariableRange, VariableReference};
-
-pub trait Evaluator {
-    fn create() -> Self;
-    fn evaluate_as_int<V: ValuationSource, S: Clone>(
-        &self,
-        expression: &Expression<VariableReference, S>,
-        valuations: &V,
-    ) -> i64;
-    fn evaluate_as_bool<V: ValuationSource, S: Clone>(
-        &self,
-        expression: &Expression<VariableReference, S>,
-        valuations: &V,
-    ) -> bool;
-    fn evaluate_as_float<V: ValuationSource, S: Clone>(
-        &self,
-        expression: &Expression<VariableReference, S>,
-        valuations: &V,
-    ) -> f64;
-}
+use prism_model::{VariableRange, VariableReference};
 
 pub trait ValuationSource {
     fn get_int(&self, index: VariableReference) -> i64;

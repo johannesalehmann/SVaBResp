@@ -368,12 +368,8 @@ impl Value {
     }
 }
 
-impl super::Evaluator for TreeWalkingEvaluator {
-    fn create() -> Self {
-        Self::new()
-    }
-
-    fn evaluate_as_int<V: ValuationSource, S: Clone>(
+impl TreeWalkingEvaluator {
+    pub fn evaluate_as_int<V: ValuationSource, S: Clone>(
         &self,
         expression: &Expression<VariableReference, S>,
         valuations: &V,
@@ -381,7 +377,7 @@ impl super::Evaluator for TreeWalkingEvaluator {
         self.evaluate(expression, valuations).as_int()
     }
 
-    fn evaluate_as_bool<V: ValuationSource, S: Clone>(
+    pub fn evaluate_as_bool<V: ValuationSource, S: Clone>(
         &self,
         expression: &Expression<VariableReference, S>,
         valuations: &V,
@@ -389,7 +385,7 @@ impl super::Evaluator for TreeWalkingEvaluator {
         self.evaluate(expression, valuations).as_bool()
     }
 
-    fn evaluate_as_float<V: ValuationSource, S: Clone>(
+    pub fn evaluate_as_float<V: ValuationSource, S: Clone>(
         &self,
         expression: &Expression<VariableReference, S>,
         valuations: &V,

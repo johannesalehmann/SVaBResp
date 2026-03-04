@@ -99,6 +99,7 @@ impl<'a> ExclusionCriterion for ExclusionList<'a> {
     }
 
     fn is_action_excluded(&self, state_index: usize, action_index: usize) -> bool {
+        let _ = (state_index, action_index);
         false
     }
 }

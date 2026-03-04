@@ -1,4 +1,4 @@
-mod expressions;
+pub mod expressions;
 mod model_in_progress;
 mod synchronised_actions;
 mod variables;
@@ -7,7 +7,7 @@ use crate::expressions::stack_based_expressions::{
     EvaluationStack, StackBasedExpression, SubExpressionManager, SubExpressionManagerWithCache,
     SubExpressionProvider,
 };
-use crate::expressions::{Evaluator, TreeWalkingEvaluator, ValuationSource, VariableType};
+use crate::expressions::{TreeWalkingEvaluator, ValuationSource, VariableType};
 use crate::model_in_progress::ModelInProgress;
 use crate::synchronised_actions::{SynchronisedAction, SynchronisedActions};
 use crate::variables::{ConstAndVarValuationSource, ModelVariableInfo};
