@@ -1,9 +1,8 @@
 use crate::ExpressionContext;
 use crate::expressions::VariableType;
-use crate::expressions::stack_based_expressions::{StackBasedExpression, SubExpressionProvider};
 use crate::variables::const_valuations::ConstValuations;
 use crate::variables::valuation_map::{ValuationMap, ValuationMapEntry};
-use prism_model::{VariableManager, VariableReference};
+use prism_model::VariableManager;
 
 pub struct VariableDetail {
     pub bounds: Option<(i64, i64)>,
@@ -14,11 +13,11 @@ pub struct VariableDetails {
     details: Vec<VariableDetail>,
 }
 impl VariableDetails {
-    pub fn new<S: Clone, SE: SubExpressionProvider>(
-        variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
+    pub fn new<S: Clone, E, EC: ExpressionContext<E>>(
+        variables: &VariableManager<E, S>,
         valuation_map: &ValuationMap,
         const_values: &ConstValuations,
-        expression_context: &mut ExpressionContext<SE>,
+        expression_context: &mut EC,
     ) -> Self {
         let mut details = Vec::new();
         let const_value_source = super::ConstOnlyValuationSource::new(valuation_map, const_values);

@@ -11,7 +11,6 @@ mod variable_details;
 use const_valuations::*;
 use valuation_map::*;
 
-use crate::expressions::stack_based_expressions::{StackBasedExpression, SubExpressionProvider};
 use crate::variables::variable_details::VariableDetails;
 use crate::{ExpressionContext, ModelBuildingError, UserProvidedConstValue};
 use prism_model::{Identifier, Model, VariableRange, VariableReference};
@@ -26,16 +25,10 @@ pub struct ModelVariableInfo<V: Valuation> {
 }
 
 impl<V: Valuation> ModelVariableInfo<V> {
-    pub fn new<S: Clone, SE: SubExpressionProvider>(
-        model: &Model<
-            (),
-            Identifier<S>,
-            StackBasedExpression<VariableReference>,
-            VariableReference,
-            S,
-        >,
+    pub fn new<S: Clone, E, EC: ExpressionContext<E>>(
+        model: &Model<(), Identifier<S>, E, VariableReference, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
-        expression_context: &mut ExpressionContext<SE>,
+        expression_context: &mut EC,
     ) -> Result<Self, ModelBuildingError> {
         let variables = &model.variable_manager;
 
@@ -58,14 +51,8 @@ impl<V: Valuation> ModelVariableInfo<V> {
         })
     }
 
-    fn prepare_valuation_context<S: Clone>(
-        model: &Model<
-            (),
-            Identifier<S>,
-            StackBasedExpression<VariableReference>,
-            VariableReference,
-            S,
-        >,
+    fn prepare_valuation_context<S: Clone, E>(
+        model: &Model<(), Identifier<S>, E, VariableReference, S>,
         valuation_map: &ValuationMap,
         details: &VariableDetails,
     ) -> V::ContextType {

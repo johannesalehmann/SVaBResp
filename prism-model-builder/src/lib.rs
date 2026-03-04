@@ -4,7 +4,7 @@ mod synchronised_actions;
 mod variables;
 
 use crate::expressions::stack_based_expressions::{
-    EvaluationStack, StackBasedExpression, SubExpressionManager, SubExpressionManagerWithCache,
+    StackBasedExpression, SubExpressionManager, SubExpressionManagerWithCache,
     SubExpressionProvider,
 };
 use crate::expressions::{TreeWalkingEvaluator, ValuationSource, VariableType};
@@ -52,54 +52,84 @@ pub struct ModelBuildingOutput<M: ModelTypes> {
     pub properties: Vec<Property<AtomicProposition, f64>>,
 }
 
-pub struct ExpressionContext<'a, SE: SubExpressionProvider> {
+pub trait ExpressionContext<E> {
+    fn reset_context(&mut self);
+
+    fn evaluate_int<V: ValuationSource>(&mut self, expression: &E, valuations: &V) -> i64;
+    fn evaluate_int_with_separate_context<V: ValuationSource>(
+        &self,
+        expression: &E,
+        valuations: &V,
+    ) -> i64;
+    fn evaluate_float<V: ValuationSource>(&mut self, expression: &E, valuations: &V) -> f64;
+    fn evaluate_float_with_separate_context<V: ValuationSource>(
+        &self,
+        expression: &E,
+        valuations: &V,
+    ) -> f64;
+    fn evaluate_bool<V: ValuationSource>(&mut self, expression: &E, valuations: &V) -> bool;
+    fn evaluate_bool_with_separate_context<V: ValuationSource>(
+        &self,
+        expression: &E,
+        valuations: &V,
+    ) -> bool;
+}
+
+pub struct SubExpressionExpressionContext<'a, SE: SubExpressionProvider> {
     sub_expressions: &'a SE,
-    stack: EvaluationStack,
     context: SE::EvaluationContext,
 }
 
-impl<'a, SE: SubExpressionProvider> ExpressionContext<'a, SE> {
-    pub fn reset_context(&mut self) {
+impl<'a, SE: SubExpressionProvider> ExpressionContext<usize>
+    for SubExpressionExpressionContext<'a, SE>
+{
+    fn reset_context(&mut self) {
         self.sub_expressions.reset_context(&mut self.context);
     }
 
-    pub fn evaluate_int<V: ValuationSource>(
-        &mut self,
-        expression: &StackBasedExpression<VariableReference>,
+    fn evaluate_int<V: ValuationSource>(&mut self, expression: &usize, valuations: &V) -> i64 {
+        self.sub_expressions
+            .evaluate_as_int(*expression, valuations, &mut self.context)
+    }
+
+    fn evaluate_int_with_separate_context<V: ValuationSource>(
+        &self,
+        expression: &usize,
         valuations: &V,
     ) -> i64 {
-        expression.evaluate_as_int_with_stack_and_sub_expressions(
-            valuations,
-            self.sub_expressions,
-            &mut self.stack,
-            &mut self.context,
-        )
+        let mut context = self.sub_expressions.create_context();
+        self.sub_expressions
+            .evaluate_as_int(*expression, valuations, &mut context)
     }
 
-    pub fn evaluate_float<V: ValuationSource>(
-        &mut self,
-        expression: &StackBasedExpression<VariableReference>,
+    fn evaluate_float<V: ValuationSource>(&mut self, expression: &usize, valuations: &V) -> f64 {
+        self.sub_expressions
+            .evaluate_as_float(*expression, valuations, &mut self.context)
+    }
+
+    fn evaluate_float_with_separate_context<V: ValuationSource>(
+        &self,
+        expression: &usize,
         valuations: &V,
     ) -> f64 {
-        expression.evaluate_as_float_with_stack_and_sub_expressions(
-            valuations,
-            self.sub_expressions,
-            &mut self.stack,
-            &mut self.context,
-        )
+        let mut context = self.sub_expressions.create_context();
+        self.sub_expressions
+            .evaluate_as_float(*expression, valuations, &mut context)
     }
 
-    pub fn evaluate_bool<V: ValuationSource>(
-        &mut self,
-        expression: &StackBasedExpression<VariableReference>,
+    fn evaluate_bool<V: ValuationSource>(&mut self, expression: &usize, valuations: &V) -> bool {
+        self.sub_expressions
+            .evaluate_as_bool(*expression, valuations, &mut self.context)
+    }
+
+    fn evaluate_bool_with_separate_context<V: ValuationSource>(
+        &self,
+        expression: &usize,
         valuations: &V,
     ) -> bool {
-        expression.evaluate_as_bool_with_stack_and_sub_expressions(
-            valuations,
-            self.sub_expressions,
-            &mut self.stack,
-            &mut self.context,
-        )
+        let mut context = self.sub_expressions.create_context();
+        self.sub_expressions
+            .evaluate_as_bool(*expression, valuations, &mut context)
     }
 }
 
@@ -153,8 +183,8 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         let mut sub_expression_manager = SubExpressionManager::new();
         let model = model.map_expressions_cloned(|e| {
             let stack = StackBasedExpression::from_expression(e, &model.variable_manager);
-            let sub_expression = sub_expression_manager.add_sub_expression(stack);
-            sub_expression
+            let sub_expression_index = sub_expression_manager.add_sub_expression(stack);
+            sub_expression_index
         });
 
         let atomic_propositions = atomic_propositions
@@ -168,9 +198,8 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
 
         let sub_expression_cache = SubExpressionManagerWithCache::new(sub_expression_manager);
         let context = sub_expression_cache.create_context();
-        let mut expression_context = ExpressionContext {
+        let mut expression_context = SubExpressionExpressionContext {
             sub_expressions: &sub_expression_cache,
-            stack: EvaluationStack::new(),
             context,
         };
 
@@ -226,23 +255,15 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn process_state<S: Clone, SE: SubExpressionProvider>(
+    fn process_state<S: Clone, E, EC: ExpressionContext<E>>(
         &mut self,
         state: usize,
-        model: &Model<
-            (),
-            Identifier<S>,
-            StackBasedExpression<VariableReference>,
-            VariableReference,
-            S,
-        >,
-        atomic_propositions: &[StackBasedExpression<VariableReference>],
+        model: &Model<(), Identifier<S>, E, VariableReference, S>,
+        atomic_propositions: &[E],
         synchronised_actions: &SynchronisedActions,
-        expression_context: &mut ExpressionContext<SE>,
+        expression_context: &mut EC,
     ) -> Result<(), ModelBuildingError> {
-        expression_context
-            .sub_expressions
-            .reset_context(&mut expression_context.context);
+        expression_context.reset_context();
 
         self.evaluate_atomic_propositions(state, atomic_propositions, expression_context);
 
@@ -277,24 +298,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         Ok(())
     }
 
-    fn process_nonsynchronised_command<S: Clone, SE: SubExpressionProvider>(
+    fn process_nonsynchronised_command<S: Clone, E, EC: ExpressionContext<E>>(
         &mut self,
         state: usize,
-        model: &Model<
-            (),
-            Identifier<S>,
-            StackBasedExpression<VariableReference>,
-            VariableReference,
-            S,
-        >,
+        model: &Model<(), Identifier<S>, E, VariableReference, S>,
         action_index: &mut usize,
-        command: &Command<
-            Identifier<S>,
-            StackBasedExpression<VariableReference>,
-            VariableReference,
-            S,
-        >,
-        expression_context: &mut ExpressionContext<SE>,
+        command: &Command<Identifier<S>, E, VariableReference, S>,
+        expression_context: &mut EC,
     ) {
         let valuation = &self.model_in_progress.get_state(state).valuation;
         let val_source = self.variable_info.get_valuation_source(valuation);
@@ -352,19 +362,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn process_synchronising_action<S: Clone, SE: SubExpressionProvider>(
+    fn process_synchronising_action<S: Clone, E, EC: ExpressionContext<E>>(
         &mut self,
         state: usize,
-        model: &Model<
-            (),
-            Identifier<S>,
-            StackBasedExpression<VariableReference>,
-            VariableReference,
-            S,
-        >,
+        model: &Model<(), Identifier<S>, E, VariableReference, S>,
         action_index: &mut usize,
         synchronised_action: &SynchronisedAction,
-        expression_context: &mut ExpressionContext<SE>,
+        expression_context: &mut EC,
     ) {
         let action_name_index = self
             .model_in_progress
@@ -507,13 +511,12 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn evaluate_atomic_propositions<SE: SubExpressionProvider>(
+    fn evaluate_atomic_propositions<E, EC: ExpressionContext<E>>(
         &mut self,
         state_index: usize,
-        atomic_propositions: &[StackBasedExpression<VariableReference>],
-        expression_context: &mut ExpressionContext<SE>,
+        atomic_propositions: &[E],
+        expression_context: &mut EC,
     ) {
-        // TODO: Switch to stack-based expressions
         let state = &mut self.model_in_progress.get_state_mut(state_index);
         let val_source = self.variable_info.get_valuation_source(&state.valuation);
         for (i, atomic_proposition) in atomic_propositions.iter().enumerate() {
@@ -522,13 +525,13 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         }
     }
 
-    fn apply_assignments<S: Clone, SE: SubExpressionProvider>(
+    fn apply_assignments<S: Clone, E, EC: ExpressionContext<E>>(
         &self,
-        variable_manager: &VariableManager<StackBasedExpression<VariableReference>, S>,
+        variable_manager: &VariableManager<E, S>,
         valuation: &<M as ModelTypes>::Valuation,
         val_source: &ConstAndVarValuationSource<<M as ModelTypes>::Valuation>,
-        updates: &[&Update<StackBasedExpression<VariableReference>, VariableReference, S>],
-        expression_context: &mut ExpressionContext<SE>,
+        updates: &[&Update<E, VariableReference, S>],
+        expression_context: &mut EC,
     ) -> <M as ModelTypes>::Valuation {
         let mut new_valuation = valuation.clone();
         for update in updates {
@@ -572,16 +575,10 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
         new_valuation
     }
 
-    fn create_initial_states<S: Clone, SE: SubExpressionProvider>(
+    fn create_initial_states<S: Clone, E, EC: ExpressionContext<E>>(
         &mut self,
-        model: &Model<
-            (),
-            Identifier<S>,
-            StackBasedExpression<VariableReference>,
-            VariableReference,
-            S,
-        >,
-        expression_context: &mut ExpressionContext<SE>,
+        model: &Model<(), Identifier<S>, E, VariableReference, S>,
+        expression_context: &mut EC,
     ) -> Result<(), ModelBuildingError> {
         if model.init_constraint.is_some() {
             panic!("Init constraints are not yet supported by the model builder");

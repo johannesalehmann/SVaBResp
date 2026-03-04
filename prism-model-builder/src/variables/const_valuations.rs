@@ -1,5 +1,4 @@
 use crate::expressions::ValuationSource;
-use crate::expressions::stack_based_expressions::{StackBasedExpression, SubExpressionProvider};
 use crate::{ExpressionContext, UserProvidedConstValue};
 use prism_model::{VariableManager, VariableReference};
 use std::collections::HashMap;
@@ -9,10 +8,10 @@ pub struct ConstValuations {
 }
 
 impl ConstValuations {
-    pub fn new<S: Clone, SE: SubExpressionProvider>(
-        variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
+    pub fn new<S: Clone, E, EC: ExpressionContext<E>>(
+        variables: &VariableManager<E, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
-        expression_context: &mut ExpressionContext<SE>,
+        expression_context: &mut EC,
     ) -> Self {
         let mut valuations = Vec::new();
         for var in &variables.variables {
@@ -28,11 +27,11 @@ impl ConstValuations {
         Self { valuations }
     }
 
-    fn compute_initial_const_value<S: Clone, SE: SubExpressionProvider>(
-        variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
+    fn compute_initial_const_value<S: Clone, E, EC: ExpressionContext<E>>(
+        variables: &VariableManager<E, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
-        var: &prism_model::VariableInfo<StackBasedExpression<VariableReference>, S>,
-        expression_context: &mut ExpressionContext<SE>,
+        var: &prism_model::VariableInfo<E, S>,
+        expression_context: &mut EC,
     ) -> ConstValuation {
         if let Some(value) = user_provided_consts.get(&var.name.name) {
             Self::process_user_initial_value(&var, value)
@@ -46,8 +45,8 @@ impl ConstValuations {
         }
     }
 
-    fn process_user_initial_value<S: Clone>(
-        var: &prism_model::VariableInfo<StackBasedExpression<VariableReference>, S>,
+    fn process_user_initial_value<S: Clone, E>(
+        var: &prism_model::VariableInfo<E, S>,
         value: &UserProvidedConstValue,
     ) -> ConstValuation {
         use crate::VariableRange;
@@ -68,13 +67,14 @@ impl ConstValuations {
         }
     }
 
-    fn evaluate_initial_expression<S: Clone, SE: SubExpressionProvider>(
-        variables: &VariableManager<StackBasedExpression<VariableReference>, S>,
+    fn evaluate_initial_expression<S: Clone, E, EC: ExpressionContext<E>>(
+        variables: &VariableManager<E, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
-        var: &prism_model::VariableInfo<StackBasedExpression<VariableReference>, S>,
-        expression_context: &mut ExpressionContext<SE>,
+        var: &prism_model::VariableInfo<E, S>,
+        expression_context: &mut EC,
     ) -> ConstValuation {
-        let value_source = ConstRecursiveEvaluator::new(variables, user_provided_consts);
+        let value_source =
+            ConstRecursiveEvaluator::new(variables, user_provided_consts, expression_context);
         let initial = var
             .initial_value
             .as_ref()
@@ -82,14 +82,16 @@ impl ConstValuations {
         use crate::VariableRange;
         match var.range {
             VariableRange::BoundedInt { .. } | VariableRange::UnboundedInt { .. } => {
-                ConstValuation::Int(expression_context.evaluate_int(initial, &value_source))
+                ConstValuation::Int(
+                    expression_context.evaluate_int_with_separate_context(initial, &value_source),
+                )
             }
-            VariableRange::Boolean { .. } => {
-                ConstValuation::Bool(expression_context.evaluate_bool(initial, &value_source))
-            }
-            VariableRange::Float { .. } => {
-                ConstValuation::Float(expression_context.evaluate_float(initial, &value_source))
-            }
+            VariableRange::Boolean { .. } => ConstValuation::Bool(
+                expression_context.evaluate_bool_with_separate_context(initial, &value_source),
+            ),
+            VariableRange::Float { .. } => ConstValuation::Float(
+                expression_context.evaluate_float_with_separate_context(initial, &value_source),
+            ),
         }
     }
 }
@@ -131,24 +133,31 @@ impl ConstValuation {
     }
 }
 
-struct ConstRecursiveEvaluator<'a, 'b, S: Clone> {
-    variables: &'a VariableManager<StackBasedExpression<VariableReference>, S>,
+struct ConstRecursiveEvaluator<'a, 'b, 'c, S: Clone, E, EC: ExpressionContext<E>> {
+    variables: &'a VariableManager<E, S>,
     const_values: &'b HashMap<String, UserProvidedConstValue>,
+    expression_context: &'c EC,
 }
 
-impl<'a, 'b, S: Clone> ConstRecursiveEvaluator<'a, 'b, S> {
+impl<'a, 'b, 'c, S: Clone, E, EC: ExpressionContext<E>>
+    ConstRecursiveEvaluator<'a, 'b, 'c, S, E, EC>
+{
     pub fn new(
-        variables: &'a VariableManager<StackBasedExpression<VariableReference>, S>,
+        variables: &'a VariableManager<E, S>,
         const_values: &'b HashMap<String, UserProvidedConstValue>,
+        expression_context: &'c EC,
     ) -> Self {
         Self {
             variables,
             const_values,
+            expression_context,
         }
     }
 }
 
-impl<'a, 'b, S: Clone> ValuationSource for ConstRecursiveEvaluator<'a, 'b, S> {
+impl<'a, 'b, 'c, S: Clone, E, EC: ExpressionContext<E>> ValuationSource
+    for ConstRecursiveEvaluator<'a, 'b, 'c, S, E, EC>
+{
     fn get_int(&self, index: VariableReference) -> i64 {
         let var = self.variables.get(&index).unwrap();
         if !var.is_constant {
@@ -165,10 +174,12 @@ impl<'a, 'b, S: Clone> ValuationSource for ConstRecursiveEvaluator<'a, 'b, S> {
                 }
             }
         } else {
-            var.initial_value
-                .as_ref()
-                .expect("Constant without initial value")
-                .evaluate_as_int(self)
+            self.expression_context.evaluate_int_with_separate_context(
+                var.initial_value
+                    .as_ref()
+                    .expect("Constant without initial value"),
+                self,
+            )
         }
     }
 
@@ -188,10 +199,12 @@ impl<'a, 'b, S: Clone> ValuationSource for ConstRecursiveEvaluator<'a, 'b, S> {
                 }
             }
         } else {
-            var.initial_value
-                .as_ref()
-                .expect("Constant without initial value")
-                .evaluate_as_bool(self)
+            self.expression_context.evaluate_bool_with_separate_context(
+                var.initial_value
+                    .as_ref()
+                    .expect("Constant without initial value"),
+                self,
+            )
         }
     }
 
@@ -211,10 +224,13 @@ impl<'a, 'b, S: Clone> ValuationSource for ConstRecursiveEvaluator<'a, 'b, S> {
                 UserProvidedConstValue::Float(f) => *f,
             }
         } else {
-            var.initial_value
-                .as_ref()
-                .expect("Constant without initial value")
-                .evaluate_as_float(self)
+            self.expression_context
+                .evaluate_float_with_separate_context(
+                    var.initial_value
+                        .as_ref()
+                        .expect("Constant without initial value"),
+                    self,
+                )
         }
     }
 

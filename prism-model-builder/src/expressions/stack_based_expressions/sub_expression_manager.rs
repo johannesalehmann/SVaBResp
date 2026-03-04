@@ -234,15 +234,10 @@ impl<V> SubExpressionManager<V> {
         }
     }
 
-    pub fn add_sub_expression(
-        &mut self,
-        expression: StackBasedExpression<V>,
-    ) -> StackBasedExpression<V> {
+    pub fn add_sub_expression(&mut self, expression: StackBasedExpression<V>) -> usize {
         let index = self.sub_expressions.len();
-        let sub_expression =
-            StackBasedExpression::with_sub_expression(index, expression.expression_type);
         self.sub_expressions.push(expression);
-        sub_expression
+        index
     }
 }
 
