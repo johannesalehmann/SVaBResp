@@ -5,8 +5,7 @@ pub use sub_expression_manager::{
     SubExpressionManager, SubExpressionManagerWithCache, SubExpressionProvider,
 };
 
-#[cfg(test)]
-mod tests;
+mod optimisations;
 
 use crate::expressions::ValuationSource;
 use crate::expressions::stack_based_expressions::sub_expression_manager::EmptySubexpressionProvider;
@@ -91,8 +90,12 @@ impl StackBasedExpression<VariableReference> {
             Expression::Function(name, args, _) => {
                 if name.name == "min" || name.name == "max" {
                     let mut all_int = true;
+                    let mut args_ops = Vec::new();
                     for arg in args {
-                        let arg_type = Self::process_expression(arg, operations, variable_manager);
+                        let mut arg_ops = Vec::new();
+                        let arg_type =
+                            Self::process_expression(arg, &mut arg_ops, variable_manager);
+                        args_ops.push((arg_type, arg_ops));
                         match arg_type {
                             ExpressionType::Int => {}
                             ExpressionType::Bool => {
@@ -103,7 +106,14 @@ impl StackBasedExpression<VariableReference> {
                             }
                         }
                     }
-                    if name.name == "min" {
+                    for (arg_type, mut arg_ops) in args_ops {
+                        operations.append(&mut arg_ops);
+                        if !all_int && arg_type == ExpressionType::Int {
+                            operations.push(Operation::IntToFloat);
+                        }
+                    }
+
+                    if name.name == "max" {
                         if all_int {
                             operations.push(Operation::MaxInt(args.len()));
                             ExpressionType::Int
@@ -127,8 +137,12 @@ impl StackBasedExpression<VariableReference> {
                     if arg_type == ExpressionType::Float {
                         operations.push(Operation::Floor);
                         ExpressionType::Int
+                    } else if arg_type == ExpressionType::Int {
+                        // Flooring an integer is a no-op. However, this is done in some models
+                        // (see e.g. csma from QComp)
+                        ExpressionType::Int
                     } else {
-                        panic!("Function floor can only operate on floats");
+                        panic!("Function floor can only operate on floats and integers");
                     }
                 } else if name.name == "ceil" {
                     assert_eq!(args.len(), 1, "Function ceil takes exactly one operand");
@@ -136,6 +150,9 @@ impl StackBasedExpression<VariableReference> {
 
                     if arg_type == ExpressionType::Float {
                         operations.push(Operation::Ceil);
+                        ExpressionType::Int
+                    } else if arg_type == ExpressionType::Int {
+                        // "Ceil"ing an integer is a no-op.
                         ExpressionType::Int
                     } else {
                         panic!("Function ceil can only operate on floats");
@@ -147,6 +164,9 @@ impl StackBasedExpression<VariableReference> {
                     if arg_type == ExpressionType::Float {
                         operations.push(Operation::Round);
                         ExpressionType::Int
+                    } else if arg_type == ExpressionType::Int {
+                        // Rounding an integer is a no-op.
+                        ExpressionType::Int
                     } else {
                         panic!("Function round can only operate on floats");
                     }
@@ -157,7 +177,7 @@ impl StackBasedExpression<VariableReference> {
 
                     let mut arg2ops = Vec::new();
                     let arg2_type =
-                        Self::process_expression(&args[0], &mut arg2ops, variable_manager);
+                        Self::process_expression(&args[1], &mut arg2ops, variable_manager);
 
                     if arg1_type == ExpressionType::Float || arg2_type == ExpressionType::Float {
                         if arg1_type == ExpressionType::Int {
@@ -895,11 +915,11 @@ impl StackBasedExpression<VariableReference> {
                 }
                 Operation::Ceil => {
                     let val = stack.floats.pop().unwrap();
-                    stack.ints.push(val.floor() as i64);
+                    stack.ints.push(val.ceil() as i64);
                 }
                 Operation::Round => {
                     let val = stack.floats.pop().unwrap();
-                    let rounded = if val < 0.0 && val.fract() == 0.5 {
+                    let rounded = if val.fract() == -0.5 {
                         val.ceil()
                     } else {
                         val.round()

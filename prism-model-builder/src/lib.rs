@@ -1,3 +1,5 @@
+pub use probabilistic_models;
+
 pub mod expressions;
 mod model_in_progress;
 mod synchronised_actions;
@@ -11,6 +13,7 @@ use crate::expressions::{TreeWalkingEvaluator, ValuationSource, VariableType};
 use crate::model_in_progress::ModelInProgress;
 use crate::synchronised_actions::{SynchronisedAction, SynchronisedActions};
 use crate::variables::{ConstAndVarValuationSource, ModelVariableInfo};
+use log::info;
 use prism_model::{
     Command, Expression, Identifier, Model, Update, VariableManager, VariableRange,
     VariableReference,
@@ -235,7 +238,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             .model_in_progress
             .into_model(builder.variable_info.valuation_context);
 
-        println!(
+        info!(
             "Model built in {:?} ({} states)",
             start_time.elapsed(),
             model.states.len()
@@ -548,8 +551,11 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
                         let (min, max) = self.variable_info.details[target_index].bounds.unwrap();
                         if value < min || value > max {
                             panic!(
-                                "Value exceeds variable bounds, bounds are ({}, {}), value is {}",
-                                min, max, value
+                                "Value for {} exceeds variable bounds, bounds are ({}, {}), value is {}",
+                                variable_manager.variables[assignment.target.index].name,
+                                min,
+                                max,
+                                value
                             );
                         } else {
                             new_valuation.set_bounded_int(target_index, value);

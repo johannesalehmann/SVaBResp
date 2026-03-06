@@ -1,6 +1,9 @@
-pub mod stack_based_expressions;
-mod tree_walking_enumerator;
+#[cfg(test)]
+mod tests;
 
+pub mod stack_based_expressions;
+
+mod tree_walking_enumerator;
 pub use tree_walking_enumerator::TreeWalkingEvaluator;
 
 use prism_model::{VariableRange, VariableReference};

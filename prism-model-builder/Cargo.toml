@@ -8,3 +8,6 @@ prism-model = { path = "../prism-model" }
 probabilistic-models = { path = "../probabilistic-models" }
 log = "0.4.29"
 rustc-hash = "2.1.1"
+
+[dev-dependencies]
+paste = "1.0.15"

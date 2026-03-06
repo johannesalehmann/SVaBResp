@@ -132,8 +132,8 @@ impl TreeWalkingEvaluator {
             "floor" => self.round(params, valuations, "floor", f64::floor),
             "ceil" => self.round(params, valuations, "ceil", f64::ceil),
             "round" => self.round(params, valuations, "round", |f| {
-                if f < 0.0 {
-                    -(-f).round() // Ensure that -n.5 is rounded to -n and not to -(n+1)
+                if f.fract() == -0.5 {
+                    f.ceil()
                 } else {
                     f.round()
                 }
