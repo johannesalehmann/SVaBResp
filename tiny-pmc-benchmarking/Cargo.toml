@@ -1,0 +1,8 @@
+[package]
+name = "tiny-pmc-benchmarking"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tiny-pmc = { path = "../tiny-pmc" }
+prism-model-builder = { path = "../prism-model-builder" }

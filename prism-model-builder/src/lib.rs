@@ -345,15 +345,6 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
 
             let action_name_index = self.model_in_progress.get_unnamed_action_name_index();
             let successors = distribution.finish();
-            if successors.number_of_successors() == 0 {
-                println!(
-                    "State {} a local action with zero successors",
-                    self.model_in_progress
-                        .get_state(state)
-                        .valuation
-                        .displayable(&self.variable_info.valuation_context)
-                )
-            }
             self.model_in_progress
                 .get_state_mut(state)
                 .actions

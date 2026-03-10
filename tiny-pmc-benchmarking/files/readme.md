@@ -1,0 +1,2 @@
+The files in this directory are taken from the [Quantitative Verification Benchmark Set](https://qcomp.org/benchmarks/).
+They are licensed under [CC-BY-SA 4.0](https://creativecommons.org/licenses/by/4.0/).

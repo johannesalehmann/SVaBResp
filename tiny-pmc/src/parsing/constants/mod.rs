@@ -31,7 +31,7 @@ pub fn parse_const_assignments(
         return Ok(result);
     }
 
-    for assignment in assignments.split(";") {
+    for assignment in assignments.split([';', ',']) {
         if let Some((lhs, rhs)) = assignment.split_once("=") {
             let name = lhs.trim().to_string();
             let value = if let Ok(i) = rhs.parse::<i64>() {
