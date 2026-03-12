@@ -6,7 +6,7 @@ pub use singleton::SingletonInitialPartition;
 
 use super::PlayerPartition;
 use crate::state_based::{StateBasedResponsibilityGame, grouping::StateGroups};
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableGame;
 
 pub trait InitialPartitionProvider {
     fn get_initial_coalition<G: StateGroups, A: SolvableGame>(

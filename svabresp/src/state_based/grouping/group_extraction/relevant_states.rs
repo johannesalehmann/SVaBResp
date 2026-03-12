@@ -1,4 +1,4 @@
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::winning_region;
+use probabilistic_model_algorithms::deterministic_games::winning_region;
 use probabilistic_models::{
     ActionCollection, AtomicProposition, ModelTypes, TwoPlayer, VectorPredecessors,
 };

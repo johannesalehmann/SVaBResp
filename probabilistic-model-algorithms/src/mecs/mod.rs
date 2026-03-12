@@ -1,7 +1,7 @@
 mod sub_mdp;
 use sub_mdp::*;
 
-use crate::mdp::sccs::StateToSccMap;
+use crate::sccs::StateToSccMap;
 use probabilistic_models::{
     ActionCollection, ActionVector, Distribution, DistributionVector, ModelTypes, Predecessors,
     ProbabilisticModel,

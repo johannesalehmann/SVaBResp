@@ -9,7 +9,7 @@ pub use winning_region_size::{WinningRegionSizeCriterion, WinningRegionSizeSelec
 
 use super::{BlockSwitchingPair, PlayerPartition};
 use crate::state_based::{StateBasedResponsibilityGame, grouping::StateGroups};
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableGame;
 
 pub trait BlockSelectionHeuristics {
     fn select_blocks<G: StateGroups, A: SolvableGame>(

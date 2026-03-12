@@ -15,7 +15,7 @@ pub fn check(
             },
             Path::Eventually(AtomicProposition { index }),
         ) => {
-            probabilistic_model_algorithms::mdp::optimistic_value_iteration(
+            probabilistic_model_algorithms::value_iteration::optimistic_value_iteration(
                 model, *index, 0.000_001,
             );
         }

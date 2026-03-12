@@ -1,7 +1,5 @@
+use super::algorithm_collections::{AdaptableOwners, AlgorithmCollection, ChangeableOwners};
 use crate::regions::StateRegion;
-use crate::two_player_games::non_probabilistic::algorithm_collections::{
-    AdaptableOwners, AlgorithmCollection, ChangeableOwners,
-};
 use probabilistic_models::{ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 
 pub trait SolvableGame {

@@ -1,8 +1,6 @@
 mod algorithm_collections;
 pub use algorithm_collections::*;
 
-pub mod attractor;
-
 mod solvable_game;
 pub use solvable_game::*;
 
@@ -12,5 +10,5 @@ pub trait ChangeableOwners {
 
 pub struct ReachabilityAlgorithmCollectionWithCachedTarget {
     pub target_states: Vec<usize>,
-    pub buffer: attractor::AttractorBuffer,
+    pub buffer: crate::attractor::AttractorBuffer,
 }

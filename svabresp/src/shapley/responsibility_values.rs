@@ -40,6 +40,7 @@ impl CriticalPairCounter {
     }
 }
 
+#[derive(Debug)]
 pub struct CriticalPairCounterState {
     counts: Vec<usize>,
 }
@@ -64,6 +65,7 @@ impl CriticalPairCounterState {
     }
 }
 
+#[derive(Debug)]
 pub struct ResponsibilityValues<P> {
     pub players: Vec<ResponsibilityValue<P>>,
 }
@@ -82,6 +84,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct ResponsibilityValue<P> {
     pub player_info: P,
     pub value: BigRational,

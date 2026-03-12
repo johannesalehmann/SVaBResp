@@ -1,5 +1,5 @@
-use crate::mdp::mecs;
-use crate::mdp::sccs::{Scc, SccList, SccWithDependencies};
+use crate::mecs;
+use crate::sccs::{Scc, SccList, SccWithDependencies};
 use probabilistic_models::{
     ActionCollection, ActionVector, AtomicPropositions, Distribution, DistributionVector,
     ProbabilisticModel, VectorPredecessors,
@@ -28,7 +28,7 @@ pub fn optimistic_value_iteration<
         handle_reachability_objective(&model, objective_ap_index, &mecs, &winning_mecs, &mut data);
 
     let sccs: SccList =
-        crate::mdp::sccs::compute_sccs(&model, &super::sccs::ExclusionList::new(&excluded[..]));
+        crate::sccs::compute_sccs(&model, &super::sccs::ExclusionList::new(&excluded[..]));
     let sccs = sccs.compute_dependencies(&model);
     let order = sccs.get_reverse_topological_order();
 
@@ -175,7 +175,7 @@ pub fn value_iteration<
         handle_reachability_objective(&model, objective_ap_index, &mecs, &winning_mecs, &mut data);
 
     let sccs: SccList =
-        crate::mdp::sccs::compute_sccs(&model, &super::sccs::ExclusionList::new(&excluded[..]));
+        crate::sccs::compute_sccs(&model, &super::sccs::ExclusionList::new(&excluded[..]));
     let sccs = sccs.compute_dependencies(&model);
     let order = sccs.get_reverse_topological_order();
 
@@ -240,7 +240,7 @@ fn value_iteration_internal<M: probabilistic_models::ModelTypes, SCC: Scc>(
     model: &ProbabilisticModel<M>,
     data: &mut Vec<StateData>,
     eps: f64,
-    sccs: &crate::mdp::sccs::SccList<SCC>,
+    sccs: &SccList<SCC>,
     scc_order: &[usize],
 ) {
     for &scc in scc_order {

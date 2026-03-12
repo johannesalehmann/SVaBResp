@@ -1,7 +1,7 @@
-use super::super::attractor;
+use super::super::AdaptableOwners;
 use super::AlgorithmCollection;
+use crate::attractor;
 use crate::regions::{FlagStateRegion, InvertedStateRegion, MutableStateRegion, StateRegion};
-use crate::two_player_games::non_probabilistic::AdaptableOwners;
 use probabilistic_models::probabilistic_properties::{
     Path, ProbabilityConstraint, ProbabilityKind, ProbabilityOperator, Property,
 };

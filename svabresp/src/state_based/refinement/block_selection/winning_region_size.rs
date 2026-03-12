@@ -3,7 +3,7 @@ use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{
     BlockSelectionHeuristics, BlockSwitchingPair, PlayerPartition,
 };
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableGame;
 
 pub struct WinningRegionSizeSelectionHeuristics {
     blocks_per_iteration: usize,

@@ -15,8 +15,8 @@ use crate::shapley::MinimalCoalitionCache;
 use crate::state_based::grouping::StateGroups;
 use log::trace;
 pub use partition::{PlayerPartition, PlayerPartitionEntry};
+use probabilistic_model_algorithms::deterministic_games::SolvableGame;
 use probabilistic_model_algorithms::regions::StateRegion;
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
 
 pub trait GroupBlockingProvider {
     fn compute_blocks<G: StateGroups, A: SolvableGame>(

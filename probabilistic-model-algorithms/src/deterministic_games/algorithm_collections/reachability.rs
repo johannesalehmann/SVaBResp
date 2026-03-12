@@ -1,5 +1,5 @@
-use super::super::attractor;
 use super::AlgorithmCollection;
+use crate::attractor;
 use crate::regions::FlagStateRegion;
 use probabilistic_models::probabilistic_properties::{
     Path, ProbabilityConstraint, ProbabilityKind, ProbabilityOperator, Property,

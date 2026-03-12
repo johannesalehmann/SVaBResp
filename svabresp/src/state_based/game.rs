@@ -2,7 +2,7 @@ use crate::shapley::{
     CoalitionSpecifier, MonotoneCooperativeGame, PlayerDescriptions, SimpleCooperativeGame,
 };
 use crate::state_based::grouping::StateGroups;
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableGame;
 use probabilistic_models::TwoPlayer;
 
 pub struct StateBasedResponsibilityGame<G: StateGroups, A: SolvableGame> {

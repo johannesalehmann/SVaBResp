@@ -4,7 +4,7 @@ use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{
     InitialPartitionProvider, PlayerPartition, PlayerPartitionEntry,
 };
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableGame;
 use rand::Rng;
 
 pub struct RandomInitialPartition {

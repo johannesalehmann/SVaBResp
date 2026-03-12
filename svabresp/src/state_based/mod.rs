@@ -16,7 +16,7 @@ use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
 use prism_model_builder::UserProvidedConstValue;
-use probabilistic_model_algorithms::two_player_games::non_probabilistic::{
+use probabilistic_model_algorithms::deterministic_games::{
     AlgorithmCollection, BuechiAlgorithmCollection, GameAndSolverExternalOwners,
     ReachabilityAlgorithmCollection, SafetyAlgorithmCollection,
 };
