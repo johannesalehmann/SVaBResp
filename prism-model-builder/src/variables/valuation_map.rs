@@ -5,6 +5,19 @@ pub struct ValuationMap {
 }
 
 impl ValuationMap {
+    #[cfg(test)]
+    pub fn with_mock_values() -> Self {
+        Self {
+            entries: vec![
+                ValuationMapEntry::Var(0),
+                ValuationMapEntry::Var(1),
+                ValuationMapEntry::Const(0),
+                ValuationMapEntry::Const(1),
+                ValuationMapEntry::Var(2),
+                ValuationMapEntry::Const(2),
+            ],
+        }
+    }
     pub fn new<S: Clone, E>(variables: &VariableManager<E, S>) -> Self {
         let mut entries = Vec::new();
 

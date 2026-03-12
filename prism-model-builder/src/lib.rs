@@ -199,7 +199,7 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             })
             .collect::<Vec<_>>();
 
-        let sub_expression_cache = SubExpressionManagerWithCache::new(sub_expression_manager);
+        let mut sub_expression_cache = SubExpressionManagerWithCache::new(sub_expression_manager);
         let context = sub_expression_cache.create_context();
         let mut expression_context = SubExpressionExpressionContext {
             sub_expressions: &sub_expression_cache,
@@ -211,6 +211,19 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             user_provided_consts,
             &mut expression_context,
         )?;
+
+        sub_expression_cache
+            .manager
+            .optimise_expressions(&variable_info);
+
+        // TODO: Reconstructing the context here is a bit unclean, but avoiding this requires some
+        // reorganisation to satisfy the borrow-checker.
+
+        let context = sub_expression_cache.create_context();
+        let mut expression_context = SubExpressionExpressionContext {
+            sub_expressions: &sub_expression_cache,
+            context,
+        };
 
         let properties = Self::build_properties(properties, &variable_info)?;
 

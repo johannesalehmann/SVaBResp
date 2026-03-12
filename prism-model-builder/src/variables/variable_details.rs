@@ -13,6 +13,26 @@ pub struct VariableDetails {
     details: Vec<VariableDetail>,
 }
 impl VariableDetails {
+    #[cfg(test)]
+    pub fn with_mock_values() -> Self {
+        Self {
+            details: vec![
+                VariableDetail {
+                    bounds: None,
+                    variable_type: VariableType::Float,
+                },
+                VariableDetail {
+                    bounds: Some((-10, 15)),
+                    variable_type: VariableType::Int,
+                },
+                VariableDetail {
+                    bounds: None,
+                    variable_type: VariableType::Bool,
+                },
+            ],
+        }
+    }
+
     pub fn new<S: Clone, E, EC: ExpressionContext<E>>(
         variables: &VariableManager<E, S>,
         valuation_map: &ValuationMap,

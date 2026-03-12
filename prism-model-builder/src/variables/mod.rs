@@ -5,6 +5,8 @@ mod valuation_source;
 pub use valuation_source::ConstAndVarValuationSource;
 
 mod const_valuations;
+pub use const_valuations::ConstValuation;
+
 mod valuation_map;
 mod variable_details;
 
@@ -25,6 +27,31 @@ pub struct ModelVariableInfo<V: Valuation> {
 }
 
 impl<V: Valuation> ModelVariableInfo<V> {
+    /// Generates a valuation source for use in tests.
+    ///
+    /// The valuation source contains the following items.
+    ///
+    /// * `[0]`: Variable with index 0 of type `float` with name `float_var`
+    /// * `[1]`: Variable with index 1 of type `int` with name `int_var` and bounds -10, 15
+    /// * `[2]`: Const with index 0 of type `int` with value `-5`
+    /// * `[3]`: Const with index 1 of type `bool` with value `true`
+    /// * `[4]`: Variable with index 2 of type `bool` with name `bool_var`
+    /// * `[5]`: Const with index 2 of type `float` with value `1.23`
+    #[cfg(test)]
+    pub fn with_mock_values() -> Self {
+        let mut builder = V::get_context_builder();
+        builder.register_float("float_var".to_string());
+        builder.register_bounded_int("int_var".to_string(), -10, 15);
+        builder.register_bool("bool_var".to_string());
+
+        ModelVariableInfo {
+            valuation_map: ValuationMap::with_mock_values(),
+            const_valuations: ConstValuations::with_mock_values(),
+            details: VariableDetails::with_mock_values(),
+            valuation_context: builder.finish(),
+        }
+    }
+
     pub fn new<S: Clone, E, EC: ExpressionContext<E>>(
         model: &Model<(), Identifier<S>, E, VariableReference, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
@@ -97,5 +124,9 @@ impl<V: Valuation> ModelVariableInfo<V> {
             &self.details,
             valuation,
         )
+    }
+
+    pub fn value_of_const(&self, reference: VariableReference) -> Option<ConstValuation> {
+        Some(self.const_valuations[self.valuation_map.map_to_constant(reference.index)?])
     }
 }

@@ -33,6 +33,13 @@ impl<V> StackBasedExpression<V> {
             expression_type,
         }
     }
+
+    pub fn new(operations: Vec<Operation<V>>, expression_type: ExpressionType) -> Self {
+        Self {
+            operations,
+            expression_type,
+        }
+    }
 }
 
 impl StackBasedExpression<VariableReference> {
@@ -991,7 +998,7 @@ impl EvaluationStack {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Operation<V> {
     PushInt(i64),
     PushFloat(f64),

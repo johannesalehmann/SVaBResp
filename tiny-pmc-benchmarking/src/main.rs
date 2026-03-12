@@ -4,7 +4,6 @@ use std::time::Duration;
 
 fn main() {
     BenchmarkResult::print_header();
-    let too_short_time = 1;
     let too_long_time = 1_000_000;
     let models = vec![
         (
@@ -671,8 +670,8 @@ struct BenchmarkResult {
 impl BenchmarkResult {
     fn print_header() {
         println!(
-            "{:>30}    {:>10}   {:>10}   {:>10} {:>10} {:>12} {:10}",
-            "name", "parsing", "building", "total", "states", "per second", "speedup"
+            "{:>30}    {:>10}   {:>10}   {:>10} {:>10} {:>12} {:>10}",
+            "name", "parsing", "building", "total", "states", "per second", "relative"
         );
     }
     fn print(&self, name: &'static str, reference_time: f64) {
@@ -684,7 +683,7 @@ impl BenchmarkResult {
             self.total.as_millis().to_string(),
             self.state_count.to_string(),
             self.state_count as f64 / self.building.as_secs_f64() * 0.001,
-            -(100.0 * (self.building.as_secs_f64() / reference_time)) + 100.0
+            (100.0 * (self.building.as_secs_f64() / reference_time)) - 100.0
         )
     }
 }

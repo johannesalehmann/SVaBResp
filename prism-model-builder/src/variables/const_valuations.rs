@@ -8,6 +8,17 @@ pub struct ConstValuations {
 }
 
 impl ConstValuations {
+    #[cfg(test)]
+    pub fn with_mock_values() -> Self {
+        Self {
+            valuations: vec![
+                ConstValuation::Int(-5),
+                ConstValuation::Bool(true),
+                ConstValuation::Float(1.23),
+            ],
+        }
+    }
+
     pub fn new<S: Clone, E, EC: ExpressionContext<E>>(
         variables: &VariableManager<E, S>,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
@@ -104,6 +115,7 @@ impl std::ops::Index<usize> for ConstValuations {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum ConstValuation {
     Int(i64),
     Bool(bool),
