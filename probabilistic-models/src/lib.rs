@@ -22,6 +22,9 @@ pub use initial_states::*;
 mod iter;
 pub use iter::*;
 
+mod features;
+pub use features::{ModelFeatures, Ownership};
+
 mod predecessors;
 pub use predecessors::*;
 
@@ -162,6 +165,10 @@ impl<M: ModelTypes> ProbabilisticModel<M> {
         for (index, predecessors) in new_predecessors.into_iter().enumerate() {
             self.states[index].predecessors = predecessors.finish();
         }
+    }
+
+    pub fn get_model_features(&self) -> ModelFeatures {
+        ModelFeatures::from_model(self)
     }
 }
 
