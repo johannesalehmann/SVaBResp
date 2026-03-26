@@ -7,7 +7,7 @@ use chumsky::{Parser, select};
 use prism_model::Identifier;
 
 pub fn expression_parser<'a, 'b, I>()
--> impl Parser<'a, I, prism_model::Expression<Identifier<Span>, Span>, E<'a>>
+-> impl Parser<'a, I, prism_model::Expression<Identifier<Span>, Span>, E<'a>> + Clone
 where
     I: ValueInput<'a, Token = Token, Span = Span>,
 {

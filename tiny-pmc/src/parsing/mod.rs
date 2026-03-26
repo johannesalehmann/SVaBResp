@@ -9,18 +9,18 @@ use prism_parser::{PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
 
 mod constants;
-pub use constants::{parse_const_assignments, ConstParsingError};
+pub use constants::{ConstParsingError, parse_const_assignments};
 
 pub enum ErrorSource {
     Model,
     Property(usize),
 }
 
-pub fn parse_model_from_source<'a>(
+pub fn parse_model_from_source<'a, P: AsRef<str>>(
     source: &str,
-    properties: &[&str],
+    properties: &[P],
 ) -> Result<
-    (PrismModel, Vec<crate::PrismProperty>),
+    (PrismModel, Vec<crate::PrismQuery>),
     Vec<(ErrorSource, PrismParserError<'a, SimpleSpan, String>)>,
 > {
     let parse_results = prism_parser::parse_prism(source, properties);
@@ -49,11 +49,11 @@ pub fn parse_model_from_source<'a>(
     }
 }
 
-pub fn parse_prism_and_print_errors(
+pub fn parse_prism_and_print_errors<P: AsRef<str>>(
     file_name: Option<&str>,
     source: &str,
-    properties: &[&str],
-) -> Option<(PrismModel, Vec<crate::PrismProperty>)> {
+    properties: &[P],
+) -> Option<(PrismModel, Vec<crate::PrismQuery>)> {
     let parse_result = crate::parsing::parse_model_from_source(source, properties);
     match parse_result {
         Err(errors) => {
@@ -64,7 +64,7 @@ pub fn parse_prism_and_print_errors(
                     }
                     ErrorSource::Property(i) => {
                         let name = format!("Property {}", i + 1);
-                        print_error(&Some(&name[..]), properties[i], error);
+                        print_error(&Some(&name[..]), properties[i].as_ref(), error);
                     }
                 }
             }

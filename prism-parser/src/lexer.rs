@@ -34,8 +34,27 @@ pub enum Token {
     PMax,
     PMin,
 
+    R,
+    RMax,
+    RMin,
+
+    Max,
+    Min,
+
+    T,
+    TMax,
+    TMin,
+
+    LRA,
+    LRAMax,
+    LRAMin,
+
+    Instantaneous,
+    Cumulative,
+
     Finally,
     Generally,
+    Until,
 
     Identifier(String),
 
@@ -44,6 +63,8 @@ pub enum Token {
     RightSqBracket,
     LeftBracket,
     RightBracket,
+    LeftCurlyBracket,
+    RightCurlyBracket,
     Arrow,
     AssignedTo,
     Colon,
@@ -115,11 +136,25 @@ impl Display for Token {
             Token::Int => write!(f, "int"),
             Token::Double => write!(f, "double"),
             Token::Bool => write!(f, "bool"),
-            Token::PMax => write!(f, "PMax"),
-            Token::PMin => write!(f, "PMin"),
             Token::P => write!(f, "P"),
+            Token::PMax => write!(f, "Pmax"),
+            Token::PMin => write!(f, "Pmin"),
+            Token::R => write!(f, "R"),
+            Token::RMax => write!(f, "Rmax"),
+            Token::RMin => write!(f, "Rmin"),
+            Token::Max => write!(f, "max"),
+            Token::Min => write!(f, "min"),
+            Token::T => write!(f, "T"),
+            Token::TMax => write!(f, "Tmax"),
+            Token::TMin => write!(f, "Tmin"),
+            Token::LRA => write!(f, "LRA"),
+            Token::LRAMax => write!(f, "LRAmax"),
+            Token::LRAMin => write!(f, "LRAmin"),
+            Token::Instantaneous => write!(f, "I"),
+            Token::Cumulative => write!(f, "C"),
             Token::Finally => write!(f, "F"),
             Token::Generally => write!(f, "G"),
+            Token::Until => write!(f, "U"),
             Token::Identifier(_) => write!(f, "[Identifier]"),
             Token::LeftSqBracket => write!(f, "["),
             Token::RightSqBracket => write!(f, "]"),
@@ -153,6 +188,8 @@ impl Display for Token {
             Token::IfAndOnlyIf => write!(f, "<=>"),
             Token::Implies => write!(f, "=>"),
             Token::Questionmark => write!(f, "?"),
+            Token::LeftCurlyBracket => write!(f, "{{"),
+            Token::RightCurlyBracket => write!(f, "}}"),
         }
     }
 }
@@ -204,6 +241,8 @@ fn lexer<'a>()
         .or(just(']').map(|_| Token::RightSqBracket))
         .or(just('(').map(|_| Token::LeftBracket))
         .or(just(')').map(|_| Token::RightBracket))
+        .or(just('{').map(|_| Token::LeftCurlyBracket))
+        .or(just('}').map(|_| Token::RightCurlyBracket))
         .or(just("->").map(|_| Token::Arrow))
         .or(just('\'')
             .then(chumsky::text::whitespace())
@@ -240,6 +279,24 @@ fn lexer<'a>()
         "PMax" | "Pmax" => Token::PMax,
         "PMin" | "Pmin" => Token::PMin,
         "P" => Token::P,
+
+        "RMax" | "Rmax" => Token::RMax,
+        "RMin" | "Rmin" => Token::RMin,
+        "R" => Token::R,
+
+        "TMax" | "Tmax" => Token::TMax,
+        "TMin" | "Tmin" => Token::TMin,
+        "T" => Token::T,
+
+        "LRA" => Token::LRA,
+        "LRAMax" | "LRAmax" => Token::LRAMax,
+        "LRAMin" | "LRAmin" => Token::LRAMin,
+
+        "I" => Token::Instantaneous,
+        "C" => Token::Cumulative,
+
+        "Max" | "max" => Token::Max,
+        "Min" | "min" => Token::Min,
 
         "F" => Token::Finally,
         "G" => Token::Generally,

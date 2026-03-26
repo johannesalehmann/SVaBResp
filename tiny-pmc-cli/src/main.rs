@@ -1,5 +1,7 @@
 use clap::Parser;
-use prism_model_builder::ModelBuildingError;
+use prism_model_builder::{ModelBuildingError, ModelBuildingOutput};
+use probabilistic_models::MdpType;
+use tiny_pmc::CheckerError;
 use tiny_pmc::parsing::ConstParsingError;
 
 mod input;
@@ -38,7 +40,7 @@ fn checker() -> Result<(), ModelCheckerError> {
         &mut atomic_propositions,
         properties,
     );
-    let builder_output = prism_model_builder::build_model(
+    let builder_output: ModelBuildingOutput<MdpType> = prism_model_builder::build_model(
         &prism_model,
         &atomic_propositions[..],
         properties.into_iter(),
@@ -52,7 +54,7 @@ fn checker() -> Result<(), ModelCheckerError> {
     }
     // for (i, property) in properties.iter().enumerate() {
     println!("Checking property {} of {}", 0 + 1, properties.len());
-    tiny_pmc::checking::check(model, &properties[0]);
+    tiny_pmc::checking::check(model, properties[0].clone())?;
     // }
 
     println!("Finished in {:?}", start_time.elapsed());
@@ -68,6 +70,7 @@ enum ModelCheckerError {
     ConstParsingError(ConstParsingError),
     ModelAndPropertyParsingError,
     ModelBuildingError(ModelBuildingError),
+    ModelCheckingError(CheckerError),
 }
 
 impl ModelCheckerError {
@@ -85,6 +88,10 @@ impl ModelCheckerError {
             ModelCheckerError::ModelBuildingError(err) => {
                 println!("Error during model building: {:?}", err);
                 4
+            }
+            ModelCheckerError::ModelCheckingError(err) => {
+                println!("Error during model checking: {:?}", err);
+                5
             }
         }
     }
@@ -105,5 +112,11 @@ impl From<ConstParsingError> for ModelCheckerError {
 impl From<ModelBuildingError> for ModelCheckerError {
     fn from(value: ModelBuildingError) -> Self {
         ModelCheckerError::ModelBuildingError(value)
+    }
+}
+
+impl From<CheckerError> for ModelCheckerError {
+    fn from(value: CheckerError) -> Self {
+        ModelCheckerError::ModelCheckingError(value)
     }
 }

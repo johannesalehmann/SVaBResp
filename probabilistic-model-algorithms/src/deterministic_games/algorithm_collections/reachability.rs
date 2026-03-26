@@ -1,9 +1,7 @@
 use super::AlgorithmCollection;
 use crate::attractor;
 use crate::regions::FlagStateRegion;
-use probabilistic_models::probabilistic_properties::{
-    Path, ProbabilityConstraint, ProbabilityKind, ProbabilityOperator, Property,
-};
+use probabilistic_models::probabilistic_properties::{Bound, BoundOperator, Query, StateFormula};
 use probabilistic_models::{
     AtomicProposition, InitialStates, ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors,
 };
@@ -34,25 +32,17 @@ impl AlgorithmCollection for ReachabilityAlgorithmCollection {
         }
     }
 
-    fn create_if_compatible(property: &Property<AtomicProposition, f64>) -> Option<Self> {
-        if let Property {
-            operator:
-                ProbabilityOperator {
-                    kind: ProbabilityKind::P,
-                    constraint: ProbabilityConstraint::EqualTo(1.0),
+    fn create_if_compatible(property: &Query<i64, f64, AtomicProposition>) -> Option<Self> {
+        if let Query::StateFormula(StateFormula::ProbabilityBound {
+            non_determinism: Option::None,
+            bound:
+                Bound {
+                    operator: BoundOperator::GreaterOrEqual,
+                    value: 1.0,
                 },
-            path: Path::Eventually(ap),
-        } = property
-        {
-            Some(Self { target_states: *ap })
-        } else if let Property {
-            operator:
-                ProbabilityOperator {
-                    kind: ProbabilityKind::P,
-                    constraint: ProbabilityConstraint::GreaterOrEqual(1.0),
-                },
-            path: Path::Eventually(ap),
-        } = property
+            path,
+        }) = property
+            && let Some(StateFormula::Expression(ap)) = path.eventually_condition()
         {
             Some(Self { target_states: *ap })
         } else {

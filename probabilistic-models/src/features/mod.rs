@@ -20,7 +20,7 @@ impl ModelFeatures {
         }
     }
 
-    pub fn game() -> Self {
+    pub fn nonstochastic_game() -> Self {
         Self {
             probabilism: false,
             non_determinism: true,
@@ -57,7 +57,7 @@ impl ModelFeatures {
 
         let mut probabilism = false;
         let mut non_determinism = false;
-        let mut ownership = match <M::Owners as crate::Owners>::max_player_count() {
+        let ownership = match <M::Owners as crate::Owners>::max_player_count() {
             1 => Ownership::SinglePlayer,
             2 => Ownership::TwoPlayer,
             i => panic!("Cannot express model features of a model with {i} players"),
@@ -87,5 +87,25 @@ impl ModelFeatures {
             non_determinism,
             ownership,
         }
+    }
+
+    pub fn representable_as_transition_system(&self) -> bool {
+        !self.probabilism && self.ownership == Ownership::SinglePlayer
+    }
+
+    pub fn representable_as_non_stochastic_game(&self) -> bool {
+        !self.probabilism
+    }
+
+    pub fn representable_as_markov_chain(&self) -> bool {
+        !self.non_determinism && self.ownership == Ownership::SinglePlayer
+    }
+
+    pub fn representable_as_markov_decision_process(&self) -> bool {
+        self.ownership == Ownership::SinglePlayer
+    }
+
+    pub fn representable_as_stochastic_game(&self) -> bool {
+        true
     }
 }

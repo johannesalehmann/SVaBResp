@@ -9,7 +9,7 @@ use probabilistic_models::{
     AtomicProposition, Context, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation,
     VectorPredecessors,
 };
-use probabilistic_properties::Property;
+use probabilistic_properties::Query;
 use std::collections::HashMap;
 
 pub struct ModuleGroupExtractionScheme {
@@ -31,8 +31,14 @@ impl ModuleGroupExtractionScheme {
 impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
     type GroupType = crate::state_based::grouping::VectorStateGroups;
 
-    fn transform_prism(&mut self, prism_model: &mut PrismModel, property: &mut PrismProperty) {
-        let _ = property;
+    fn transform_prism(
+        &mut self,
+        prism_model: &mut PrismModel,
+        property: &mut PrismProperty,
+
+        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+    ) {
+        let _ = (property, atomic_propositions);
 
         let span = SimpleSpan::new(0, 0);
         let selected_module_variable = prism_model
@@ -209,7 +215,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
     fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
         &mut self,
         game: &mut ProbabilisticModel<M>,
-        property: &Property<AtomicProposition, f64>,
+        property: &Query<i64, f64, AtomicProposition>,
     ) -> GroupsAndAuxiliary<Self::GroupType> {
         let _ = property;
 

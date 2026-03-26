@@ -1,8 +1,8 @@
 use crate::{PrismModel, PrismProperty};
+use chumsky::span::SimpleSpan;
 use probabilistic_models::{
     AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors,
 };
-use probabilistic_properties::Property;
 
 mod action_groups;
 pub use action_groups::ActionGroupExtractionScheme;
@@ -18,6 +18,8 @@ pub use value_groups::ValueGroupExtractionScheme;
 
 mod label_groups;
 pub use label_groups::LabelGroupExtractionScheme;
+use prism_model::VariableReference;
+use probabilistic_properties::Query;
 
 mod relevant_states;
 
@@ -27,12 +29,18 @@ pub trait GroupExtractionScheme {
     type GroupType: super::super::grouping::StateGroups;
 
     #[allow(unused)]
-    fn transform_prism(&mut self, prism_model: &mut PrismModel, property: &mut PrismProperty) {}
+    fn transform_prism(
+        &mut self,
+        prism_model: &mut PrismModel,
+        property: &mut PrismProperty,
+        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+    ) {
+    }
 
     fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
         &mut self,
         game: &mut ProbabilisticModel<M>,
-        property: &Property<AtomicProposition, f64>,
+        property: &Query<i64, f64, AtomicProposition>,
     ) -> GroupsAndAuxiliary<Self::GroupType>;
 }
 

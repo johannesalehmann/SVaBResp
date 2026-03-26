@@ -1,10 +1,12 @@
 use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
+use chumsky::prelude::SimpleSpan;
+use prism_model::VariableReference;
 use probabilistic_models::{
     AtomicProposition, AtomicPropositions, ModelTypes, ProbabilisticModel, TwoPlayer,
     VectorPredecessors,
 };
-use probabilistic_properties::Property;
+use probabilistic_properties::Query;
 use std::collections::HashMap;
 
 pub struct LabelGroupExtractionScheme {
@@ -27,17 +29,28 @@ impl LabelGroupExtractionScheme {
 impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
     type GroupType = crate::state_based::grouping::VectorStateGroups;
 
-    fn transform_prism(&mut self, prism_model: &mut PrismModel, property: &mut PrismProperty) {
+    fn transform_prism(
+        &mut self,
+        prism_model: &mut PrismModel,
+        property: &mut PrismProperty,
+        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+    ) {
         let _ = property;
         let mut label_atomic_propositions = Vec::new();
 
+        for label in &prism_model.labels.labels {
+            atomic_propositions.push(label.condition.clone());
+        }
+
         for label in &self.labels {
-            let index = prism_model
+            let prism_label = prism_model
                 .labels
-                .get_index(label.as_str())
+                .by_name(label.as_str())
                 .unwrap_or_else(|| panic!("Could not find label with name `{}`", label));
+
+            let index = atomic_propositions.len();
+            atomic_propositions.push(prism_label.condition.clone());
             label_atomic_propositions.push(AtomicProposition::new(index));
-            // This relies on the model builder creating an atomic proposition with matching index for each label. This is currently the case, but should perhaps be handled more generically
         }
 
         self.label_atomic_propositions = Some(label_atomic_propositions);
@@ -46,7 +59,7 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
     fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
         &mut self,
         game: &mut ProbabilisticModel<M>,
-        property: &Property<AtomicProposition, f64>,
+        property: &Query<i64, f64, AtomicProposition>,
     ) -> GroupsAndAuxiliary<Self::GroupType> {
         let _ = property;
         let label_atomic_propositions = self.label_atomic_propositions.as_ref().unwrap();

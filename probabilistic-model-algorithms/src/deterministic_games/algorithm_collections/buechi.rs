@@ -2,9 +2,7 @@ use super::super::AdaptableOwners;
 use super::AlgorithmCollection;
 use crate::attractor;
 use crate::regions::{FlagStateRegion, InvertedStateRegion, MutableStateRegion, StateRegion};
-use probabilistic_models::probabilistic_properties::{
-    Path, ProbabilityConstraint, ProbabilityKind, ProbabilityOperator, Property,
-};
+use probabilistic_models::probabilistic_properties::{Bound, BoundOperator, Query, StateFormula};
 use probabilistic_models::{
     AtomicProposition, InitialStates, ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors,
 };
@@ -39,25 +37,26 @@ impl AlgorithmCollection for BuechiAlgorithmCollection {
         context
     }
 
-    fn create_if_compatible(property: &Property<AtomicProposition, f64>) -> Option<Self> {
-        if let Property {
-            operator:
-                ProbabilityOperator {
-                    kind: ProbabilityKind::P,
-                    constraint: ProbabilityConstraint::EqualTo(1.0),
+    fn create_if_compatible(property: &Query<i64, f64, AtomicProposition>) -> Option<Self> {
+        if let Query::StateFormula(StateFormula::ProbabilityBound {
+            non_determinism: Option::None,
+            bound:
+                Bound {
+                    operator: BoundOperator::GreaterOrEqual,
+                    value: 1.0,
                 },
-            path: Path::InfinitelyOften(ap),
-        } = property
-        {
-            Some(Self { buechi_states: *ap })
-        } else if let Property {
-            operator:
-                ProbabilityOperator {
-                    kind: ProbabilityKind::P,
-                    constraint: ProbabilityConstraint::GreaterOrEqual(1.0),
-                },
-            path: Path::InfinitelyOften(ap),
-        } = property
+            path,
+        }) = property
+            && let Some(StateFormula::ProbabilityBound {
+                non_determinism: Option::None,
+                bound:
+                    Bound {
+                        operator: BoundOperator::GreaterOrEqual,
+                        value: 1.0,
+                    },
+                path,
+            }) = path.generally_condition()
+            && let Some(StateFormula::Expression(ap)) = path.eventually_condition()
         {
             Some(Self { buechi_states: *ap })
         } else {

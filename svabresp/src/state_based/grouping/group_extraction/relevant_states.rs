@@ -2,7 +2,7 @@ use probabilistic_model_algorithms::deterministic_games::winning_region;
 use probabilistic_models::{
     ActionCollection, AtomicProposition, ModelTypes, TwoPlayer, VectorPredecessors,
 };
-use probabilistic_properties::Property;
+use probabilistic_properties::Query;
 use std::collections::HashSet;
 
 pub struct RelevantStates {
@@ -13,7 +13,7 @@ pub struct RelevantStates {
 impl RelevantStates {
     pub fn compute<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
         model: &mut probabilistic_models::ProbabilisticModel<M>,
-        property: &Property<AtomicProposition, f64>,
+        property: &Query<i64, f64, AtomicProposition>,
     ) -> Self {
         for state in &mut model.states {
             state.owner = TwoPlayer::PlayerOne;

@@ -2,7 +2,7 @@ use crate::state_based::grouping::{GroupsAndAuxiliary, VectorStateGroupBuilder};
 use probabilistic_models::{
     AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation, VectorPredecessors,
 };
-use probabilistic_properties::Property;
+use probabilistic_properties::Query;
 
 pub struct IndividualGroupExtractionScheme {
     restrict_to_relevant_states: bool,
@@ -26,7 +26,7 @@ impl IndividualGroupExtractionScheme {
         &self,
         builder: &mut VectorStateGroupBuilder,
         game: &mut ProbabilisticModel<M>,
-        property: &Property<AtomicProposition, f64>,
+        property: &Query<i64, f64, AtomicProposition>,
     ) {
         let relevant_states = super::RelevantStates::compute(game, property);
 
@@ -66,7 +66,7 @@ impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
     fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
         &mut self,
         game: &mut ProbabilisticModel<M>,
-        property: &Property<AtomicProposition, f64>,
+        property: &Query<i64, f64, AtomicProposition>,
     ) -> GroupsAndAuxiliary<Self::GroupType> {
         let mut builder = Self::GroupType::get_builder();
 

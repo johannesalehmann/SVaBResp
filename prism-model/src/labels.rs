@@ -24,10 +24,19 @@ impl<E, S: Clone> LabelManager<E, S> {
         self.labels.get(index)
     }
 
-    pub fn get_index(&self, name: &str) -> Option<usize> {
+    pub fn index_of_name(&self, name: &str) -> Option<usize> {
         for (i, label) in self.labels.iter().enumerate() {
             if label.name.name == name {
                 return Some(i);
+            }
+        }
+        None
+    }
+
+    pub fn by_name(&self, name: &str) -> Option<&Label<E, S>> {
+        for label in &self.labels {
+            if label.name.name == name {
+                return Some(label);
             }
         }
         None

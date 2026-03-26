@@ -19,7 +19,8 @@ type PrismModel = prism_model::Model<
     VariableReference,
     SimpleSpan,
 >;
-type PrismProperty = probabilistic_properties::Property<
+type PrismProperty = probabilistic_properties::Query<
+    Expression<VariableReference, SimpleSpan>,
     Expression<VariableReference, SimpleSpan>,
     Expression<VariableReference, SimpleSpan>,
 >;

@@ -17,7 +17,7 @@ fn small_network_explicit() {
         model_description: ModelFromString::new(
             "small-network.prism",
             include_str!("files/small-network.prism"),
-            "P=1 [F \"obj\"]",
+            "P>=1 [F \"obj\"]",
         ),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
@@ -26,6 +26,10 @@ fn small_network_explicit() {
         refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
+
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
 
     assert_res("(loc=1)", "1/12", &result);
     assert_res("(loc=2)", "1/12", &result);
@@ -39,7 +43,7 @@ fn labelled_groups() {
         model_description: ModelFromString::new(
             "labelled-groups.prism",
             include_str!("files/labelled-groups.prism"),
-            "P=1 [F \"obj\"]",
+            "P>=1 [F \"obj\"]",
         ),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
@@ -54,6 +58,10 @@ fn labelled_groups() {
     };
     let result = task.run();
 
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
+
     assert_res("l1, l2", "1/12", &result);
     assert_res("l2", "1/12", &result);
     assert_res("l1", "1/4", &result);
@@ -66,7 +74,7 @@ fn value_groups() {
         model_description: ModelFromString::new(
             "value-groups.prism",
             include_str!("files/value-groups.prism"),
-            "P=1 [F \"obj\"]",
+            "P>=1 [F \"obj\"]",
         ),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
@@ -80,6 +88,10 @@ fn value_groups() {
     };
     let result = task.run();
 
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
+
     assert_res("(x=-2, z=true, w=4)", "1/5", &result);
     assert_res("(x=1, z=true, w=4)", "1/5", &result);
     assert_res("(x=2, z=false, w=4)", "0/1", &result);
@@ -92,7 +104,7 @@ fn module_groups() {
         model_description: ModelFromString::new(
             "module-groups.prism",
             include_str!("files/module-groups.prism"),
-            "P=1 [G !\"obj\"]",
+            "P>=1 [G !\"obj\"]",
         ),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
@@ -101,6 +113,10 @@ fn module_groups() {
         refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
+
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
 
     assert_res("scheduler", "0", &result);
     assert_res("Window", "0", &result);
@@ -118,7 +134,7 @@ fn action_groups() {
         model_description: ModelFromString::new(
             "action-groups.prism",
             include_str!("files/action-groups.prism"),
-            "P=1 [G !\"obj\"]",
+            "P>=1 [G !\"obj\"]",
         ),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
@@ -142,7 +158,7 @@ fn simple_refinement() {
         model_description: ModelFromString::new(
             "simple-refinement.prism",
             include_str!("files/simple-refinement.prism"),
-            "P=1 [F \"obj\"]",
+            "P>=1 [F \"obj\"]",
         ),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
@@ -170,7 +186,7 @@ fn refinement_from_paper() {
         model_description: ModelFromString::new(
             "refinement-example-paper.prism",
             include_str!("files/refinement-example-paper.prism"),
-            "P=1 [G !\"obj\"]",
+            "P>=1 [G !\"obj\"]",
         ),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
@@ -183,6 +199,10 @@ fn refinement_from_paper() {
         ),
     };
     let result = task.run();
+
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
 
     assert_res("(s=2)", "5/12", &result);
     assert_res("(s=3)", "5/12", &result);

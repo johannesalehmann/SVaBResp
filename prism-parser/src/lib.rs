@@ -26,7 +26,8 @@ pub struct ParseResults<'a, 'b> {
     pub properties: Vec<
         ParseResult<
             'b,
-            probabilistic_properties::Property<
+            probabilistic_properties::Query<
+                prism_model::Expression<prism_model::VariableReference, Span>,
                 prism_model::Expression<prism_model::VariableReference, Span>,
                 prism_model::Expression<prism_model::VariableReference, Span>,
             >,
@@ -34,12 +35,14 @@ pub struct ParseResults<'a, 'b> {
     >,
 }
 
-pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResults<'b, 'b> {
+pub fn parse_prism<'a, 'b, P: AsRef<str>>(
+    source: &'a str,
+    properties: &[P],
+) -> ParseResults<'b, 'b> {
     let mut model_errors = Vec::new();
     let mut property_errors = (0..properties.len())
         .map(|_| Vec::new())
         .collect::<Vec<_>>();
-
     if let Some(lexer_output) = lex(source, &mut model_errors) {
         let (output, parse_errors) = parser::program_parser()
             .map_with(|ast, e| (ast, e.span()))
@@ -55,15 +58,16 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
         let lexed_properties = properties
             .iter()
             .zip(property_errors.iter_mut())
-            .map(|(p, errs)| lex(p, errs))
+            .map(|(p, errs)| lex(p.as_ref(), errs))
             .collect::<Vec<_>>();
         let mut parsed_properties = lexed_properties
             .into_iter()
             .zip(properties)
             .zip(property_errors.iter_mut())
             .map(|((lexer_output, source), errs)| {
+                let source = source.as_ref();
                 lexer_output.map_or(None, |lexer_output| {
-                    let (output, parse_errors) = parser::property_parser()
+                    let (output, parse_errors) = parser::query_parser()
                         .map_with(|ast, e| (ast, e.span()))
                         .parse(
                             lexer_output
@@ -85,7 +89,7 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
                     .zip(property_errors.iter_mut())
                     .for_each(|(p_option, errs)| {
                         if let Some(p) = p_option {
-                            use prism_model::SubstitutableProperty;
+                            use prism_model::SubstitutableQuery;
                             p.substitute_labels(SimpleSpan::new(0, 1), &output.labels);
                             let substitution =
                                 p.substitute_formulas(SimpleSpan::new(0, 1), &output.formulas);
@@ -110,14 +114,18 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
                 if let Err(error) = output.expand_renamed_models() {
                     model_errors
                         .push(PrismParserValidationError::ModuleExpansionError { error }.into());
-                    (None, vec![None; properties.len()])
+                    let mut empty_vec = Vec::with_capacity(properties.len());
+                    for _ in 0..properties.len() {
+                        empty_vec.push(None);
+                    }
+                    (None, empty_vec)
                 } else {
                     let properties = parsed_properties
                         .into_iter()
                         .zip(property_errors.iter_mut())
                         .map(|(p, errs)| {
                             p.map_or(None, |p| {
-                                use prism_model::SubstitutableProperty;
+                                use prism_model::SubstitutableQuery;
                                 match p.replace_identifiers_by_variable_indices(
                                     &output.variable_manager,
                                 ) {
@@ -157,7 +165,13 @@ pub fn parse_prism<'a, 'b>(source: &'a str, properties: &[&'a str]) -> ParseResu
                     )
                 }
             }
-            None => (None, vec![None; properties.len()]),
+            None => {
+                let mut empty_vec = Vec::with_capacity(properties.len());
+                for _ in 0..properties.len() {
+                    empty_vec.push(None);
+                }
+                (None, empty_vec)
+            }
         };
 
         let properties = properties

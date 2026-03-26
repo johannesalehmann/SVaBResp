@@ -18,7 +18,7 @@ use prism_model::{
     Command, Expression, Identifier, Model, Update, VariableManager, VariableRange,
     VariableReference,
 };
-use probabilistic_models::probabilistic_properties::{ProbabilityOperator, Property};
+use probabilistic_models::probabilistic_properties::Query;
 use probabilistic_models::{
     Action, AtomicProposition, AtomicPropositions, Builder, Distribution, ModelTypes,
     PredecessorsBuilder, ProbabilisticModel, Successor, Valuation, ValuationBuilder,
@@ -29,7 +29,13 @@ use std::collections::HashMap;
 pub fn build_model<
     S: Clone,
     M: ModelTypes,
-    I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
+    I: Iterator<
+        Item = Query<
+            Expression<VariableReference, S>,
+            Expression<VariableReference, S>,
+            AtomicProposition,
+        >,
+    >,
 >(
     model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     atomic_propositions: &[Expression<VariableReference, S>],
@@ -52,7 +58,7 @@ pub enum UserProvidedConstValue {
 
 pub struct ModelBuildingOutput<M: ModelTypes> {
     pub model: ProbabilisticModel<M>,
-    pub properties: Vec<Property<AtomicProposition, f64>>,
+    pub properties: Vec<Query<i64, f64, AtomicProposition>>,
 }
 
 pub trait ExpressionContext<E> {
@@ -145,36 +151,43 @@ pub struct ExplicitModelBuilder<M: ModelTypes> {
 impl<M: ModelTypes> ExplicitModelBuilder<M> {
     fn build_properties<
         S: Clone,
-        I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
+        I: Iterator<
+            Item = Query<
+                Expression<VariableReference, S>,
+                Expression<VariableReference, S>,
+                AtomicProposition,
+            >,
+        >,
     >(
         properties: I,
         variable_info: &variables::ModelVariableInfo<M::Valuation>,
-    ) -> Result<Vec<Property<AtomicProposition, f64>>, ModelBuildingError> {
+    ) -> Result<Vec<Query<i64, f64, AtomicProposition>>, ModelBuildingError> {
         let const_valuation_source = variable_info.get_const_only_valuation_source();
 
         let mut result = Vec::new();
         for property in properties {
-            let constraint = property
-                .operator
-                .constraint
-                .map_probability_specifier_with_result(|p| {
-                    Ok(TreeWalkingEvaluator::new().evaluate_as_float(&p, &const_valuation_source))
-                })?;
-
-            result.push(Property {
-                operator: ProbabilityOperator {
-                    kind: property.operator.kind,
-                    constraint,
-                },
-                path: property.path,
-            })
+            result.push(
+                property
+                    .map_i(&mut |ex| {
+                        TreeWalkingEvaluator::new().evaluate_as_int(&ex, &const_valuation_source)
+                    })
+                    .map_f(&mut |ex| {
+                        TreeWalkingEvaluator::new().evaluate_as_float(&ex, &const_valuation_source)
+                    }),
+            );
         }
         Ok(result)
     }
 
     pub fn build_model<
         S: Clone,
-        I: Iterator<Item = Property<AtomicProposition, Expression<VariableReference, S>>>,
+        I: Iterator<
+            Item = Query<
+                Expression<VariableReference, S>,
+                Expression<VariableReference, S>,
+                AtomicProposition,
+            >,
+        >,
     >(
         model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
         atomic_propositions: &[Expression<VariableReference, S>],

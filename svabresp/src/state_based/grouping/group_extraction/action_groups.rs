@@ -1,12 +1,13 @@
 use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
+use chumsky::prelude::SimpleSpan;
 use prism_model::{Expression, VariableRange, VariableReference};
 use probabilistic_models::{
     Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, Distribution,
     DistributionBuilder, ModelTypes, Predecessors, PredecessorsBuilder, ProbabilisticModel, State,
     Successor, TwoPlayer, Valuation, VectorPredecessors,
 };
-use probabilistic_properties::Property;
+use probabilistic_properties::Query;
 
 pub struct ActionGroupExtractionScheme {
     action_index: Option<VariableReference>,
@@ -25,8 +26,13 @@ impl ActionGroupExtractionScheme {
 impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
     type GroupType = crate::state_based::grouping::VectorStateGroups;
 
-    fn transform_prism(&mut self, prism_model: &mut PrismModel, property: &mut PrismProperty) {
-        let _ = property;
+    fn transform_prism(
+        &mut self,
+        prism_model: &mut PrismModel,
+        property: &mut PrismProperty,
+        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+    ) {
+        let _ = (property, atomic_propositions);
         // Add two variables to the PRISM code that will later be used during model construction to
         // assign unique values to additional auxiliary states. Adding the variables at this stage
         // is easier than adding them after the model builder has run
@@ -62,7 +68,7 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
     fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
         &mut self,
         game: &mut ProbabilisticModel<M>,
-        property: &Property<AtomicProposition, f64>,
+        property: &Query<i64, f64, AtomicProposition>,
     ) -> GroupsAndAuxiliary<Self::GroupType> {
         let _ = property;
 

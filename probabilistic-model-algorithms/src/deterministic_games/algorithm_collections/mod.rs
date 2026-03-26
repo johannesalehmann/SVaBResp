@@ -8,7 +8,7 @@ mod buechi;
 pub use buechi::{BuechiAlgorithmCollection, BuechiAlgorithmContext};
 
 use crate::regions::{BoxedStateRegion, StateRegion};
-use probabilistic_models::probabilistic_properties::Property;
+use probabilistic_models::probabilistic_properties::Query;
 use probabilistic_models::{AtomicProposition, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 
 pub trait AlgorithmCollection: Sized {
@@ -23,7 +23,11 @@ pub trait AlgorithmCollection: Sized {
     ) -> Self::ModelContext;
 
     fn create_if_compatible(
-        property: &probabilistic_models::probabilistic_properties::Property<AtomicProposition, f64>,
+        property: &probabilistic_models::probabilistic_properties::Query<
+            i64,
+            f64,
+            AtomicProposition,
+        >,
     ) -> Option<Self>;
 
     fn winning<
@@ -99,7 +103,7 @@ pub fn is_winning<
     M: probabilistic_models::ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
 >(
     model: &probabilistic_models::ProbabilisticModel<M>,
-    property: &Property<AtomicProposition, f64>,
+    property: &Query<i64, f64, AtomicProposition>,
 ) -> TwoPlayer {
     if let Some(mut safety) = SafetyAlgorithmCollection::create_if_compatible(property) {
         safety.winning(model)
@@ -118,7 +122,7 @@ pub fn winning_from_state<
     M: probabilistic_models::ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
 >(
     model: &probabilistic_models::ProbabilisticModel<M>,
-    property: &Property<AtomicProposition, f64>,
+    property: &Query<i64, f64, AtomicProposition>,
     state: usize,
 ) -> TwoPlayer {
     if let Some(mut safety) = SafetyAlgorithmCollection::create_if_compatible(property) {
@@ -138,7 +142,7 @@ pub fn winning_region<
     M: probabilistic_models::ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
 >(
     model: &probabilistic_models::ProbabilisticModel<M>,
-    property: &Property<AtomicProposition, f64>,
+    property: &Query<i64, f64, AtomicProposition>,
 ) -> BoxedStateRegion {
     if let Some(mut safety) = SafetyAlgorithmCollection::create_if_compatible(property) {
         safety.winning_region(model).into()

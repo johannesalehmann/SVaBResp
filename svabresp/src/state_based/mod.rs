@@ -1,6 +1,6 @@
 use log::{info, trace};
 use probabilistic_models::{
-    IterFunctions, IterProbabilisticModel, MdpType, TwoPlayer, VectorPredecessors,
+    IterFunctions, IterProbabilisticModel, MdpType, TwoPlayer, Valuation, VectorPredecessors,
 };
 
 mod game;
@@ -33,14 +33,12 @@ pub fn compute_for_prism<
     shapley: &mut S,
     constants: std::collections::HashMap<String, UserProvidedConstValue>,
 ) -> S::Output<String> {
-    trace!("Applying grouping scheme to PRISM model");
-    grouping_scheme.transform_prism(&mut prism_model, &mut prism_property);
-
-    trace!("Building atomic proposition list");
     let mut atomic_propositions = Vec::new();
-    // for label in &prism_model.labels.labels {
-    //     atomic_propositions.push(label.condition.clone());
-    // }
+    grouping_scheme.transform_prism(
+        &mut prism_model,
+        &mut prism_property,
+        &mut atomic_propositions,
+    );
     let properties = tiny_pmc::building::prism_objectives_to_atomic_propositions(
         &mut atomic_propositions,
         vec![prism_property],
@@ -69,8 +67,24 @@ pub fn compute_for_prism<
     trace!("Computing state groups");
     let grouping = grouping_scheme.create_groups(&mut game, &property);
     info!("There are {} state groups", grouping.groups.get_count());
+    let print_groups = true;
+    if print_groups {
+        println!("Group membership:");
+        for group in 0..grouping.groups.get_count() {
+            println!("  Group {}", group);
+            for state in grouping.groups.get_states(group) {
+                println!(
+                    "    {}",
+                    game.states[state]
+                        .valuation
+                        .displayable(&game.valuation_context)
+                );
+            }
+        }
+    }
 
     if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
+        println!("Reachability property");
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
         let mut coop_game = game::StateBasedResponsibilityGame::new(
             solvable_game,
@@ -87,6 +101,7 @@ pub fn compute_for_prism<
 
         shapley.compute_simple(cached_coop_game)
     } else if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
+        println!("Safety property");
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
         let mut coop_game = game::StateBasedResponsibilityGame::new(
             solvable_game,
@@ -102,6 +117,7 @@ pub fn compute_for_prism<
 
         shapley.compute_simple(cached_coop_game)
     } else if let Some(solver) = BuechiAlgorithmCollection::create_if_compatible(&property) {
+        println!("Büchi property");
         let solvable_game = GameAndSolverExternalOwners::new(game, solver);
         let mut coop_game = game::StateBasedResponsibilityGame::new(
             solvable_game,

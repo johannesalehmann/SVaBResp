@@ -1,5 +1,3 @@
-use probabilistic_properties::StateSpecifier;
-
 pub trait AtomicPropositions {
     fn get_empty(capacity: usize) -> Self;
     fn set_value(&mut self, index: usize, value: bool);
@@ -51,5 +49,3 @@ impl AtomicProposition {
         Self { index }
     }
 }
-
-impl StateSpecifier for AtomicProposition {}
