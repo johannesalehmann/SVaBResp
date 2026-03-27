@@ -15,6 +15,7 @@ enum SVaBRespCommand {
 impl SVaBRespCommand {
     pub fn from_arguments() -> Self {
         let matches = ComputeResponsibilityCommand::get_command()
+            .args_conflicts_with_subcommands(true)
             .subcommand(ListGroupingOptionsCommand::get_subcommand())
             .get_matches();
 
