@@ -1,10 +1,10 @@
 use crate::shapley::SimpleCooperativeGame;
-use crate::state_based::StateBasedResponsibilityGame;
+use crate::state_based::StateBasedResponsibilityNonstochasticGame;
 use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{
     InitialPartitionProvider, PlayerPartition, PlayerPartitionEntry,
 };
-use probabilistic_model_algorithms::deterministic_games::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
 
 pub struct SingletonInitialPartition {}
 
@@ -15,9 +15,9 @@ impl SingletonInitialPartition {
 }
 
 impl InitialPartitionProvider for SingletonInitialPartition {
-    fn get_initial_coalition<G: StateGroups, A: SolvableGame>(
+    fn get_initial_coalition<G: StateGroups, A: SolvableNonstochasticGame>(
         self,
-        game: &StateBasedResponsibilityGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
     ) -> PlayerPartition {
         let mut players = Vec::with_capacity(game.get_player_count());
         for i in 0..game.get_player_count() {

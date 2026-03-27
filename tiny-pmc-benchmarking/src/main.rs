@@ -702,7 +702,7 @@ fn model_building<M: ModelTypes>(
 
     let parsed_model_and_objectives =
         tiny_pmc::parsing::parse_prism_and_print_errors::<&str>(Some(path), &source, &[]);
-    let (prism_model, properties) = match parsed_model_and_objectives {
+    let (mut prism_model, properties) = match parsed_model_and_objectives {
         None => panic!("Error parsing model"),
         Some((prism_model, properties)) => (prism_model, properties),
     };
@@ -714,7 +714,7 @@ fn model_building<M: ModelTypes>(
         properties,
     );
     let builder_output: ModelBuildingOutput<M> = prism_model_builder::build_model(
-        &prism_model,
+        &mut prism_model,
         &atomic_propositions[..],
         properties.into_iter(),
         &constants,

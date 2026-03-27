@@ -2,19 +2,19 @@ use super::PlayerPartition;
 use crate::shapley::{
     CoalitionSpecifier, MonotoneCooperativeGame, PlayerDescriptions, SimpleCooperativeGame,
 };
-use crate::state_based::{StateBasedResponsibilityGame, grouping::StateGroups};
-use probabilistic_model_algorithms::deterministic_games::SolvableGame;
+use crate::state_based::{StateBasedResponsibilityNonstochasticGame, grouping::StateGroups};
+use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
 use probabilistic_models::TwoPlayer;
 
-pub struct GroupedGame<'a, G: StateGroups, A: SolvableGame> {
-    game: &'a mut StateBasedResponsibilityGame<G, A>,
+pub struct GroupedGame<'a, G: StateGroups, A: SolvableNonstochasticGame> {
+    game: &'a mut StateBasedResponsibilityNonstochasticGame<G, A>,
     partition: &'a PlayerPartition,
     player_description: GroupedGamePlayerDescriptions,
 }
 
-impl<'a, G: StateGroups, A: SolvableGame> GroupedGame<'a, G, A> {
+impl<'a, G: StateGroups, A: SolvableNonstochasticGame> GroupedGame<'a, G, A> {
     pub fn new(
-        game: &'a mut StateBasedResponsibilityGame<G, A>,
+        game: &'a mut StateBasedResponsibilityNonstochasticGame<G, A>,
         partition: &'a PlayerPartition,
     ) -> Self {
         let players = GroupedGamePlayerDescriptions::new(partition.entries.len());
@@ -50,7 +50,9 @@ impl<'a, G: StateGroups, A: SolvableGame> GroupedGame<'a, G, A> {
     }
 }
 
-impl<'a, G: StateGroups, A: SolvableGame> SimpleCooperativeGame for GroupedGame<'a, G, A> {
+impl<'a, G: StateGroups, A: SolvableNonstochasticGame> SimpleCooperativeGame
+    for GroupedGame<'a, G, A>
+{
     type PlayerDescriptions = GroupedGamePlayerDescriptions;
 
     fn get_player_count(&self) -> usize {
@@ -77,7 +79,10 @@ impl<'a, G: StateGroups, A: SolvableGame> SimpleCooperativeGame for GroupedGame<
     }
 }
 
-impl<'a, G: StateGroups, A: SolvableGame> MonotoneCooperativeGame for GroupedGame<'a, G, A> {}
+impl<'a, G: StateGroups, A: SolvableNonstochasticGame> MonotoneCooperativeGame
+    for GroupedGame<'a, G, A>
+{
+}
 
 pub struct GroupedGamePlayerDescriptions {
     players: Vec<usize>,

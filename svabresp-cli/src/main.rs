@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use svabresp::num_traits::{Signed, ToPrimitive};
+use svabresp::num_traits::ToPrimitive;
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgorithm};
 
 use clap::{Arg, Command, arg};
@@ -535,10 +535,10 @@ trait OutputPrinter<T> {
 
 struct ResponsibilityValuesPrinter {}
 
-impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD>>
+impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
     for ResponsibilityValuesPrinter
 {
-    fn print_human_readable(self, output: ResponsibilityValues<PD>) {
+    fn print_human_readable(self, output: ResponsibilityValues<PD, f64, f64>) {
         println!("Responsibility values:");
         let mut counter = 0;
         for player in output.players {
@@ -552,14 +552,14 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD>>
                     .unwrap_or_else(|| "err".to_string()),
                 player.value
             );
-            if player.value.is_positive() {
+            if player.value > 0.0 {
                 counter += 1;
             }
         }
         println!("{} entities have responsibility", counter);
     }
 
-    fn print_parsable(self, output: ResponsibilityValues<PD>) {
+    fn print_parsable(self, output: ResponsibilityValues<PD, f64, f64>) {
         for player in output.players {
             println!(
                 "{}:{}",

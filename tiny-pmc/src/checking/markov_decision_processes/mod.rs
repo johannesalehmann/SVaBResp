@@ -20,13 +20,16 @@ pub fn check_mdp<
         path: PathFormula::Eventually { condition },
     } = query
     {
-        if non_determinism == NonDeterminismKind::Minimise {
-            panic!("PMin properties are currently not supported – but this should be easy to add");
-        }
         if let StateFormula::Expression(ap) = *condition {
-            probabilistic_model_algorithms::value_iteration::optimistic_value_iteration(
-                model, ap.index, 0.000_001,
-            );
+            if non_determinism == NonDeterminismKind::Minimise {
+                probabilistic_model_algorithms::value_iteration::mdp::optimistic_value_iteration_minimise(
+                    model, ap.index, 0.000_001,
+                );
+            } else if non_determinism == NonDeterminismKind::Maximise {
+                probabilistic_model_algorithms::value_iteration::mdp::optimistic_value_iteration_maximise(
+                    model, ap.index, 0.000_001,
+                );
+            }
         }
     }
 

@@ -1,8 +1,8 @@
-use super::algorithm_collections::{AdaptableOwners, AlgorithmCollection, ChangeableOwners};
+use super::algorithm_collections::{AdaptableOwners, ChangeableOwners, NonstochasticGameAlgorithm};
 use crate::regions::StateRegion;
 use probabilistic_models::{ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 
-pub trait SolvableGame {
+pub trait SolvableNonstochasticGame {
     type WinningRegionType: StateRegion;
 
     type ModelTypes: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer> + Sized;
@@ -16,9 +16,9 @@ pub trait SolvableGame {
     fn get_game(&self) -> &ProbabilisticModel<Self::ModelTypes>;
 }
 
-pub struct GameAndSolver<
+pub struct NonstochasticGameAndSolver<
     M: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
-    AC: AlgorithmCollection<ModelContext: AdaptableOwners>,
+    AC: NonstochasticGameAlgorithm<ModelContext: AdaptableOwners>,
 > {
     game: probabilistic_models::ProbabilisticModel<M>,
     solver: AC,
@@ -27,8 +27,8 @@ pub struct GameAndSolver<
 
 impl<
     M: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
-    AC: AlgorithmCollection<ModelContext: AdaptableOwners>,
-> GameAndSolver<M, AC>
+    AC: NonstochasticGameAlgorithm<ModelContext: AdaptableOwners>,
+> NonstochasticGameAndSolver<M, AC>
 {
     pub fn new(game: ProbabilisticModel<M>, solver: AC) -> Self {
         let context = solver.create_model_context(&game);
@@ -42,8 +42,8 @@ impl<
 
 impl<
     M: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
-    AC: AlgorithmCollection<ModelContext: AdaptableOwners>,
-> SolvableGame for GameAndSolver<M, AC>
+    AC: NonstochasticGameAlgorithm<ModelContext: AdaptableOwners>,
+> SolvableNonstochasticGame for NonstochasticGameAndSolver<M, AC>
 {
     type WinningRegionType = AC::WinningRegionType;
     type ModelTypes = M;
@@ -69,9 +69,9 @@ impl<
     }
 }
 
-pub struct GameAndSolverExternalOwners<
+pub struct NonstochasticGameAndSolverExternalOwners<
     M: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
-    AC: AlgorithmCollection<ModelContext: ChangeableOwners>,
+    AC: NonstochasticGameAlgorithm<ModelContext: ChangeableOwners>,
 > {
     game: probabilistic_models::ProbabilisticModel<M>,
     solver: AC,
@@ -80,10 +80,10 @@ pub struct GameAndSolverExternalOwners<
 
 impl<
     M: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
-    AC: AlgorithmCollection<ModelContext: ChangeableOwners>,
-> GameAndSolverExternalOwners<M, AC>
+    A: NonstochasticGameAlgorithm<ModelContext: ChangeableOwners>,
+> NonstochasticGameAndSolverExternalOwners<M, A>
 {
-    pub fn new(game: ProbabilisticModel<M>, solver: AC) -> Self {
+    pub fn new(game: ProbabilisticModel<M>, solver: A) -> Self {
         let context = solver.create_model_context(&game);
         Self {
             game,
@@ -95,8 +95,8 @@ impl<
 
 impl<
     M: ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
-    AC: AlgorithmCollection<ModelContext: ChangeableOwners>,
-> SolvableGame for GameAndSolverExternalOwners<M, AC>
+    AC: NonstochasticGameAlgorithm<ModelContext: ChangeableOwners>,
+> SolvableNonstochasticGame for NonstochasticGameAndSolverExternalOwners<M, AC>
 {
     type WinningRegionType = AC::WinningRegionType;
     type ModelTypes = M;

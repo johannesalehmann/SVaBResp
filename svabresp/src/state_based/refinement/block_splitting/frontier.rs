@@ -1,7 +1,7 @@
 use super::{BlockSplittingHeuristics, PlayerPartition};
-use crate::state_based::StateBasedResponsibilityGame;
+use crate::state_based::StateBasedResponsibilityNonstochasticGame;
 use crate::state_based::grouping::StateGroups;
-use probabilistic_model_algorithms::deterministic_games::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
 use probabilistic_model_algorithms::regions::StateRegion;
 use probabilistic_models::{ActionCollection, Distribution, Valuation};
 use rand::Rng;
@@ -63,9 +63,9 @@ impl OverlapData {
 }
 
 impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
-    fn split_block<G: StateGroups, A: SolvableGame>(
+    fn split_block<G: StateGroups, A: SolvableNonstochasticGame>(
         &mut self,
-        game: &StateBasedResponsibilityGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
         partition: &mut PlayerPartition,
         bsp: super::super::BlockSwitchingPair<A::WinningRegionType>,
     ) {

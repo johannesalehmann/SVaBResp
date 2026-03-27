@@ -1,14 +1,19 @@
 use log::{info, trace};
+use probabilistic_model_algorithms::traits::{StochasticGameAlgorithm, StochasticGameAndSolver};
 use probabilistic_models::{
     IterFunctions, IterProbabilisticModel, MdpType, TwoPlayer, Valuation, VectorPredecessors,
 };
 
-mod game;
-pub use game::StateBasedResponsibilityGame;
+mod nonstochastic_game;
+pub use nonstochastic_game::StateBasedResponsibilityNonstochasticGame;
 
 pub mod grouping;
 
+mod group_names;
+pub use group_names::GroupNames;
+
 pub mod refinement;
+mod stochastic_game;
 
 use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm};
 use crate::state_based::grouping::StateGroups;
@@ -17,9 +22,11 @@ use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
 use prism_model_builder::UserProvidedConstValue;
 use probabilistic_model_algorithms::deterministic_games::{
-    AlgorithmCollection, BuechiAlgorithmCollection, GameAndSolverExternalOwners,
-    ReachabilityAlgorithmCollection, SafetyAlgorithmCollection,
+    BuechiAlgorithmCollection, NonstochasticGameAlgorithm,
+    NonstochasticGameAndSolverExternalOwners, ReachabilityAlgorithmCollection,
+    SafetyAlgorithmCollection,
 };
+use probabilistic_model_algorithms::value_iteration::stochastic_games::StochasticGameValueIterationAlgorithm;
 
 pub fn compute_for_prism<
     G: GroupExtractionScheme,
@@ -46,7 +53,7 @@ pub fn compute_for_prism<
 
     trace!("Building model");
     let builder_results = prism_model_builder::build_model::<_, MdpType<VectorPredecessors>, _>(
-        &prism_model,
+        &mut prism_model,
         &atomic_propositions[..],
         properties.into_iter(),
         &constants,
@@ -58,81 +65,110 @@ pub fn compute_for_prism<
     let property = properties.into_iter().nth(0).unwrap();
 
     let model = builder_results.model;
-    trace!("Transforming transition system into game");
-    let mut game: probabilistic_models::TwoPlayerNonstochasticGame<VectorPredecessors> = model
-        .into_iter()
-        .map_owners(|_| TwoPlayer::PlayerTwo)
-        .collect();
+    let features = model.get_model_features();
+    if features.probabilism {
+        info!("Model exhibits probabilistic behaviour");
 
-    trace!("Computing state groups");
-    let grouping = grouping_scheme.create_groups(&mut game, &property);
-    info!("There are {} state groups", grouping.groups.get_count());
-    let print_groups = true;
-    if print_groups {
-        println!("Group membership:");
-        for group in 0..grouping.groups.get_count() {
-            println!("  Group {}", group);
-            for state in grouping.groups.get_states(group) {
-                println!(
-                    "    {}",
-                    game.states[state]
-                        .valuation
-                        .displayable(&game.valuation_context)
-                );
+        let mut game: probabilistic_models::TwoPlayerStochasticGame<VectorPredecessors> = model
+            .into_iter()
+            .map_owners(|_| TwoPlayer::PlayerTwo)
+            .collect();
+
+        let grouping = grouping_scheme.create_groups(&mut game, &property);
+
+        if let Some(solver) = StochasticGameValueIterationAlgorithm::create_if_compatible(&property)
+        {
+            let solvable_game = StochasticGameAndSolver::new(game, solver);
+
+            let coop_game = stochastic_game::StateBasedResponsibilityStochasticGame::new(
+                solvable_game,
+                grouping.groups,
+                grouping.always_helping,
+                grouping.always_adversarial,
+            );
+
+            // TODO: Support blocking?
+            // let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
+            // let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+
+            shapley.compute(coop_game)
+        } else {
+            panic!("Unsupported property type");
+        }
+    } else {
+        trace!("Transforming transition system into game");
+        let mut game: probabilistic_models::TwoPlayerNonstochasticGame<VectorPredecessors> = model
+            .into_iter()
+            .map_owners(|_| TwoPlayer::PlayerTwo)
+            .collect();
+
+        trace!("Computing state groups");
+        let grouping = grouping_scheme.create_groups(&mut game, &property);
+        info!("There are {} state groups", grouping.groups.get_count());
+        let print_groups = true;
+        if print_groups {
+            println!("Group membership:");
+            for group in 0..grouping.groups.get_count() {
+                println!("  Group {}", group);
+                for state in grouping.groups.get_states(group) {
+                    println!(
+                        "    {}",
+                        game.states[state]
+                            .valuation
+                            .displayable(&game.valuation_context)
+                    );
+                }
             }
         }
-    }
 
-    if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
-        println!("Reachability property");
-        let solvable_game = GameAndSolverExternalOwners::new(game, solver);
-        let mut coop_game = game::StateBasedResponsibilityGame::new(
-            solvable_game,
-            grouping.groups,
-            grouping.always_helping,
-            grouping.always_adversarial,
-        );
+        if let Some(solver) = ReachabilityAlgorithmCollection::create_if_compatible(&property) {
+            let solvable_game = NonstochasticGameAndSolverExternalOwners::new(game, solver);
+            let mut coop_game = nonstochastic_game::StateBasedResponsibilityNonstochasticGame::new(
+                solvable_game,
+                grouping.groups,
+                grouping.always_helping,
+                grouping.always_adversarial,
+            );
 
-        let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
+            let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
 
-        let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+            let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
 
-        let cached_coop_game = MinimalCoalitionCache::create(coop_game);
+            let cached_coop_game = MinimalCoalitionCache::create(coop_game);
 
-        shapley.compute_simple(cached_coop_game)
-    } else if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
-        println!("Safety property");
-        let solvable_game = GameAndSolverExternalOwners::new(game, solver);
-        let mut coop_game = game::StateBasedResponsibilityGame::new(
-            solvable_game,
-            grouping.groups,
-            grouping.always_helping,
-            grouping.always_adversarial,
-        );
+            shapley.compute_simple(cached_coop_game)
+        } else if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
+            let solvable_game = NonstochasticGameAndSolverExternalOwners::new(game, solver);
+            let mut coop_game = nonstochastic_game::StateBasedResponsibilityNonstochasticGame::new(
+                solvable_game,
+                grouping.groups,
+                grouping.always_helping,
+                grouping.always_adversarial,
+            );
 
-        let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
-        let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+            let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
+            let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
 
-        let cached_coop_game = MinimalCoalitionCache::create(coop_game);
+            let cached_coop_game = MinimalCoalitionCache::create(coop_game);
 
-        shapley.compute_simple(cached_coop_game)
-    } else if let Some(solver) = BuechiAlgorithmCollection::create_if_compatible(&property) {
-        println!("Büchi property");
-        let solvable_game = GameAndSolverExternalOwners::new(game, solver);
-        let mut coop_game = game::StateBasedResponsibilityGame::new(
-            solvable_game,
-            grouping.groups,
-            grouping.always_helping,
-            grouping.always_adversarial,
-        );
+            shapley.compute_simple(cached_coop_game)
+        } else if let Some(solver) = BuechiAlgorithmCollection::create_if_compatible(&property) {
+            let solvable_game = NonstochasticGameAndSolverExternalOwners::new(game, solver);
+            let mut coop_game = nonstochastic_game::StateBasedResponsibilityNonstochasticGame::new(
+                solvable_game,
+                grouping.groups,
+                grouping.always_helping,
+                grouping.always_adversarial,
+            );
 
-        let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
-        let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+            let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
+            let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
 
-        let cached_coop_game = MinimalCoalitionCache::create(coop_game);
+            let cached_coop_game = MinimalCoalitionCache::create(coop_game);
 
-        shapley.compute_simple(cached_coop_game)
-    } else {
-        panic!("Unsupported property type");
+            shapley.compute_simple(cached_coop_game)
+        } else {
+            panic!("Unsupported property type");
+        }
     }
 }

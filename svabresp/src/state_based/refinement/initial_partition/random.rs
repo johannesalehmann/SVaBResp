@@ -1,10 +1,10 @@
 use crate::shapley::SimpleCooperativeGame;
-use crate::state_based::StateBasedResponsibilityGame;
+use crate::state_based::StateBasedResponsibilityNonstochasticGame;
 use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{
     InitialPartitionProvider, PlayerPartition, PlayerPartitionEntry,
 };
-use probabilistic_model_algorithms::deterministic_games::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
 use rand::Rng;
 
 pub struct RandomInitialPartition {
@@ -18,9 +18,9 @@ impl RandomInitialPartition {
 }
 
 impl InitialPartitionProvider for RandomInitialPartition {
-    fn get_initial_coalition<G: StateGroups, A: SolvableGame>(
+    fn get_initial_coalition<G: StateGroups, A: SolvableNonstochasticGame>(
         self,
-        game: &StateBasedResponsibilityGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
     ) -> PlayerPartition {
         let mut blocks = PlayerPartition::new();
         for _ in 0..self.block_count {

@@ -1,48 +1,48 @@
-use crate::shapley::{
-    CoalitionSpecifier, MonotoneCooperativeGame, PlayerDescriptions, SimpleCooperativeGame,
-};
+use crate::shapley::{CoalitionSpecifier, MonotoneCooperativeGame, SimpleCooperativeGame};
 use crate::state_based::grouping::StateGroups;
-use probabilistic_model_algorithms::deterministic_games::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
 use probabilistic_models::TwoPlayer;
 
-pub struct StateBasedResponsibilityGame<G: StateGroups, A: SolvableGame> {
+pub struct StateBasedResponsibilityNonstochasticGame<G: StateGroups, A: SolvableNonstochasticGame> {
     solvable: A,
     grouping: G,
     always_helping: Vec<usize>,
     always_adversarial: Vec<usize>,
-    group_info: GroupInfo,
+    group_names: super::GroupNames,
 }
 
-impl<'a, G: StateGroups, A: SolvableGame> StateBasedResponsibilityGame<G, A> {
+impl<'a, G: StateGroups, A: SolvableNonstochasticGame>
+    StateBasedResponsibilityNonstochasticGame<G, A>
+{
     pub fn new(
         solvable: A,
         grouping: G,
         always_helping: Vec<usize>,
         always_adversarial: Vec<usize>,
     ) -> Self {
-        let group_info = GroupInfo::from_grouping(&grouping);
+        let group_names = super::GroupNames::from_grouping(&grouping);
         Self {
             solvable,
             grouping,
             always_helping,
             always_adversarial,
-            group_info,
+            group_names,
         }
     }
 
     pub fn map_grouping<G2: StateGroups, F: Fn(G) -> G2>(
         self,
         map: F,
-    ) -> StateBasedResponsibilityGame<G2, A> {
+    ) -> StateBasedResponsibilityNonstochasticGame<G2, A> {
         let grouping = map(self.grouping);
-        let group_info = GroupInfo::from_grouping(&grouping);
+        let group_names = super::GroupNames::from_grouping(&grouping);
 
-        StateBasedResponsibilityGame {
+        StateBasedResponsibilityNonstochasticGame {
             solvable: self.solvable,
             grouping,
             always_helping: self.always_helping,
             always_adversarial: self.always_adversarial,
-            group_info,
+            group_names,
         }
     }
 
@@ -103,23 +103,25 @@ impl<'a, G: StateGroups, A: SolvableGame> StateBasedResponsibilityGame<G, A> {
     }
 }
 
-impl<G: StateGroups, A: SolvableGame> SimpleCooperativeGame for StateBasedResponsibilityGame<G, A> {
-    type PlayerDescriptions = GroupInfo;
+impl<G: StateGroups, A: SolvableNonstochasticGame> SimpleCooperativeGame
+    for StateBasedResponsibilityNonstochasticGame<G, A>
+{
+    type PlayerDescriptions = super::GroupNames;
 
     fn get_player_count(&self) -> usize {
         self.grouping.get_count()
     }
 
     fn player_descriptions(&self) -> &Self::PlayerDescriptions {
-        &self.group_info
+        &self.group_names
     }
 
     fn player_descriptions_mut(&mut self) -> &mut Self::PlayerDescriptions {
-        &mut self.group_info
+        &mut self.group_names
     }
 
     fn into_player_descriptions(self) -> Self::PlayerDescriptions {
-        self.group_info
+        self.group_names
     }
 
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool {
@@ -128,34 +130,7 @@ impl<G: StateGroups, A: SolvableGame> SimpleCooperativeGame for StateBasedRespon
     }
 }
 
-impl<G: StateGroups, A: SolvableGame> MonotoneCooperativeGame
-    for StateBasedResponsibilityGame<G, A>
+impl<G: StateGroups, A: SolvableNonstochasticGame> MonotoneCooperativeGame
+    for StateBasedResponsibilityNonstochasticGame<G, A>
 {
-}
-
-pub struct GroupInfo {
-    names: Vec<String>,
-}
-
-impl GroupInfo {
-    pub fn from_grouping<G: StateGroups>(groups: &G) -> Self {
-        let mut names = Vec::with_capacity(groups.get_count());
-        for g in 0..groups.get_count() {
-            names.push(groups.get_label(g))
-        }
-        Self { names }
-    }
-}
-
-impl PlayerDescriptions for GroupInfo {
-    type IntoIter = std::vec::IntoIter<String>;
-    type PlayerType = String;
-
-    fn get_player_description(&self, index: usize) -> &Self::PlayerType {
-        &self.names[index]
-    }
-
-    fn into_iterator(self) -> Self::IntoIter {
-        IntoIterator::into_iter(self.names)
-    }
 }

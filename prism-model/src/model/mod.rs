@@ -76,6 +76,7 @@ impl<AM: Default, A, E, V, S: Clone> Model<AM, A, E, V, S> {
         }
     }
 }
+
 impl<AM, A, V, S: Clone> Model<AM, A, Expression<V, S>, V, S> {
     pub fn map_span<S2: Clone, F: Fn(S) -> S2>(
         self,
@@ -96,6 +97,19 @@ impl<AM, A, V, S: Clone> Model<AM, A, Expression<V, S>, V, S> {
             labels: self.labels.map_span(map),
             rewards: self.rewards.map_span(map),
             span: map(self.span),
+        }
+    }
+
+    pub fn replace_empty_updates_with_identity_update(&mut self) {
+        for module in &mut self.modules.modules {
+            for command in &mut module.commands {
+                if command.updates.len() == 0 {
+                    command.updates.push(crate::Update::new(
+                        Expression::Float(1.0, command.span.clone()),
+                        command.span.clone(),
+                    )); // TODO: The expression's and update's span should only cover the `true` token, but its span is currently not tracked
+                }
+            }
         }
     }
 }

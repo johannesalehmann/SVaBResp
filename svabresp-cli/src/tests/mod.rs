@@ -1,5 +1,6 @@
 use std::str::FromStr;
 use svabresp::num_rational::BigRational;
+use svabresp::num_traits::ToPrimitive;
 use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues};
 use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, IndividualGroupExtractionScheme, LabelGroupExtractionScheme,
@@ -209,13 +210,53 @@ fn refinement_from_paper() {
     assert_res("(s=6)", "1/12", &result);
     assert_res("(s=8)", "1/12", &result);
 }
+#[test]
+fn probabilistic() {
+    let task = ResponsibilityTask {
+        model_description: ModelFromString::new(
+            "probabilistic.prism",
+            include_str!("files/probabilistic.prism"),
+            "P=? [F \"obj\"]",
+        ),
+        constants: "".to_string(),
+        coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
+        algorithm: BruteForceAlgorithm::new(),
+        grouping_scheme: IndividualGroupExtractionScheme::including_irrelevant_states(),
+        refinement: IdentityGroupBlockingProvider::new(),
+    };
+    let result = task.run();
 
-fn assert_res(name: &str, value: &str, result: &ResponsibilityValues<String>) {
-    assert_eq!(
-        result
-            .get(&(name.to_string()))
-            .unwrap_or_else(|| panic!("No responsibility value entry for `{}`", name))
-            .value,
-        BigRational::from_str(value).unwrap()
-    );
+    for res in result.players.iter() {
+        println!("{}: {}", res.player_info, res.value);
+    }
+
+    let probabilistic_eps = 0.000_1; // Allow a fairly large error, as the error of value iteration is potentially magnified in the Shapley value compuation
+
+    assert_res_with_eps("(x=0)", "1/10", &result, probabilistic_eps);
+    assert_res_with_eps("(x=1)", "0", &result, probabilistic_eps);
+    assert_res_with_eps("(x=2)", "0", &result, probabilistic_eps);
+    assert_res_with_eps("(x=3)", "0", &result, probabilistic_eps);
+    assert_res_with_eps("(x=4)", "0", &result, probabilistic_eps);
+}
+
+fn assert_res(name: &str, value: &str, result: &ResponsibilityValues<String, f64, f64>) {
+    assert_res_with_eps(name, value, result, 0.000_000_001)
+}
+fn assert_res_with_eps(
+    name: &str,
+    value: &str,
+    result: &ResponsibilityValues<String, f64, f64>,
+    eps: f64,
+) {
+    let actual = result
+        .get(&(name.to_string()))
+        .unwrap_or_else(|| panic!("No responsibility value entry for `{}`", name))
+        .value;
+    let expected = BigRational::from_str(value).unwrap().to_f64().unwrap();
+    if (actual - expected).abs() >= eps {
+        panic!(
+            "Incorrect responsibility value for `{}`. Got {}, expected {}",
+            name, actual, expected
+        );
+    }
 }

@@ -10,7 +10,7 @@ pub use coop_game::{
 };
 
 mod responsibility_values;
-pub use responsibility_values::{ResponsibilityValues, ResponsibilityValue};
+pub use responsibility_values::{ResponsibilityValue, ResponsibilityValues};
 
 pub trait ShapleyAlgorithm {
     type Output<PD>;
@@ -22,7 +22,5 @@ pub trait ShapleyAlgorithm {
     fn compute_simple<G: SimpleCooperativeGame>(
         &mut self,
         game: G,
-    ) -> Self::Output<<G::PlayerDescriptions as PlayerDescriptions>::PlayerType> {
-        self.compute(game)
-    }
+    ) -> Self::Output<<G::PlayerDescriptions as PlayerDescriptions>::PlayerType>;
 }

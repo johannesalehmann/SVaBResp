@@ -37,7 +37,7 @@ pub fn build_model<
         >,
     >,
 >(
-    model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+    model: &mut Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
     atomic_propositions: &[Expression<VariableReference, S>],
     properties: I,
     user_provided_consts: &HashMap<String, UserProvidedConstValue>,
@@ -189,12 +189,20 @@ impl<M: ModelTypes> ExplicitModelBuilder<M> {
             >,
         >,
     >(
-        model: &Model<(), Identifier<S>, Expression<VariableReference, S>, VariableReference, S>,
+        model: &mut Model<
+            (),
+            Identifier<S>,
+            Expression<VariableReference, S>,
+            VariableReference,
+            S,
+        >,
         atomic_propositions: &[Expression<VariableReference, S>],
         properties: I,
         user_provided_consts: &HashMap<String, UserProvidedConstValue>,
     ) -> Result<ModelBuildingOutput<M>, ModelBuildingError> {
         let start_time = std::time::Instant::now();
+
+        model.replace_empty_updates_with_identity_update();
 
         let mut sub_expression_manager = SubExpressionManager::new();
         let model = model.map_expressions_cloned(|e| {

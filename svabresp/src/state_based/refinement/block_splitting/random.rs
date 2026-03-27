@@ -1,8 +1,8 @@
 use super::BlockSplittingHeuristics;
-use crate::state_based::StateBasedResponsibilityGame;
+use crate::state_based::StateBasedResponsibilityNonstochasticGame;
 use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{BlockSwitchingPair, PlayerPartition};
-use probabilistic_model_algorithms::deterministic_games::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
 use probabilistic_model_algorithms::regions::StateRegion;
 use rand::Rng;
 
@@ -15,9 +15,9 @@ impl RandomSplittingHeuristics {
 }
 
 impl BlockSplittingHeuristics for RandomSplittingHeuristics {
-    fn split_block<G: StateGroups, A: SolvableGame>(
+    fn split_block<G: StateGroups, A: SolvableNonstochasticGame>(
         &mut self,
-        game: &StateBasedResponsibilityGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
         partition: &mut PlayerPartition,
         bsp: BlockSwitchingPair<A::WinningRegionType>,
     ) {

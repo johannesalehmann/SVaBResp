@@ -1,264 +1,126 @@
-use crate::mecs;
-use crate::sccs::{Scc, SccList, SccWithDependencies};
+pub mod mdp;
+pub mod stochastic_games;
+
+use crate::sccs::{Scc, SccList};
 use probabilistic_models::{
-    ActionCollection, ActionVector, AtomicPropositions, Distribution, DistributionVector,
-    ProbabilisticModel, VectorPredecessors,
+    ActionCollection, Distribution, Owners, ProbabilisticModel, SinglePlayer, TwoPlayer, Valuation,
 };
 
-pub fn optimistic_value_iteration<
-    M: probabilistic_models::ModelTypes<
-            Predecessors = VectorPredecessors,
-            Distribution = DistributionVector,
-            ActionCollection = ActionVector<DistributionVector>,
-        >,
+trait ValueComparator<O: Owners>: Copy {
+    fn initial_value(&self, state_owner: &O) -> f64;
+    fn is_better(&self, state_owner: &O, before: f64, new: f64) -> bool;
+}
+
+#[derive(Copy, Clone)]
+struct Maximiser {}
+
+impl ValueComparator<SinglePlayer> for Maximiser {
+    fn initial_value(&self, state_owner: &SinglePlayer) -> f64 {
+        let _ = state_owner;
+        0.0
+    }
+
+    fn is_better(&self, state_owner: &SinglePlayer, before: f64, new: f64) -> bool {
+        let _ = state_owner;
+        new >= before
+    }
+}
+
+#[derive(Copy, Clone)]
+struct Minimiser {}
+
+impl ValueComparator<SinglePlayer> for Minimiser {
+    fn initial_value(&self, state_owner: &SinglePlayer) -> f64 {
+        let _ = state_owner;
+        0.0
+    }
+
+    fn is_better(&self, state_owner: &SinglePlayer, before: f64, new: f64) -> bool {
+        let _ = state_owner;
+        new <= before
+    }
+}
+
+#[derive(Copy, Clone)]
+struct TwoPlayerMaxMin {}
+
+impl ValueComparator<TwoPlayer> for TwoPlayerMaxMin {
+    fn initial_value(&self, state_owner: &TwoPlayer) -> f64 {
+        match state_owner {
+            TwoPlayer::PlayerOne => 0.0,
+            TwoPlayer::PlayerTwo => 1.0,
+        }
+    }
+
+    fn is_better(&self, state_owner: &TwoPlayer, before: f64, new: f64) -> bool {
+        match state_owner {
+            TwoPlayer::PlayerOne => new >= before,
+            TwoPlayer::PlayerTwo => new <= before,
+        }
+    }
+}
+
+fn value_iteration_internal<
+    M: probabilistic_models::ModelTypes,
+    SCC: Scc,
+    C: ValueComparator<M::Owners>,
 >(
-    mut model: ProbabilisticModel<M>,
-    objective_ap_index: usize,
-    mut eps: f64,
-) {
-    let start_time = std::time::Instant::now();
-
-    let mecs = mecs::compute_mecs(&mut model);
-    let winning_mecs = winning_mecs(&mecs, objective_ap_index, &model);
-    mecs.collapse_mecs(&mut model);
-
-    let mut data = vec![StateData::new(); model.states.len()];
-    let mut upper_bound = vec![0.0; model.states.len()];
-    let excluded =
-        handle_reachability_objective(&model, objective_ap_index, &mecs, &winning_mecs, &mut data);
-
-    let sccs: SccList =
-        crate::sccs::compute_sccs(&model, &super::sccs::ExclusionList::new(&excluded[..]));
-    let sccs = sccs.compute_dependencies(&model);
-    let order = sccs.get_reverse_topological_order();
-
-    let initial_eps = eps;
-
-    loop {
-        println!("eps={}:", eps);
-        value_iteration_internal(&model, &mut data, eps, &sccs, &order[..]);
-
-        for i in 0..model.states.len() {
-            upper_bound[i] = match data[i].value {
-                0.0 => 0.0,
-                v => (v + initial_eps).min(1.0),
-            }
-            // upper_bound[i] = match data[i].value {
-            //     v => (v * (1.0 + initial_eps)).min(1.0),
-            // }
-        }
-
-        let is_upper_bound = verify_optimistic(&mut model, eps, &mut data, &mut upper_bound, &sccs);
-
-        match is_upper_bound {
-            OptimisticValueIterationResult::UpperBoundVerified => {
-                println!("Upper bound candidate verified!");
-                for i in 0..model.states.len() {
-                    if i == 0 {
-                        println!(
-                            "Lower bound: {}, upper bound: {}",
-                            data[i].value, upper_bound[i]
-                        );
-                    }
-                    data[i].value = 0.5 * (data[i].value + upper_bound[i]);
-                }
-                break;
-            }
-            OptimisticValueIterationResult::UpperBoundRefuted { error } => {
-                eps = error * 0.5;
-            }
-        }
-    }
-
-    println!(
-        "Optimistic value iteration finished in {:?}: {}",
-        start_time.elapsed(),
-        data[0].value
-    );
-}
-
-fn verify_optimistic<
-    M: probabilistic_models::ModelTypes<
-            Predecessors = VectorPredecessors,
-            Distribution = DistributionVector,
-            ActionCollection = ActionVector<DistributionVector>,
-        >,
->(
-    model: &mut ProbabilisticModel<M>,
-    eps: f64,
-    data: &mut Vec<StateData>,
-    upper_bound: &mut Vec<f64>,
-    sccs: &SccList<SccWithDependencies>,
-) -> OptimisticValueIterationResult {
-    let start_time = std::time::Instant::now();
-    let verification_steps = (1.0 / eps).max(1.0) as usize;
-    let mut error: f64 = 0.0;
-    for i in 0..verification_steps {
-        let mut all_up = true;
-        let mut all_down = true;
-        error = 0.0;
-        for scc in &sccs.sccs {
-            for &state_index in scc.get_members() {
-                let mut new_lower_value = 0.0;
-                let mut new_upper_value = 0.0;
-
-                let state = &model.states[state_index];
-                for action in state.actions.iter() {
-                    let distribution = &action.successors;
-                    let mut lower_value = 0.0;
-                    let mut upper_value = 0.0;
-                    for successor in distribution.iter() {
-                        lower_value += successor.probability * data[successor.index].value;
-                        upper_value += successor.probability * upper_bound[successor.index];
-                    }
-                    if lower_value >= new_lower_value {
-                        new_lower_value = lower_value;
-                    }
-                    if upper_value >= new_upper_value {
-                        new_upper_value = upper_value;
-                    }
-                }
-
-                if new_lower_value > 0.0 {
-                    error = error.max(new_lower_value - data[state_index].value);
-                }
-                data[state_index].value = new_lower_value;
-                if new_upper_value < upper_bound[state_index] {
-                    all_up = false;
-                    upper_bound[state_index] = new_upper_value;
-                } else if new_upper_value > upper_bound[state_index] {
-                    all_down = false;
-                }
-
-                if new_upper_value < new_lower_value {
-                    println!("Crossed in {} steps and {:?}", i, start_time.elapsed());
-                    return OptimisticValueIterationResult::UpperBoundRefuted { error };
-                }
-            }
-        }
-
-        if all_down {
-            println!("Verified in {} steps and {:?}", i, start_time.elapsed());
-            return OptimisticValueIterationResult::UpperBoundVerified;
-        } else if all_up {
-            println!("Refuted in {} steps and {:?}", i, start_time.elapsed());
-            return OptimisticValueIterationResult::UpperBoundRefuted { error };
-        }
-    }
-    OptimisticValueIterationResult::UpperBoundRefuted { error }
-}
-
-enum OptimisticValueIterationResult {
-    UpperBoundVerified,
-    UpperBoundRefuted { error: f64 },
-}
-
-pub fn value_iteration<
-    M: probabilistic_models::ModelTypes<
-            Predecessors = VectorPredecessors,
-            Distribution = DistributionVector,
-            ActionCollection = ActionVector<DistributionVector>,
-        >,
->(
-    mut model: ProbabilisticModel<M>,
-    objective_ap_index: usize,
-    eps: f64,
-) {
-    let start_time = std::time::Instant::now();
-
-    let mecs = mecs::compute_mecs(&mut model);
-    let winning_mecs = winning_mecs(&mecs, objective_ap_index, &model);
-    mecs.collapse_mecs(&mut model);
-
-    let mut data = vec![StateData::new(); model.states.len()];
-    let excluded =
-        handle_reachability_objective(&model, objective_ap_index, &mecs, &winning_mecs, &mut data);
-
-    let sccs: SccList =
-        crate::sccs::compute_sccs(&model, &super::sccs::ExclusionList::new(&excluded[..]));
-    let sccs = sccs.compute_dependencies(&model);
-    let order = sccs.get_reverse_topological_order();
-
-    value_iteration_internal(&model, &mut data, eps, &sccs, &order[..]);
-
-    println!(
-        "Value iteration finished in {:?}: {}",
-        start_time.elapsed(),
-        data[0].value
-    );
-}
-
-fn handle_reachability_objective<M: probabilistic_models::ModelTypes>(
-    model: &ProbabilisticModel<M>,
-    objective_ap_index: usize,
-    mecs: &mecs::Mecs,
-    winning_mecs: &[usize],
-    data: &mut Vec<StateData>,
-) -> Vec<usize> {
-    let mut excluded = Vec::new();
-    for (i, state) in model.states.iter().enumerate() {
-        if state.atomic_propositions.get_value(objective_ap_index) {
-            data[i].value = 1.0;
-            excluded.push(i);
-        }
-    }
-
-    for &winning_mec in winning_mecs {
-        let state_index = mecs.identified_mec_state_index(winning_mec);
-        if data[state_index].value != 1.0 {
-            data[state_index].value = 1.0;
-            excluded.push(state_index);
-        }
-    }
-    excluded
-}
-
-fn winning_mecs<M: probabilistic_models::ModelTypes>(
-    mecs: &mecs::Mecs,
-    objective_ap_index: usize,
-    model: &ProbabilisticModel<M>,
-) -> Vec<usize> {
-    let mut is_accepting = vec![false; mecs.len()];
-
-    for (state_index, state) in model.states.iter().enumerate() {
-        if let Some(mec_index) = mecs.mec_of_state(state_index) {
-            if state.atomic_propositions.get_value(objective_ap_index) {
-                is_accepting[mec_index] = true;
-            }
-        }
-    }
-
-    is_accepting
-        .into_iter()
-        .enumerate()
-        .filter(|(_, acc)| *acc)
-        .map(|(i, _)| i)
-        .collect()
-}
-
-fn value_iteration_internal<M: probabilistic_models::ModelTypes, SCC: Scc>(
     model: &ProbabilisticModel<M>,
     data: &mut Vec<StateData>,
     eps: f64,
     sccs: &SccList<SCC>,
     scc_order: &[usize],
+    comparator: C,
 ) {
+    let print_details = false;
+    if print_details {
+        println!("Value iteration");
+    }
     for &scc in scc_order {
+        if print_details {
+            println!(
+                "  Scc {} with states {:?}",
+                scc,
+                sccs.sccs[scc].get_members()
+            );
+        }
         loop {
             let mut largest_change: f64 = 0.0;
             for &state_index in sccs.sccs[scc].get_members() {
+                if print_details {
+                    println!(
+                        "      State {}",
+                        model.states[state_index]
+                            .valuation
+                            .displayable(&model.valuation_context),
+                    );
+                }
                 let state = &model.states[state_index];
+                let owner = &state.owner;
 
-                let mut best_value = 0.0;
+                let mut best_value = comparator.initial_value(owner);
                 let mut best_action = 0;
 
                 for (action_index, action) in state.actions.iter().enumerate() {
+                    if print_details {
+                        println!("        Action {}", action_index);
+                    }
                     let distribution = &action.successors;
                     let mut value = 0.0;
                     for successor in distribution.iter() {
+                        if print_details {
+                            println!(
+                                "          to {} with {}, has value {}",
+                                model.states[successor.index]
+                                    .valuation
+                                    .displayable(&model.valuation_context),
+                                successor.probability,
+                                data[successor.index].value
+                            );
+                        }
                         value += successor.probability * data[successor.index].value;
                     }
-                    if value >= best_value {
+                    if comparator.is_better(owner, best_value, value) {
                         best_value = value;
                         best_action = action_index;
                     }
@@ -269,6 +131,9 @@ fn value_iteration_internal<M: probabilistic_models::ModelTypes, SCC: Scc>(
                 let relative_error = absolute_error / best_value;
                 if relative_error > largest_change {
                     largest_change = relative_error;
+                }
+                if print_details {
+                    println!("      {} -> {}", state_data.value, best_value);
                 }
                 *state_data = StateData {
                     value: best_value,

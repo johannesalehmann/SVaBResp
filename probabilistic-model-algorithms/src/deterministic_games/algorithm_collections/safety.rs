@@ -1,4 +1,4 @@
-use super::AlgorithmCollection;
+use super::NonstochasticGameAlgorithm;
 use crate::attractor;
 use crate::regions::{FlagStateRegion, InvertedStateRegion, StateRegion};
 use probabilistic_models::probabilistic_properties::{Bound, BoundOperator, Query, StateFormula};
@@ -10,7 +10,7 @@ pub struct SafetyAlgorithmCollection {
     good_states: AtomicProposition,
 }
 
-impl AlgorithmCollection for SafetyAlgorithmCollection {
+impl NonstochasticGameAlgorithm for SafetyAlgorithmCollection {
     type WinningRegionType = InvertedStateRegion<FlagStateRegion>;
     type ModelContext = SafetyAlgorithmContext;
 

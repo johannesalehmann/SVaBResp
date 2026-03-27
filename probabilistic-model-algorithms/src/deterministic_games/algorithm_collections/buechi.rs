@@ -1,5 +1,5 @@
 use super::super::AdaptableOwners;
-use super::AlgorithmCollection;
+use super::NonstochasticGameAlgorithm;
 use crate::attractor;
 use crate::regions::{FlagStateRegion, InvertedStateRegion, MutableStateRegion, StateRegion};
 use probabilistic_models::probabilistic_properties::{Bound, BoundOperator, Query, StateFormula};
@@ -11,7 +11,7 @@ pub struct BuechiAlgorithmCollection {
     buechi_states: AtomicProposition,
 }
 
-impl AlgorithmCollection for BuechiAlgorithmCollection {
+impl NonstochasticGameAlgorithm for BuechiAlgorithmCollection {
     type WinningRegionType = InvertedStateRegion<FlagStateRegion>;
     type ModelContext = BuechiAlgorithmContext;
 

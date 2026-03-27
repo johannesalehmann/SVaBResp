@@ -14,6 +14,10 @@ pub fn compute_weights(n: usize) -> Vec<BigRational> {
     }
 
     let mut weights = Vec::with_capacity(n + 1);
+
+    // TODO: Both the Shapley values and the counts in the brute-force algorithm never use the
+    // entries with index 0. This is confusing – update indexing in both places simultaneously to
+    // avoid this
     weights.push(BigRational::zero());
     for i in 1..=n {
         weights.push(

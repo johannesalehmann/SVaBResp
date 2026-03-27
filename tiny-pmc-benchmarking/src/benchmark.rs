@@ -75,7 +75,7 @@ impl Benchmark {
             &source,
             &self.property_vector(),
         );
-        let (prism_model, properties) = match parsed_model_and_objectives {
+        let (mut prism_model, properties) = match parsed_model_and_objectives {
             None => panic!("Error parsing model"),
             Some((prism_model, properties)) => (prism_model, properties),
         };
@@ -87,7 +87,7 @@ impl Benchmark {
             properties,
         );
         let builder_output: ModelBuildingOutput<M> = prism_model_builder::build_model(
-            &prism_model,
+            &mut prism_model,
             &atomic_propositions[..],
             properties.clone().into_iter(),
             &constants,

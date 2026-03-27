@@ -10,18 +10,18 @@ pub use initial_partition::*;
 mod grouped_game;
 mod partition;
 
-use super::StateBasedResponsibilityGame;
+use super::StateBasedResponsibilityNonstochasticGame;
 use crate::shapley::MinimalCoalitionCache;
 use crate::state_based::grouping::StateGroups;
 use log::trace;
 pub use partition::{PlayerPartition, PlayerPartitionEntry};
-use probabilistic_model_algorithms::deterministic_games::SolvableGame;
+use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
 use probabilistic_model_algorithms::regions::StateRegion;
 
 pub trait GroupBlockingProvider {
-    fn compute_blocks<G: StateGroups, A: SolvableGame>(
+    fn compute_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
         self,
-        game: &mut StateBasedResponsibilityGame<G, A>,
+        game: &mut StateBasedResponsibilityNonstochasticGame<G, A>,
     ) -> PlayerPartition;
 }
 
@@ -34,9 +34,9 @@ impl IdentityGroupBlockingProvider {
 }
 
 impl GroupBlockingProvider for IdentityGroupBlockingProvider {
-    fn compute_blocks<G: StateGroups, A: SolvableGame>(
+    fn compute_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
         self,
-        game: &mut StateBasedResponsibilityGame<G, A>,
+        game: &mut StateBasedResponsibilityNonstochasticGame<G, A>,
     ) -> PlayerPartition {
         let mut partition = PlayerPartition::new();
         for player in 0..game.get_grouping().get_count() {
@@ -82,9 +82,9 @@ impl<
 > GroupBlockingProvider
     for RefinementGroupBlockingProvider<InitialPartition, SelectionHeuristics, SplittingHeuristics>
 {
-    fn compute_blocks<G: StateGroups, A: SolvableGame>(
+    fn compute_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
         self,
-        game: &mut StateBasedResponsibilityGame<G, A>,
+        game: &mut StateBasedResponsibilityNonstochasticGame<G, A>,
     ) -> PlayerPartition {
         let mut algorithm = RefinementAlgorithm::new(
             game,
@@ -115,11 +115,11 @@ impl<R: StateRegion> BlockSwitchingPair<R> {
 pub struct RefinementAlgorithm<
     'a,
     G: StateGroups,
-    A: SolvableGame,
+    A: SolvableNonstochasticGame,
     SelectionHeuristics: BlockSelectionHeuristics,
     SplittingHeuristics: BlockSplittingHeuristics,
 > {
-    game: &'a mut StateBasedResponsibilityGame<G, A>,
+    game: &'a mut StateBasedResponsibilityNonstochasticGame<G, A>,
     current_partition: PlayerPartition,
     selection_heuristics: SelectionHeuristics,
     splitting_heuristics: SplittingHeuristics,
@@ -128,13 +128,13 @@ pub struct RefinementAlgorithm<
 impl<
     'a,
     G: StateGroups,
-    A: SolvableGame,
+    A: SolvableNonstochasticGame,
     SelectionHeuristics: BlockSelectionHeuristics,
     SplittingHeuristics: BlockSplittingHeuristics,
 > RefinementAlgorithm<'a, G, A, SelectionHeuristics, SplittingHeuristics>
 {
     pub fn new<I: InitialPartitionProvider>(
-        game: &'a mut StateBasedResponsibilityGame<G, A>,
+        game: &'a mut StateBasedResponsibilityNonstochasticGame<G, A>,
         initial_coalition_provider: I,
         selection_heuristics: SelectionHeuristics,
         splitting_heuristics: SplittingHeuristics,

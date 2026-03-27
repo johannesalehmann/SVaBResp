@@ -30,7 +30,7 @@ fn checker() -> Result<(), ModelCheckerError> {
         &source,
         &[&arguments.property],
     );
-    let (prism_model, properties) = match parsed_model_and_objectives {
+    let (mut prism_model, properties) = match parsed_model_and_objectives {
         None => return Err(ModelCheckerError::ModelAndPropertyParsingError),
         Some((prism_model, properties)) => (prism_model, properties),
     };
@@ -41,7 +41,7 @@ fn checker() -> Result<(), ModelCheckerError> {
         properties,
     );
     let builder_output: ModelBuildingOutput<MdpType> = prism_model_builder::build_model(
-        &prism_model,
+        &mut prism_model,
         &atomic_propositions[..],
         properties.into_iter(),
         &constants,

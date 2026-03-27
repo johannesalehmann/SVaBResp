@@ -1,4 +1,4 @@
-use super::AlgorithmCollection;
+use super::NonstochasticGameAlgorithm;
 use crate::attractor;
 use crate::regions::FlagStateRegion;
 use probabilistic_models::probabilistic_properties::{Bound, BoundOperator, Query, StateFormula};
@@ -10,7 +10,7 @@ pub struct ReachabilityAlgorithmCollection {
     target_states: AtomicProposition,
 }
 
-impl AlgorithmCollection for ReachabilityAlgorithmCollection {
+impl NonstochasticGameAlgorithm for ReachabilityAlgorithmCollection {
     type WinningRegionType = FlagStateRegion;
     type ModelContext = ReachabilityAlgorithmContext;
 

@@ -1,4 +1,5 @@
 use super::Successor;
+use crate::Distribution;
 
 pub struct DistributionVector {
     successors: Vec<Successor>,
@@ -68,6 +69,36 @@ impl super::DistributionBuilder<DistributionVector> for Builder {
     }
 
     fn finish(self) -> DistributionVector {
+        let sum: f64 = self
+            .distribution
+            .successors
+            .iter()
+            .map(|s| s.probability)
+            .sum();
+        let eps = 0.000_000_001;
+        if sum < 1.0 - eps || sum > 1.0 + eps {
+            let detail = if self.distribution.number_of_successors() == 0 {
+                "Distribution is empty".to_string()
+            } else if self.distribution.number_of_successors() == 1 {
+                format!(
+                    "Distribution contains a single entry with probability {}",
+                    sum
+                )
+            } else {
+                format!(
+                    "Distribution contains {} entries with probability {} = {}",
+                    self.distribution.number_of_successors(),
+                    self.distribution
+                        .successors
+                        .iter()
+                        .map(|s| s.probability.to_string())
+                        .collect::<Vec<_>>()
+                        .join(","),
+                    sum
+                )
+            };
+            panic!("Probabilities of distribution do not add to 1: {detail}");
+        }
         self.distribution
     }
 }

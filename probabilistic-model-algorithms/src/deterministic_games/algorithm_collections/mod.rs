@@ -11,9 +11,9 @@ use crate::regions::{BoxedStateRegion, StateRegion};
 use probabilistic_models::probabilistic_properties::Query;
 use probabilistic_models::{AtomicProposition, ProbabilisticModel, TwoPlayer, VectorPredecessors};
 
-pub trait AlgorithmCollection: Sized {
+pub trait NonstochasticGameAlgorithm: Sized {
     type WinningRegionType: StateRegion;
-    type ModelContext;
+    type ModelContext: Sized;
 
     fn create_model_context<
         M: probabilistic_models::ModelTypes<Predecessors = VectorPredecessors, Owners = TwoPlayer>,
