@@ -35,7 +35,7 @@ pub fn compute_for_prism<
 >(
     mut prism_model: PrismModel,
     mut prism_property: PrismProperty,
-    mut grouping_scheme: G,
+    grouping_scheme: &mut G,
     group_blocking_provider: B,
     shapley: &mut S,
     constants: std::collections::HashMap<String, UserProvidedConstValue>,
@@ -50,7 +50,6 @@ pub fn compute_for_prism<
         &mut atomic_propositions,
         vec![prism_property],
     );
-
     trace!("Building model");
     let builder_results = prism_model_builder::build_model::<_, MdpType<VectorPredecessors>, _>(
         &mut prism_model,
@@ -105,7 +104,7 @@ pub fn compute_for_prism<
         trace!("Computing state groups");
         let grouping = grouping_scheme.create_groups(&mut game, &property);
         info!("There are {} state groups", grouping.groups.get_count());
-        let print_groups = true;
+        let print_groups = false;
         if print_groups {
             println!("Group membership:");
             for group in 0..grouping.groups.get_count() {

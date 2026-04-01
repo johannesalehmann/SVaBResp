@@ -72,13 +72,13 @@ impl ListGroupingOptionsCommand {
         });
         grouping_options.push(GroupingOption {
             name: "by variable".to_string(),
-            args: "-g variables($selected)".to_string(),
+            args: "-g variables($options)".to_string(),
             kind: GroupingOptionKind::Multiselect,
             values: Some(variables),
         });
         grouping_options.push(GroupingOption {
             name: "by label".to_string(),
-            args: "-g labels($selected)".to_string(),
+            args: "-g labels($options)".to_string(),
             kind: GroupingOptionKind::Multiselect,
             values: Some(labels),
         });

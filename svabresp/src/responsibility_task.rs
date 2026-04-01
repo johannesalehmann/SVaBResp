@@ -5,6 +5,7 @@ use crate::{PrismModel, PrismProperty};
 use log::trace;
 
 pub struct ResponsibilityTask<
+    'a,
     M: ModelAndPropertySource,
     C: CounterexampleSource,
     A: ShapleyAlgorithm,
@@ -15,17 +16,18 @@ pub struct ResponsibilityTask<
     pub constants: String,
     pub coop_game_type: CoopGameType<C>,
     pub algorithm: A,
-    pub grouping_scheme: G,
+    pub grouping_scheme: &'a mut G,
     pub refinement: R,
 }
 
 impl<
+    'a,
     M: ModelAndPropertySource,
     C: CounterexampleSource,
     A: ShapleyAlgorithm,
     G: GroupExtractionScheme,
     R: GroupBlockingProvider,
-> ResponsibilityTask<M, C, A, G, R>
+> ResponsibilityTask<'a, M, C, A, G, R>
 {
     pub fn run(mut self) -> A::Output<String> {
         trace!("Loading model and property");
@@ -49,6 +51,7 @@ impl<
 
 pub trait ModelAndPropertySource {
     fn get_model_and_property(self) -> (super::PrismModel, super::PrismProperty);
+    fn get_source_code(&self) -> String;
 }
 
 pub struct ModelFromFile {
@@ -63,11 +66,15 @@ impl ModelFromFile {
             property: property.into(),
         }
     }
+
+    fn read_file(&self) -> String {
+        std::fs::read_to_string(&self.path).expect("Failed to read input model")
+    }
 }
 
 impl ModelAndPropertySource for ModelFromFile {
     fn get_model_and_property(self) -> (super::PrismModel, super::PrismProperty) {
-        let file = std::fs::read_to_string(&self.path).expect("Failed to read input model");
+        let file = self.read_file();
 
         let model_from_string = ModelFromString {
             name: self.path,
@@ -76,6 +83,10 @@ impl ModelAndPropertySource for ModelFromFile {
         };
 
         model_from_string.get_model_and_property()
+    }
+
+    fn get_source_code(&self) -> String {
+        self.read_file()
     }
 }
 
@@ -112,6 +123,10 @@ impl ModelAndPropertySource for ModelFromString {
         let property = properties.into_iter().nth(0).unwrap();
 
         (model, property)
+    }
+
+    fn get_source_code(&self) -> String {
+        self.model.clone()
     }
 }
 

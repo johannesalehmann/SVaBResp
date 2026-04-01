@@ -3,9 +3,12 @@ pub use num_rational;
 pub use num_traits;
 
 mod responsibility_task;
-pub mod shapley;
-pub mod state_based;
 pub use responsibility_task::*;
+
+pub mod shapley;
+
+pub mod state_based;
+pub mod syntax_highlighting;
 
 pub use prism_model_builder::UserProvidedConstValue;
 

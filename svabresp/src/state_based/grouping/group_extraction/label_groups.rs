@@ -1,3 +1,4 @@
+use crate::shapley::ResponsibilityValues;
 use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
 use chumsky::prelude::SimpleSpan;
@@ -98,5 +99,13 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         }
 
         GroupsAndAuxiliary::new(builder.finish())
+    }
+
+    fn get_syntax_elements(
+        &self,
+        values: &ResponsibilityValues<String, f64, f64>,
+    ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
+        let _ = values;
+        None
     }
 }

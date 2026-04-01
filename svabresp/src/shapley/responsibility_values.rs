@@ -141,6 +141,24 @@ where
         None
     }
 }
+impl<P, V, VD> ResponsibilityValues<P, V, VD> {
+    pub fn map_player_info<P2, F: FnMut(P) -> P2>(
+        self,
+        mut map: F,
+    ) -> ResponsibilityValues<P2, V, VD> {
+        ResponsibilityValues {
+            players: self
+                .players
+                .into_iter()
+                .map(|p| ResponsibilityValue {
+                    player_info: map(p.player_info),
+                    value: p.value,
+                    details: p.details,
+                })
+                .collect(),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct ResponsibilityValue<P, V, VD> {

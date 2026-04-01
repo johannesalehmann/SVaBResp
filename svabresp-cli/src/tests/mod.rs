@@ -23,7 +23,7 @@ fn small_network_explicit() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: IndividualGroupExtractionScheme::new(),
+        grouping_scheme: &mut IndividualGroupExtractionScheme::new(),
         refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
@@ -49,7 +49,7 @@ fn labelled_groups() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: LabelGroupExtractionScheme::new(vec![
+        grouping_scheme: &mut LabelGroupExtractionScheme::new(vec![
             "l3".to_string(),
             "l1".to_string(),
             "l2".to_string(),
@@ -80,7 +80,7 @@ fn value_groups() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: ValueGroupExtractionScheme::new(vec![
+        grouping_scheme: &mut ValueGroupExtractionScheme::new(vec![
             "x".to_string(),
             "z".to_string(),
             "w".to_string(),
@@ -110,7 +110,7 @@ fn module_groups() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: ModuleGroupExtractionScheme::new(),
+        grouping_scheme: &mut ModuleGroupExtractionScheme::new(),
         refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
@@ -140,7 +140,7 @@ fn action_groups() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: ActionGroupExtractionScheme::new(),
+        grouping_scheme: &mut ActionGroupExtractionScheme::new(),
         refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();
@@ -164,7 +164,7 @@ fn simple_refinement() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: IndividualGroupExtractionScheme::including_irrelevant_states(),
+        grouping_scheme: &mut IndividualGroupExtractionScheme::including_irrelevant_states(),
         refinement: // IdentityGroupBlockingProvider::new(),
         RefinementGroupBlockingProvider::new(
             SingletonInitialPartition::new(),
@@ -192,7 +192,7 @@ fn refinement_from_paper() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: IndividualGroupExtractionScheme::new(),
+        grouping_scheme: &mut IndividualGroupExtractionScheme::new(),
         refinement: RefinementGroupBlockingProvider::new(
             SingletonInitialPartition::new(),
             RandomBlockSelectionHeuristics::new(1),
@@ -221,7 +221,7 @@ fn probabilistic() {
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
-        grouping_scheme: IndividualGroupExtractionScheme::including_irrelevant_states(),
+        grouping_scheme: &mut IndividualGroupExtractionScheme::including_irrelevant_states(),
         refinement: IdentityGroupBlockingProvider::new(),
     };
     let result = task.run();

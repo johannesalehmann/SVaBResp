@@ -1,3 +1,4 @@
+use crate::shapley::ResponsibilityValues;
 use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
 use chumsky::span::SimpleSpan;
@@ -12,10 +13,31 @@ use probabilistic_models::{
 use probabilistic_properties::Query;
 use std::collections::HashMap;
 
+pub struct ModuleGroupInfo {
+    name: String,
+    spans: Vec<SimpleSpan>,
+}
+
+impl ModuleGroupInfo {
+    pub fn new<S: Into<String>>(name: S, spans: Vec<SimpleSpan>) -> Self {
+        Self {
+            name: name.into(),
+            spans,
+        }
+    }
+
+    pub fn with_single_span<S: Into<String>>(name: S, span: SimpleSpan) -> Self {
+        Self {
+            name: name.into(),
+            spans: vec![span],
+        }
+    }
+}
+
 pub struct ModuleGroupExtractionScheme {
     group_count: Option<usize>, // The number of groups includes the scheduler group, one group per module and one per synchronising action
     selected_module_variable: Option<VariableReference>,
-    group_names: Vec<String>,
+    group_info: Vec<ModuleGroupInfo>,
 }
 
 impl ModuleGroupExtractionScheme {
@@ -23,7 +45,7 @@ impl ModuleGroupExtractionScheme {
         Self {
             group_count: None,
             selected_module_variable: None,
-            group_names: Vec::new(),
+            group_info: Vec::new(),
         }
     }
 }
@@ -55,34 +77,36 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
 
         let mut action_infos: HashMap<String, ActionInfo> = HashMap::new();
         for module in &prism_model.modules.modules {
-            let mut module_action_infos = HashMap::new();
+            let mut module_action_guards: HashMap<String, Expression<_, _>> = HashMap::new();
+            let mut module_action_spans: HashMap<String, Vec<SimpleSpan>> = HashMap::new();
             for command in &module.commands {
                 if let Some(action) = &command.action {
-                    if module_action_infos.contains_key(&action.name) {
-                        let current_guard: &mut Expression<_, _> =
-                            module_action_infos.get_mut(&action.name).unwrap();
+                    if module_action_guards.contains_key(&action.name) {
+                        let current_guard = module_action_guards.get_mut(&action.name).unwrap();
                         *current_guard = Expression::Disjunction(
                             Box::new(command.guard.clone()),
                             Box::new(current_guard.clone()),
                             span,
                         );
+                        let current_spans = module_action_spans.get_mut(&action.name).unwrap();
+                        current_spans.push(action.span);
                     } else {
-                        module_action_infos.insert(action.name.clone(), command.guard.clone());
+                        module_action_guards.insert(action.name.clone(), command.guard.clone());
+                        module_action_spans.insert(action.name.clone(), vec![action.span.clone()]);
                     }
                 }
             }
-            for (name, guard) in module_action_infos {
-                if action_infos.contains_key(&name) {
-                    action_infos
-                        .get_mut(&name)
-                        .unwrap()
-                        .module_guards
-                        .push(guard);
+            for (name, guard) in module_action_guards {
+                let spans = module_action_spans.get_mut(&name).unwrap();
+                if let Some(action_info) = action_infos.get_mut(&name) {
+                    action_info.module_guards.push(guard);
+                    action_info.spans.append(spans)
                 } else {
                     action_infos.insert(
                         name,
                         ActionInfo {
                             module_guards: vec![guard],
+                            spans: spans.clone(),
                         },
                     );
                 }
@@ -90,10 +114,16 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
         }
 
         let mut scheduler = Module::new(Identifier::new("scheduler", span).unwrap(), span);
-        self.group_names.push("scheduler".to_string());
+        self.group_info.push(ModuleGroupInfo::with_single_span(
+            "scheduler",
+            prism_model.model_type.get_span().clone(),
+        ));
 
         for (module_index, module) in prism_model.modules.modules.iter_mut().enumerate() {
-            self.group_names.push(module.name.name.clone());
+            self.group_info.push(ModuleGroupInfo::with_single_span(
+                module.name.name.clone(),
+                module.name.span.clone(),
+            ));
             let execute_action = format!("execute_module_{}", module_index);
             let mut guard = Expression::Bool(false, span);
             for command in &mut module.commands {
@@ -157,7 +187,8 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
         let mut index = 1 + prism_model.modules.modules.len();
         for (action, action_info) in action_infos {
             if action_info.is_synchronising() {
-                self.group_names.push(action.clone());
+                self.group_info
+                    .push(ModuleGroupInfo::new(&action, action_info.spans.clone()));
 
                 let guard = Expression::Conjunction(
                     Box::new(action_info.get_guard()),
@@ -240,16 +271,48 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
         }
 
         let mut builder = Self::GroupType::get_builder();
-        for (group_name, group) in self.group_names.drain(..).zip(groups.into_iter()) {
+        for (group_name, group) in self
+            .group_info
+            .iter()
+            .map(|g| g.name.clone())
+            .zip(groups.into_iter())
+        {
             builder.create_group_from_vec(group, group_name);
         }
 
         GroupsAndAuxiliary::new(builder.finish())
     }
+
+    fn get_syntax_elements(
+        &self,
+        values: &ResponsibilityValues<String, f64, f64>,
+    ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
+        use crate::syntax_highlighting::*;
+        let mut highlighting = SyntaxHighlighting::new();
+
+        for group in &self.group_info {
+            let value = if let Some(responsibility) = values.get(&group.name) {
+                responsibility.value
+            } else {
+                0.0
+            };
+            for span in &group.spans {
+                highlighting.add_highlight(Highlight::new(
+                    span.start,
+                    span.end,
+                    Colour::new(0, value),
+                    "Example tooltip",
+                ));
+            }
+        }
+
+        Some(highlighting)
+    }
 }
 
 struct ActionInfo {
     pub module_guards: Vec<Expression<VariableReference, SimpleSpan>>,
+    pub spans: Vec<SimpleSpan>,
 }
 
 impl ActionInfo {

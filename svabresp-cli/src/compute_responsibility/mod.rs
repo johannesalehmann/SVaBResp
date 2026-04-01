@@ -69,6 +69,8 @@ enum OutputKind {
     HumanReadable,
     Parsable,
     Silent,
+    SyntaxHighlight,
+    SyntaxHighlightJson,
 }
 
 enum LoggingLevel {
@@ -84,7 +86,7 @@ impl ComputeResponsibilityCommand {
         Command::new("svabresp").about("Computes responsibility values")
             .arg(arg!(-a --algorithm <ALGORITHM> "The algorithm that is used to compute the responsibility values. Legal values are `brute-force`, `stochastic`, `refinement`.").default_value("brute-force"))
             .arg(arg!(-g --grouping <GROUPING> "The scheme that is used to group states. Legal values are `individual`, `labels([space-separated list of label names])`, `modules`, `actions`, `variables([space-separated list of variable names])`.").default_value("individual"))
-            .arg(arg!(-o --output <OUTPUT> "How the output should be presented. Legal values are `human-readable`, `parsable` (simple format that can be processed by other tools) and `silent` (no output).").default_value("human-readable"))
+            .arg(arg!(-o --output <OUTPUT> "How the output should be presented. Legal values are `human-readable`, `parsable` (simple format that can be processed by other tools), `syntax-highlight` (html file highlighting the responsible syntax elements), `syntax-highlight-json` (json file describing syntax highlighting) and `silent` (no output).").default_value("human-readable"))
             .arg(arg!(-c --constants <CONSTANTS> "Values for the undefined constants in the model").required(false))
             .arg(arg!(-l --logging <LEVEL> "The level of detail for the logs. Legal values are `error`, `warn`, `info`, `debug` and `trace`.").default_value("warn"))
             .arg(arg!(--initialpartition <HEURISTICS> "Refinement algorithm: The heuristics used to construct the initial partition. Legal values are `singleton` and `random(<INTEGER>)`, where <INTEGER> is a positive integer.").default_value("singleton"))
@@ -135,6 +137,8 @@ impl ComputeResponsibilityCommand {
             "human-readable" => OutputKind::HumanReadable,
             "parsable" => OutputKind::Parsable,
             "silent" => OutputKind::Silent,
+            "syntax-highlight" => OutputKind::SyntaxHighlight,
+            "syntax-highlight-json" => OutputKind::SyntaxHighlightJson,
             o => panic!("Unknown output kind `{}`", o),
         };
         let constants = match matches.get_one::<String>("constants") {
@@ -466,18 +470,21 @@ impl ComputeResponsibilityCommand {
     >(
         self,
         model_description: M,
-        grouping_scheme: G,
+        mut grouping_scheme: G,
         algorithm: A,
         printer: P,
         refinement: B,
     ) {
         let start = std::time::Instant::now();
+
+        let model_source = model_description.get_source_code();
+
         let task = ResponsibilityTask {
             model_description,
             constants: self.constants,
             coop_game_type: CoopGameType::<CounterexampleFile>::Forward, // TODO: Make this configurable
             algorithm,
-            grouping_scheme,
+            grouping_scheme: &mut grouping_scheme,
             refinement,
         };
 
@@ -496,6 +503,12 @@ impl ComputeResponsibilityCommand {
             OutputKind::Silent => {
                 // psst!
             }
+            OutputKind::SyntaxHighlight => {
+                printer.print_syntax_highlighting(&grouping_scheme, output, &model_source);
+            }
+            OutputKind::SyntaxHighlightJson => {
+                printer.print_syntax_highlighting_json(&grouping_scheme, output)
+            }
         }
     }
 }
@@ -503,6 +516,17 @@ impl ComputeResponsibilityCommand {
 trait OutputPrinter<T> {
     fn print_human_readable(self, output: T);
     fn print_parsable(self, output: T);
+    fn print_syntax_highlighting<G: GroupExtractionScheme>(
+        self,
+        grouping_scheme: &G,
+        output: T,
+        source: &str,
+    );
+    fn print_syntax_highlighting_json<G: GroupExtractionScheme>(
+        self,
+        grouping_scheme: &G,
+        output: T,
+    );
 }
 
 struct ResponsibilityValuesPrinter {}
@@ -542,6 +566,44 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
                     .map(|f| f.to_string())
                     .unwrap_or_else(|| "err".to_string())
             );
+        }
+    }
+
+    fn print_syntax_highlighting<G: GroupExtractionScheme>(
+        self,
+        grouping_scheme: &G,
+        output: ResponsibilityValues<PD, f64, f64>,
+        source: &str,
+    ) {
+        use svabresp::syntax_highlighting::*;
+        let colour_ramps = ColourRampCollection::with_predefined_ramps();
+        // TODO: This relies on the display result of p matching the group names. This is currently
+        // the case, but might not always hold.
+        let string_output = &output.map_player_info(|p| format!("{}", p));
+        if let Some(highlighting) = grouping_scheme.get_syntax_elements(string_output) {
+            let mut document = CodeDocument::new(source.to_string());
+            document.apply_highlighting(&highlighting, &colour_ramps);
+            std::fs::write("highlighting.html", document.to_html()).unwrap();
+            println!("Wrote html to `highlighting.html`");
+        } else {
+            println!("This grouping scheme does not support highlighting");
+        }
+    }
+
+    fn print_syntax_highlighting_json<G: GroupExtractionScheme>(
+        self,
+        grouping_scheme: &G,
+        output: ResponsibilityValues<PD, f64, f64>,
+    ) {
+        use svabresp::syntax_highlighting::*;
+        let colour_ramps = ColourRampCollection::with_predefined_ramps();
+        // TODO: This relies on the display result of p matching the group names. This is currently
+        // the case, but might not always hold.
+        let string_output = &output.map_player_info(|p| format!("{}", p));
+        if let Some(highlighting) = grouping_scheme.get_syntax_elements(string_output) {
+            println!("{}", highlighting.json("\n", "    ", &colour_ramps));
+        } else {
+            println!("This grouping scheme does not support highlighting");
         }
     }
 }

@@ -23,6 +23,7 @@ use probabilistic_properties::Query;
 
 mod relevant_states;
 
+use crate::shapley::ResponsibilityValues;
 pub use relevant_states::RelevantStates;
 
 pub trait GroupExtractionScheme {
@@ -42,6 +43,11 @@ pub trait GroupExtractionScheme {
         game: &mut ProbabilisticModel<M>,
         property: &Query<i64, f64, AtomicProposition>,
     ) -> GroupsAndAuxiliary<Self::GroupType>;
+
+    fn get_syntax_elements(
+        &self,
+        values: &ResponsibilityValues<String, f64, f64>,
+    ) -> Option<crate::syntax_highlighting::SyntaxHighlighting>;
 }
 
 pub struct GroupsAndAuxiliary<G: super::super::grouping::StateGroups> {
