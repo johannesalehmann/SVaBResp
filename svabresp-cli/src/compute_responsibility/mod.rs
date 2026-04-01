@@ -109,7 +109,10 @@ impl ComputeResponsibilityCommand {
             "brute-force" => AlgorithmKind::BruteForce,
             "stochastic" => AlgorithmKind::Stochastic,
             "refinement" => AlgorithmKind::Refinement,
-            a => panic!("Unknown algorithm `{}`", a),
+            a => panic!(
+                "Unknown algorithm `{}`. Legal values are `brute-force`, `stochastic` and `refinement`.",
+                a
+            ),
         };
         let grouping = match matches.get_one::<String>("grouping").unwrap().as_str() {
             "individual" => GroupingKind::Individual,
@@ -131,7 +134,10 @@ impl ComputeResponsibilityCommand {
 
                 GroupingKind::Variables { variables }
             }
-            g => panic!("Unknown grouping scheme `{}`", g),
+            g => panic!(
+                "Unknown grouping scheme `{}`. Legal values are `individual`, `labels(l1 l2 ... ln)`, `modules`, `actions` and `variables(x1 x2 ... xn)`.",
+                g
+            ),
         };
         let output = match matches.get_one::<String>("output").unwrap().as_str() {
             "human-readable" => OutputKind::HumanReadable,
@@ -139,7 +145,10 @@ impl ComputeResponsibilityCommand {
             "silent" => OutputKind::Silent,
             "syntax-highlight" => OutputKind::SyntaxHighlight,
             "syntax-highlight-json" => OutputKind::SyntaxHighlightJson,
-            o => panic!("Unknown output kind `{}`", o),
+            o => panic!(
+                "Unknown output kind `{}`. Legal values are `human-readable`, `parsable`, `silent`, `syntax-highlight` and `syntax-highlight-json`.",
+                o
+            ),
         };
         let constants = match matches.get_one::<String>("constants") {
             Some(c) => c.clone(),
@@ -151,7 +160,10 @@ impl ComputeResponsibilityCommand {
             "info" => LoggingLevel::Info,
             "debug" => LoggingLevel::Debug,
             "trace" => LoggingLevel::Trace,
-            l => panic!("Unknown logging level `{}`", l),
+            l => panic!(
+                "Unknown logging level `{}`. Legal values are `error`, `warn`, `info`, `debug` and `trace`.",
+                l
+            ),
         };
 
         let refinement_initial_partition = match matches
@@ -178,7 +190,10 @@ impl ComputeResponsibilityCommand {
                 }
             }
             "singleton" => RefinementInitialPartition::Singleton,
-            i => panic!("Unknown initial partition option `{}`", i),
+            i => panic!(
+                "Unknown initial partition option `{}`. Legal values are `random(<INTEGER>)` and `singleton`.",
+                i
+            ),
         };
 
         let refinement_block_selection_string =
@@ -206,7 +221,10 @@ impl ComputeResponsibilityCommand {
             "max-delta" => RefinementBlockSelection::MaxDelta { block_count },
             "min-delta" => RefinementBlockSelection::MinDelta { block_count },
             "min-frontier" => RefinementBlockSelection::MinFrontier { block_count },
-            b => panic!("Unknown block selection option `{}`", b),
+            b => panic!(
+                "Unknown block selection option `{}`. Legal values are `(random, n)`, `(max-delta, n)`, `(min-delta, n)` and `(min-frontier)`, where n is a positive integer. ",
+                b
+            ),
         };
 
         let refinement_splitting = match matches.get_one::<String>("splitting").unwrap().as_str() {
@@ -217,7 +235,10 @@ impl ComputeResponsibilityCommand {
             }
             "frontier(most-edges-to-winning)" => RefinementSplitting::FrontierMostEdgesToWinning,
             "frontier(most-edges-to-losing)" => RefinementSplitting::FrontierMostEdgesToLosing,
-            s => panic!("Unknown splitting heuristics `{}`", s),
+            s => panic!(
+                "Unknown splitting heuristics `{}`. Legal values are `random`, `frontier`, `frontier(random)`, `frontier(most-edges-to-winning-and-losing)`, `frontier(most-edges-to-winning)` and `frontier(most-edges-to-losing)`.",
+                s
+            ),
         };
 
         ComputeResponsibilityCommand {
