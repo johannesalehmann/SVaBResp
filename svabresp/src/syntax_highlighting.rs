@@ -6,6 +6,7 @@ use std::ops::Index;
 pub struct CodeColour {
     foreground: HslColour,
     background: HslColour,
+    tooltip: Option<String>,
 }
 
 impl CodeColour {
@@ -13,6 +14,7 @@ impl CodeColour {
         Self {
             foreground: HslColour::grey(0.0),
             background: HslColour::grey(1.0),
+            tooltip: None,
         }
     }
 }
@@ -40,6 +42,7 @@ impl CodeDocument {
         for highlight in &highlighting.highlights {
             for i in highlight.from..highlight.to {
                 self.colours[i].background = highlight.colour.to_hsl(ramps);
+                self.colours[i].tooltip = Some(highlight.tooltip.clone());
             }
         }
     }
@@ -53,6 +56,7 @@ impl CodeDocument {
 <head>
 <meta charset=utf-8>
 <title>Colour ramp demonstration page</title>
+<style>p { margin: 0; } span { display:inline-block; padding:0.2em 0; }</style>
 </head>
 <body>
 <div style=\"font-family: monospace, monospace\">"
@@ -66,6 +70,9 @@ impl CodeDocument {
             if character.is_newline() {
                 if previous_style.is_some() {
                     output.push("</span>".to_string());
+                } else {
+                    // Make sure empty lines have the same height as a normal line:
+                    output.push("<span>&nbsp;</span>".to_string());
                 }
                 output.push("</p>\n<p>".to_string());
                 previous_style = None;
@@ -75,14 +82,25 @@ impl CodeDocument {
                     if previous_style.is_some() {
                         output.push("</span>".to_string());
                     }
+                    let tooltip = match &style.tooltip {
+                        None => "".to_string(),
+                        Some(tooltip) => {
+                            format!(" title=\"{}\"", tooltip)
+                        }
+                    };
                     output.push(format!(
-                        "<span style=\"color:{};background-color:{}\">",
+                        "<span style=\"color:{};background-color:{}\"{}>",
                         style.foreground.to_hex(),
-                        style.background.to_hex()
+                        style.background.to_hex(),
+                        tooltip
                     ));
                     previous_style = Some(style);
                 }
-                output.push(character.to_string());
+                if character.is_whitespace() {
+                    output.push("&nbsp".to_string());
+                } else {
+                    output.push(character.to_string());
+                }
             }
         }
 
