@@ -1,7 +1,9 @@
 use std::str::FromStr;
 use svabresp::num_rational::BigRational;
 use svabresp::num_traits::ToPrimitive;
-use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues};
+use svabresp::shapley::{
+    BruteForceAlgorithm, DiscardingSwitchingPairCollector, ResponsibilityValues,
+};
 use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, IndividualGroupExtractionScheme, LabelGroupExtractionScheme,
     ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
@@ -25,6 +27,7 @@ fn small_network_explicit() {
         algorithm: BruteForceAlgorithm::new(),
         grouping_scheme: &mut IndividualGroupExtractionScheme::new(),
         refinement: IdentityGroupBlockingProvider::new(),
+        switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
     let result = task.run();
 
@@ -56,6 +59,7 @@ fn labelled_groups() {
             "dummy".to_string(),
         ]),
         refinement: IdentityGroupBlockingProvider::new(),
+        switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
     let result = task.run();
 
@@ -86,6 +90,7 @@ fn value_groups() {
             "w".to_string(),
         ]),
         refinement: IdentityGroupBlockingProvider::new(),
+        switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
     let result = task.run();
 
@@ -112,6 +117,7 @@ fn module_groups() {
         algorithm: BruteForceAlgorithm::new(),
         grouping_scheme: &mut ModuleGroupExtractionScheme::new(),
         refinement: IdentityGroupBlockingProvider::new(),
+        switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
     let result = task.run();
 
@@ -142,6 +148,7 @@ fn action_groups() {
         algorithm: BruteForceAlgorithm::new(),
         grouping_scheme: &mut ActionGroupExtractionScheme::new(),
         refinement: IdentityGroupBlockingProvider::new(),
+        switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
     let result = task.run();
     for res in result.players.iter() {
@@ -171,6 +178,7 @@ fn simple_refinement() {
             RandomBlockSelectionHeuristics::new(1),
             FrontierSplittingHeuristics::random_state(),
         ),
+        switching_pair_collector: &mut  DiscardingSwitchingPairCollector::new()
     };
     let result = task.run();
     for res in result.players.iter() {
@@ -198,6 +206,7 @@ fn refinement_from_paper() {
             RandomBlockSelectionHeuristics::new(1),
             FrontierSplittingHeuristics::random_state(),
         ),
+        switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
     let result = task.run();
 
@@ -223,6 +232,7 @@ fn probabilistic() {
         algorithm: BruteForceAlgorithm::new(),
         grouping_scheme: &mut IndividualGroupExtractionScheme::including_irrelevant_states(),
         refinement: IdentityGroupBlockingProvider::new(),
+        switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
     let result = task.run();
 

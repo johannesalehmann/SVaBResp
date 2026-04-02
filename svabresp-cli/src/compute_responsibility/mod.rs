@@ -2,7 +2,10 @@ use clap::{Arg, ArgMatches, Command, arg};
 use env_logger::Target;
 use log::{LevelFilter, info, trace};
 use svabresp::num_traits::ToPrimitive;
-use svabresp::shapley::{BruteForceAlgorithm, ResponsibilityValues, ShapleyAlgorithm};
+use svabresp::shapley::{
+    BruteForceAlgorithm, DiscardingSwitchingPairCollector, FullSwitchingPairCollector,
+    ResponsibilityValues, ShapleyAlgorithm, SwitchingPairCollection, SwitchingPairCollector,
+};
 use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, GroupExtractionScheme, IndividualGroupExtractionScheme,
     LabelGroupExtractionScheme, ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
@@ -71,6 +74,18 @@ enum OutputKind {
     Silent,
     SyntaxHighlight,
     SyntaxHighlightJson,
+}
+
+impl OutputKind {
+    pub fn requires_switching_pairs(&self) -> bool {
+        match self {
+            OutputKind::HumanReadable => false,
+            OutputKind::Parsable => false,
+            OutputKind::Silent => false,
+            OutputKind::SyntaxHighlight => true,
+            OutputKind::SyntaxHighlightJson => true,
+        }
+    }
 }
 
 enum LoggingLevel {
@@ -491,10 +506,47 @@ impl ComputeResponsibilityCommand {
     >(
         self,
         model_description: M,
+        grouping_scheme: G,
+        algorithm: A,
+        printer: P,
+        refinement: B,
+    ) {
+        if self.output.requires_switching_pairs() {
+            self.execute_with_switching_pair_collector(
+                model_description,
+                grouping_scheme,
+                algorithm,
+                printer,
+                refinement,
+                FullSwitchingPairCollector::new(),
+            )
+        } else {
+            self.execute_with_switching_pair_collector(
+                model_description,
+                grouping_scheme,
+                algorithm,
+                printer,
+                refinement,
+                DiscardingSwitchingPairCollector::new(),
+            )
+        }
+    }
+
+    fn execute_with_switching_pair_collector<
+        M: ModelAndPropertySource,
+        G: GroupExtractionScheme,
+        A: ShapleyAlgorithm,
+        P: OutputPrinter<A::Output<String>>,
+        B: GroupBlockingProvider,
+        SPC: SwitchingPairCollector + IntoSwitchingPairCollection,
+    >(
+        self,
+        model_description: M,
         mut grouping_scheme: G,
         algorithm: A,
         printer: P,
         refinement: B,
+        mut switching_pair_collector: SPC,
     ) {
         let start = std::time::Instant::now();
 
@@ -507,6 +559,7 @@ impl ComputeResponsibilityCommand {
             algorithm,
             grouping_scheme: &mut grouping_scheme,
             refinement,
+            switching_pair_collector: &mut switching_pair_collector,
         };
 
         trace!("Finished preparing responsibility task");
@@ -525,10 +578,17 @@ impl ComputeResponsibilityCommand {
                 // psst!
             }
             OutputKind::SyntaxHighlight => {
-                printer.print_syntax_highlighting(&grouping_scheme, output, &model_source);
+                let switching_pairs = switching_pair_collector.into_switching_pair_collection();
+                printer.print_syntax_highlighting(
+                    &grouping_scheme,
+                    output,
+                    &model_source,
+                    &switching_pairs,
+                );
             }
             OutputKind::SyntaxHighlightJson => {
-                printer.print_syntax_highlighting_json(&grouping_scheme, output)
+                let switching_pairs = switching_pair_collector.into_switching_pair_collection();
+                printer.print_syntax_highlighting_json(&grouping_scheme, output, &switching_pairs)
             }
         }
     }
@@ -542,11 +602,13 @@ trait OutputPrinter<T> {
         grouping_scheme: &G,
         output: T,
         source: &str,
+        switching_pairs: &SwitchingPairCollection,
     );
     fn print_syntax_highlighting_json<G: GroupExtractionScheme>(
         self,
         grouping_scheme: &G,
         output: T,
+        switching_pairs: &SwitchingPairCollection,
     );
 }
 
@@ -595,13 +657,16 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
         grouping_scheme: &G,
         output: ResponsibilityValues<PD, f64, f64>,
         source: &str,
+        switching_pairs: &SwitchingPairCollection,
     ) {
         use svabresp::syntax_highlighting::*;
         let colour_ramps = ColourRampCollection::with_predefined_ramps();
         // TODO: This relies on the display result of p matching the group names. This is currently
         // the case, but might not always hold.
         let string_output = &output.map_player_info(|p| format!("{}", p));
-        if let Some(highlighting) = grouping_scheme.get_syntax_elements(string_output) {
+        if let Some(highlighting) =
+            grouping_scheme.get_syntax_elements(string_output, switching_pairs)
+        {
             let mut document = CodeDocument::new(source.to_string());
             document.apply_highlighting(&highlighting, &colour_ramps);
             std::fs::write("highlighting.html", document.to_html()).unwrap();
@@ -615,16 +680,35 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
         self,
         grouping_scheme: &G,
         output: ResponsibilityValues<PD, f64, f64>,
+        switching_pairs: &SwitchingPairCollection,
     ) {
         use svabresp::syntax_highlighting::*;
         let colour_ramps = ColourRampCollection::with_predefined_ramps();
         // TODO: This relies on the display result of p matching the group names. This is currently
         // the case, but might not always hold.
         let string_output = &output.map_player_info(|p| format!("{}", p));
-        if let Some(highlighting) = grouping_scheme.get_syntax_elements(string_output) {
+        if let Some(highlighting) =
+            grouping_scheme.get_syntax_elements(string_output, switching_pairs)
+        {
             println!("{}", highlighting.json("\n", "    ", &colour_ramps));
         } else {
             println!("This grouping scheme does not support highlighting");
         }
+    }
+}
+
+trait IntoSwitchingPairCollection {
+    fn into_switching_pair_collection(self) -> SwitchingPairCollection;
+}
+
+impl IntoSwitchingPairCollection for DiscardingSwitchingPairCollector {
+    fn into_switching_pair_collection(self) -> SwitchingPairCollection {
+        panic!("Cannot retrieve switching pair information for this configuration");
+    }
+}
+
+impl IntoSwitchingPairCollection for FullSwitchingPairCollector {
+    fn into_switching_pair_collection(self) -> SwitchingPairCollection {
+        FullSwitchingPairCollector::into_switching_pair_collection(self)
     }
 }

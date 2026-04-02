@@ -1,4 +1,4 @@
-use crate::shapley::ResponsibilityValues;
+use crate::shapley::{ResponsibilityValues, SwitchingPairCollection};
 use crate::state_based::grouping::{GroupsAndAuxiliary, VectorStateGroupBuilder};
 use probabilistic_models::{
     AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation, VectorPredecessors,
@@ -82,8 +82,9 @@ impl super::GroupExtractionScheme for IndividualGroupExtractionScheme {
     fn get_syntax_elements(
         &self,
         values: &ResponsibilityValues<String, f64, f64>,
+        switching_pairs: &SwitchingPairCollection,
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
-        let _ = values;
+        let _ = (values, switching_pairs);
         None
     }
 }

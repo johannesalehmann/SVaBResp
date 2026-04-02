@@ -23,7 +23,7 @@ use probabilistic_properties::Query;
 
 mod relevant_states;
 
-use crate::shapley::ResponsibilityValues;
+use crate::shapley::{ResponsibilityValues, SwitchingPairCollection};
 pub use relevant_states::RelevantStates;
 
 pub trait GroupExtractionScheme {
@@ -47,6 +47,7 @@ pub trait GroupExtractionScheme {
     fn get_syntax_elements(
         &self,
         values: &ResponsibilityValues<String, f64, f64>,
+        switching_pairs: &SwitchingPairCollection,
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting>;
 }
 

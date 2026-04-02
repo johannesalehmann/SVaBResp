@@ -1,4 +1,4 @@
-use crate::shapley::ResponsibilityValues;
+use crate::shapley::{ResponsibilityValues, SwitchingPairCollection};
 use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
 use chumsky::span::SimpleSpan;
@@ -286,22 +286,38 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
     fn get_syntax_elements(
         &self,
         values: &ResponsibilityValues<String, f64, f64>,
+        switching_pairs: &SwitchingPairCollection,
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
 
-        for group in &self.group_info {
-            let value = if let Some(responsibility) = values.get(&group.name) {
-                responsibility.value
+        for (group_index, group) in self.group_info.iter().enumerate() {
+            let (value, tooltip_start) = if let Some(responsibility) = values.get(&group.name) {
+                (
+                    responsibility.value,
+                    format!("Responsibility: {}", responsibility.value),
+                )
             } else {
-                0.0
+                (0.0, "No responsibility".to_string())
             };
+
+            let mut tooltip_text = vec![tooltip_start];
+
+            for switching_pair in switching_pairs.switching_pairs(group_index) {
+                tooltip_text.push(format!(
+                    "<br>{:b}: {}",
+                    switching_pair.coalition, switching_pair.contribution
+                ));
+            }
+
+            let tooltip = tooltip_text.join("");
+
             for span in &group.spans {
                 highlighting.add_highlight(Highlight::new(
                     span.start,
                     span.end,
                     Colour::new(0, value),
-                    "Example tooltip",
+                    &tooltip,
                 ));
             }
         }

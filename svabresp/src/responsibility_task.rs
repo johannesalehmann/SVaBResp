@@ -1,4 +1,4 @@
-use crate::shapley::ShapleyAlgorithm;
+use crate::shapley::{ShapleyAlgorithm, SwitchingPairCollector};
 use crate::state_based::grouping::GroupExtractionScheme;
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
@@ -11,6 +11,7 @@ pub struct ResponsibilityTask<
     A: ShapleyAlgorithm,
     G: GroupExtractionScheme,
     R: GroupBlockingProvider,
+    SPC: SwitchingPairCollector,
 > {
     pub model_description: M,
     pub constants: String,
@@ -18,6 +19,7 @@ pub struct ResponsibilityTask<
     pub algorithm: A,
     pub grouping_scheme: &'a mut G,
     pub refinement: R,
+    pub switching_pair_collector: &'a mut SPC,
 }
 
 impl<
@@ -27,7 +29,8 @@ impl<
     A: ShapleyAlgorithm,
     G: GroupExtractionScheme,
     R: GroupBlockingProvider,
-> ResponsibilityTask<'a, M, C, A, G, R>
+    SPC: SwitchingPairCollector,
+> ResponsibilityTask<'a, M, C, A, G, R, SPC>
 {
     pub fn run(mut self) -> A::Output<String> {
         trace!("Loading model and property");
@@ -43,6 +46,7 @@ impl<
             self.refinement,
             &mut self.algorithm,
             constants,
+            self.switching_pair_collector,
         );
 
         responsibility
