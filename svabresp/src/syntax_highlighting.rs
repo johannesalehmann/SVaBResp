@@ -97,7 +97,7 @@ impl CodeDocument {
                     previous_style = Some(style);
                 }
                 if character.is_whitespace() {
-                    output.push("&nbsp".to_string());
+                    output.push("&nbsp;".to_string());
                 } else {
                     output.push(character.to_string());
                 }
