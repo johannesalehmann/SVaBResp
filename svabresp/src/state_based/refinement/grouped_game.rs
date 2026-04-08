@@ -67,10 +67,6 @@ impl<'a, G: StateGroups, A: SolvableNonstochasticGame> SimpleCooperativeGame
         &mut self.player_description
     }
 
-    fn into_player_descriptions(self) -> Self::PlayerDescriptions {
-        self.player_description
-    }
-
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool {
         self.set_owners(coalition);
 
@@ -84,6 +80,7 @@ impl<'a, G: StateGroups, A: SolvableNonstochasticGame> MonotoneCooperativeGame
 {
 }
 
+#[derive(Clone)]
 pub struct GroupedGamePlayerDescriptions {
     players: Vec<usize>,
 }

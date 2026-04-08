@@ -5,7 +5,7 @@ use probabilistic_models::TwoPlayer;
 
 pub struct StateBasedResponsibilityStochasticGame<G: StateGroups, A: SolvableStochasticGame> {
     solvable: A,
-    grouping: G,
+    pub grouping: G,
     always_helping: Vec<usize>,
     always_adversarial: Vec<usize>,
     group_names: super::GroupNames,
@@ -73,10 +73,6 @@ impl<G: StateGroups, A: SolvableStochasticGame> CooperativeGame
 
     fn player_descriptions_mut(&mut self) -> &mut Self::PlayerDescriptions {
         &mut self.group_names
-    }
-
-    fn into_player_descriptions(self) -> Self::PlayerDescriptions {
-        self.group_names
     }
 
     fn get_value<C: CoalitionSpecifier>(&mut self, coalition: C) -> f64 {

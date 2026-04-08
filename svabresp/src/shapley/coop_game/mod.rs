@@ -22,22 +22,20 @@ impl<P> PlayerDescriptions for Vec<P> {
 }
 
 pub trait CooperativeGame {
-    type PlayerDescriptions: PlayerDescriptions;
+    type PlayerDescriptions: PlayerDescriptions + Clone;
 
     fn get_player_count(&self) -> usize;
     fn player_descriptions(&self) -> &Self::PlayerDescriptions;
     fn player_descriptions_mut(&mut self) -> &mut Self::PlayerDescriptions;
-    fn into_player_descriptions(self) -> Self::PlayerDescriptions;
     fn get_value<C: CoalitionSpecifier>(&mut self, coalition: C) -> f64;
 }
 
 pub trait SimpleCooperativeGame {
-    type PlayerDescriptions: PlayerDescriptions;
+    type PlayerDescriptions: PlayerDescriptions + Clone;
 
     fn get_player_count(&self) -> usize;
     fn player_descriptions(&self) -> &Self::PlayerDescriptions;
     fn player_descriptions_mut(&mut self) -> &mut Self::PlayerDescriptions;
-    fn into_player_descriptions(self) -> Self::PlayerDescriptions;
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool;
 }
 
@@ -54,10 +52,6 @@ impl<G: SimpleCooperativeGame> CooperativeGame for G {
 
     fn player_descriptions_mut(&mut self) -> &mut Self::PlayerDescriptions {
         SimpleCooperativeGame::player_descriptions_mut(self)
-    }
-
-    fn into_player_descriptions(self) -> Self::PlayerDescriptions {
-        SimpleCooperativeGame::into_player_descriptions(self)
     }
 
     fn get_value<C: CoalitionSpecifier>(&mut self, coalition: C) -> f64 {
@@ -87,6 +81,22 @@ pub trait CoalitionSpecifier {
             }
         }
         mask
+    }
+
+    fn to_string<S: AsRef<str>>(&self, group_names: &[S]) -> String {
+        let mut result = vec!["{".to_string()];
+        let mut is_first = true;
+        for (i, group_name) in group_names.iter().enumerate() {
+            if self.is_in_coalition(i) {
+                if !is_first {
+                    result.push(", ".to_string());
+                }
+                is_first = false;
+                result.push(group_name.as_ref().to_string());
+            }
+        }
+        result.push("}".to_string());
+        result.join("")
     }
 }
 

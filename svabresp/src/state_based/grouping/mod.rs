@@ -10,6 +10,11 @@ pub trait StateGroups {
     fn get_states<'a>(&'a self, group: usize) -> Self::Iter<'a>;
     fn get_label(&self, group: usize) -> String;
     fn get_dummy_states<'a>(&'a self) -> Self::Iter<'a>;
+
+    // TODO: This method is unconventional – it would be nicer to provide a default implementation
+    // or to just switch to VectorStateGroups everywhere instead of having a trait with a single
+    // implementation
+    fn to_vector_state_groups(self) -> VectorStateGroups;
 }
 
 pub struct VectorStateGroups {
@@ -94,5 +99,15 @@ impl StateGroups for VectorStateGroups {
 
     fn get_dummy_states<'a>(&'a self) -> Self::Iter<'a> {
         self.dummy_states.states.iter().cloned()
+    }
+
+    fn to_vector_state_groups(self) -> VectorStateGroups {
+        self
+    }
+}
+
+impl VectorStateGroups {
+    pub fn into_names(self) -> Vec<String> {
+        self.groups.into_iter().map(|g| g.label).collect()
     }
 }

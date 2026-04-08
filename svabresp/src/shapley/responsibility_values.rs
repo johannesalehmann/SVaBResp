@@ -37,6 +37,7 @@ impl<V: Default> CriticalPairCounter<V> {
 }
 
 impl CriticalPairCounter<usize> {
+    #[allow(unused)] // TODO: Properly support both integer and floating-point critical pair counting
     pub fn to_responsibility_values<P: PlayerDescriptions>(
         self,
         weights: Vec<BigRational>,

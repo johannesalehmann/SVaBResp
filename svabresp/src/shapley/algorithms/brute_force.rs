@@ -31,10 +31,10 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
         SPC: crate::shapley::SwitchingPairCollector,
     >(
         &mut self,
-        mut game: G,
+        game: &mut G,
         switching_pair_collector: &mut SPC,
     ) -> Self::Output<<G::PlayerDescriptions as PlayerDescriptions>::PlayerType> {
-        let (n, coalition_count) = self.get_n_and_coalition_count(&game);
+        let (n, coalition_count) = self.get_n_and_coalition_count(game);
 
         let mut counts = CriticalPairCounter::new(n);
 
@@ -45,16 +45,16 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
             .collect::<Vec<_>>();
 
         let start = std::time::Instant::now();
-        let mut next_round_number = 1_000_000;
+        let mut next_round_number = 100_000;
         for base_coalition in 0..coalition_count {
             // TODO: Factor out status reporting for both simple and non-simple algorithm
             if base_coalition == next_round_number && base_coalition > 0 {
-                next_round_number += 1_000_000;
+                next_round_number += 100_000;
                 if start.elapsed().as_secs_f32() > 5.0 {
                     info!(
-                        "Checked {}m/{:.1}m ({:.2}%) switching pairs",
-                        base_coalition / 1000_000,
-                        coalition_count as f64 / 1000_000.0,
+                        "Checked {}k/{:.1} ({:.2}%) switching pairs",
+                        base_coalition / 1_000,
+                        coalition_count as f64 / 1_000.0,
                         (base_coalition as f64 / coalition_count as f64) * 100.0
                     );
                 }
@@ -71,7 +71,8 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
                         switching_pair_collector.register_switching_pair(
                             added_state,
                             base_coalition,
-                            pair_value,
+                            base_value,
+                            coalition_value,
                             pair_value * weights_float[size + 1],
                         );
                     }
@@ -79,7 +80,7 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
             }
         }
 
-        counts.to_responsibility_values(weights, game.into_player_descriptions())
+        counts.to_responsibility_values(weights, game.player_descriptions().clone())
     }
 
     fn compute_simple_with_switching_pairs<
@@ -87,10 +88,10 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
         SPC: crate::shapley::SwitchingPairCollector,
     >(
         &mut self,
-        mut game: G,
+        game: &mut G,
         switching_pair_collector: &mut SPC,
     ) -> Self::Output<<G::PlayerDescriptions as PlayerDescriptions>::PlayerType> {
-        let (n, coalition_count) = self.get_n_and_coalition_count(&game);
+        let (n, coalition_count) = self.get_n_and_coalition_count(game);
 
         let mut counts = CriticalPairCounter::new(n);
 
@@ -123,6 +124,7 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
                         switching_pair_collector.register_switching_pair(
                             added_state,
                             base_coalition,
+                            0.0,
                             1.0,
                             weights_float[size + 1],
                         );
@@ -133,6 +135,6 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
 
         counts
             .map_counts(|c| c as f64)
-            .to_responsibility_values(weights, game.into_player_descriptions())
+            .to_responsibility_values(weights, game.player_descriptions().clone())
     }
 }

@@ -16,7 +16,7 @@ pub mod refinement;
 mod stochastic_game;
 
 use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm, SwitchingPairCollector};
-use crate::state_based::grouping::StateGroups;
+use crate::state_based::grouping::{StateGroups, VectorStateGroups};
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
@@ -27,6 +27,11 @@ use probabilistic_model_algorithms::deterministic_games::{
     SafetyAlgorithmCollection,
 };
 use probabilistic_model_algorithms::value_iteration::stochastic_games::StochasticGameValueIterationAlgorithm;
+
+pub struct StateBasedOutput<O, G: StateGroups> {
+    pub shapley_output: O,
+    pub grouping: G,
+}
 
 pub fn compute_for_prism<
     G: GroupExtractionScheme,
@@ -41,7 +46,7 @@ pub fn compute_for_prism<
     shapley: &mut S,
     constants: std::collections::HashMap<String, UserProvidedConstValue>,
     switching_pair_collector: &mut SPC,
-) -> S::Output<String> {
+) -> StateBasedOutput<S::Output<String>, VectorStateGroups> {
     let mut atomic_propositions = Vec::new();
     grouping_scheme.transform_prism(
         &mut prism_model,
@@ -81,7 +86,7 @@ pub fn compute_for_prism<
         {
             let solvable_game = StochasticGameAndSolver::new(game, solver);
 
-            let coop_game = stochastic_game::StateBasedResponsibilityStochasticGame::new(
+            let mut coop_game = stochastic_game::StateBasedResponsibilityStochasticGame::new(
                 solvable_game,
                 grouping.groups,
                 grouping.always_helping,
@@ -92,7 +97,13 @@ pub fn compute_for_prism<
             // let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
             // let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
 
-            shapley.compute_with_switching_pairs(coop_game, switching_pair_collector)
+            let shapley_output =
+                shapley.compute_with_switching_pairs(&mut coop_game, switching_pair_collector);
+
+            StateBasedOutput {
+                shapley_output,
+                grouping: coop_game.grouping.to_vector_state_groups(),
+            }
         } else {
             panic!("Unsupported property type");
         }
@@ -133,11 +144,18 @@ pub fn compute_for_prism<
 
             let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
 
-            let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+            let mut coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
 
-            let cached_coop_game = MinimalCoalitionCache::create(coop_game);
+            let mut cached_coop_game = MinimalCoalitionCache::create(&mut coop_game);
 
-            shapley.compute_simple_with_switching_pairs(cached_coop_game, switching_pair_collector)
+            let shapley_output = shapley.compute_simple_with_switching_pairs(
+                &mut cached_coop_game,
+                switching_pair_collector,
+            );
+            StateBasedOutput {
+                shapley_output,
+                grouping: coop_game.grouping,
+            }
         } else if let Some(solver) = SafetyAlgorithmCollection::create_if_compatible(&property) {
             let solvable_game = NonstochasticGameAndSolverExternalOwners::new(game, solver);
             let mut coop_game = nonstochastic_game::StateBasedResponsibilityNonstochasticGame::new(
@@ -148,11 +166,18 @@ pub fn compute_for_prism<
             );
 
             let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
-            let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+            let mut coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
 
-            let cached_coop_game = MinimalCoalitionCache::create(coop_game);
+            let mut cached_coop_game = MinimalCoalitionCache::create(&mut coop_game);
 
-            shapley.compute_simple_with_switching_pairs(cached_coop_game, switching_pair_collector)
+            let shapley_output = shapley.compute_simple_with_switching_pairs(
+                &mut cached_coop_game,
+                switching_pair_collector,
+            );
+            StateBasedOutput {
+                shapley_output,
+                grouping: coop_game.grouping,
+            }
         } else if let Some(solver) = BuechiAlgorithmCollection::create_if_compatible(&property) {
             let solvable_game = NonstochasticGameAndSolverExternalOwners::new(game, solver);
             let mut coop_game = nonstochastic_game::StateBasedResponsibilityNonstochasticGame::new(
@@ -163,11 +188,18 @@ pub fn compute_for_prism<
             );
 
             let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
-            let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
+            let mut coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
 
-            let cached_coop_game = MinimalCoalitionCache::create(coop_game);
+            let mut cached_coop_game = MinimalCoalitionCache::create(&mut coop_game);
 
-            shapley.compute_simple_with_switching_pairs(cached_coop_game, switching_pair_collector)
+            let shapley_output = shapley.compute_simple_with_switching_pairs(
+                &mut cached_coop_game,
+                switching_pair_collector,
+            );
+            StateBasedOutput {
+                shapley_output,
+                grouping: coop_game.grouping,
+            }
         } else {
             panic!("Unsupported property type");
         }

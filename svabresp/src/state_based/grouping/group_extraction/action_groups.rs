@@ -260,12 +260,13 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
         )
     }
 
-    fn get_syntax_elements(
+    fn get_syntax_elements<S: AsRef<str>>(
         &self,
         values: &ResponsibilityValues<String, f64, f64>,
         switching_pairs: &SwitchingPairCollection,
+        group_names: &[S],
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
-        let _ = (values, switching_pairs);
+        let _ = (values, switching_pairs, group_names);
         None
     }
 }

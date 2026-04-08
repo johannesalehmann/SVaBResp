@@ -1,6 +1,7 @@
 use crate::shapley::PlayerDescriptions;
 use crate::state_based::grouping::StateGroups;
 
+#[derive(Clone)]
 pub struct GroupNames {
     names: Vec<String>,
 }

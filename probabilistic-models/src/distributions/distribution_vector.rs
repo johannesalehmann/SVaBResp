@@ -93,7 +93,7 @@ impl super::DistributionBuilder<DistributionVector> for Builder {
                         .iter()
                         .map(|s| s.probability.to_string())
                         .collect::<Vec<_>>()
-                        .join(","),
+                        .join(" + "),
                     sum
                 )
             };

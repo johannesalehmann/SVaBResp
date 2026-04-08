@@ -1,6 +1,8 @@
 use crate::sccs::{SccList, SccWithDependencies};
 use crate::value_iteration::StateData;
-use probabilistic_models::probabilistic_properties::{PathFormula, Query, StateFormula};
+use probabilistic_models::probabilistic_properties::{
+    NonDeterminismKind, PathFormula, Query, StateFormula,
+};
 use probabilistic_models::{
     ActionCollection, ActionVector, AtomicProposition, AtomicPropositions, DistributionVector,
     InitialStates, ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors,
@@ -122,12 +124,19 @@ impl crate::traits::StochasticGameAlgorithm for StochasticGameValueIterationAlgo
 
     fn create_if_compatible(property: &Query<i64, f64, AtomicProposition>) -> Option<Self> {
         if let Query::ProbabilityValue {
-            non_determinism: None,
+            non_determinism,
             path: PathFormula::Eventually { condition },
         } = property
         {
-            if let StateFormula::Expression(goal_states) = **condition {
-                return Some(Self { goal_states });
+            // TODO: Properly support game formulas. Games always assume that player one maximises
+            // and minimises, so we accept both no non-determinism and maximising non-determinism,
+            // as both can be considered an accurate description (either of the game objective as a
+            // whole or of player one's objective)
+            if non_determinism.is_none() || non_determinism.unwrap() == NonDeterminismKind::Maximise
+            {
+                if let StateFormula::Expression(goal_states) = **condition {
+                    return Some(Self { goal_states });
+                }
             }
         }
         None

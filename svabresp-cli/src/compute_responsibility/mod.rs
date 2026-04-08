@@ -9,6 +9,7 @@ use svabresp::shapley::{
 use svabresp::state_based::grouping::{
     ActionGroupExtractionScheme, GroupExtractionScheme, IndividualGroupExtractionScheme,
     LabelGroupExtractionScheme, ModuleGroupExtractionScheme, ValueGroupExtractionScheme,
+    VectorStateGroups,
 };
 use svabresp::state_based::refinement::{
     BlockSelectionHeuristics, BlockSplittingHeuristics, FrontierSizeSelectionHeuristics,
@@ -571,9 +572,9 @@ impl ComputeResponsibilityCommand {
                     "Computed responsibility in {:?} (including the time for model building)",
                     start.elapsed()
                 );
-                printer.print_human_readable(output)
+                printer.print_human_readable(output.shapley_output)
             }
-            OutputKind::Parsable => printer.print_parsable(output),
+            OutputKind::Parsable => printer.print_parsable(output.shapley_output),
             OutputKind::Silent => {
                 // psst!
             }
@@ -581,14 +582,20 @@ impl ComputeResponsibilityCommand {
                 let switching_pairs = switching_pair_collector.into_switching_pair_collection();
                 printer.print_syntax_highlighting(
                     &grouping_scheme,
-                    output,
+                    output.shapley_output,
                     &model_source,
                     &switching_pairs,
+                    output.grouping,
                 );
             }
             OutputKind::SyntaxHighlightJson => {
                 let switching_pairs = switching_pair_collector.into_switching_pair_collection();
-                printer.print_syntax_highlighting_json(&grouping_scheme, output, &switching_pairs)
+                printer.print_syntax_highlighting_json(
+                    &grouping_scheme,
+                    output.shapley_output,
+                    &switching_pairs,
+                    output.grouping,
+                )
             }
         }
     }
@@ -603,12 +610,14 @@ trait OutputPrinter<T> {
         output: T,
         source: &str,
         switching_pairs: &SwitchingPairCollection,
+        groups: VectorStateGroups,
     );
     fn print_syntax_highlighting_json<G: GroupExtractionScheme>(
         self,
         grouping_scheme: &G,
         output: T,
         switching_pairs: &SwitchingPairCollection,
+        groups: VectorStateGroups,
     );
 }
 
@@ -658,15 +667,18 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
         output: ResponsibilityValues<PD, f64, f64>,
         source: &str,
         switching_pairs: &SwitchingPairCollection,
+        groups: VectorStateGroups,
     ) {
         use svabresp::syntax_highlighting::*;
         let colour_ramps = ColourRampCollection::with_predefined_ramps();
         // TODO: This relies on the display result of p matching the group names. This is currently
         // the case, but might not always hold.
         let string_output = &output.map_player_info(|p| format!("{}", p));
-        if let Some(highlighting) =
-            grouping_scheme.get_syntax_elements(string_output, switching_pairs)
-        {
+        if let Some(highlighting) = grouping_scheme.get_syntax_elements(
+            string_output,
+            switching_pairs,
+            &groups.into_names()[..],
+        ) {
             let mut document = CodeDocument::new(source.to_string());
             document.apply_highlighting(&highlighting, &colour_ramps);
             std::fs::write("highlighting.html", document.to_html()).unwrap();
@@ -681,15 +693,18 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
         grouping_scheme: &G,
         output: ResponsibilityValues<PD, f64, f64>,
         switching_pairs: &SwitchingPairCollection,
+        groups: VectorStateGroups,
     ) {
         use svabresp::syntax_highlighting::*;
         let colour_ramps = ColourRampCollection::with_predefined_ramps();
         // TODO: This relies on the display result of p matching the group names. This is currently
         // the case, but might not always hold.
         let string_output = &output.map_player_info(|p| format!("{}", p));
-        if let Some(highlighting) =
-            grouping_scheme.get_syntax_elements(string_output, switching_pairs)
-        {
+        if let Some(highlighting) = grouping_scheme.get_syntax_elements(
+            string_output,
+            switching_pairs,
+            &groups.into_names()[..],
+        ) {
             println!("{}", highlighting.json("\n", "    ", &colour_ramps));
         } else {
             println!("This grouping scheme does not support highlighting");

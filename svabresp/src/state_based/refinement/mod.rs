@@ -187,8 +187,8 @@ impl<
             bsps.push(None);
         }
 
-        let game = grouped_game::GroupedGame::new(&mut self.game, &self.current_partition);
-        let cached_group_game = MinimalCoalitionCache::create(game);
+        let mut game = grouped_game::GroupedGame::new(&mut self.game, &self.current_partition);
+        let cached_group_game = MinimalCoalitionCache::create(&mut game);
         // Create another copy of the game so we can compute winning regions for the blocks with BSPs
         let mut game = grouped_game::GroupedGame::new(&mut self.game, &self.current_partition);
 

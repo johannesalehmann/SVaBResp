@@ -1,5 +1,6 @@
 use crate::shapley::{ShapleyAlgorithm, SwitchingPairCollector};
-use crate::state_based::grouping::GroupExtractionScheme;
+use crate::state_based::StateBasedOutput;
+use crate::state_based::grouping::{GroupExtractionScheme, VectorStateGroups};
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
 use log::trace;
@@ -32,7 +33,7 @@ impl<
     SPC: SwitchingPairCollector,
 > ResponsibilityTask<'a, M, C, A, G, R, SPC>
 {
-    pub fn run(mut self) -> A::Output<String> {
+    pub fn run(mut self) -> StateBasedOutput<A::Output<String>, VectorStateGroups> {
         trace!("Loading model and property");
         let (prism_model, property) = self.model_description.get_model_and_property();
         trace!("Parsing constants");

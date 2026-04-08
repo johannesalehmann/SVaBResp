@@ -44,10 +44,11 @@ pub trait GroupExtractionScheme {
         property: &Query<i64, f64, AtomicProposition>,
     ) -> GroupsAndAuxiliary<Self::GroupType>;
 
-    fn get_syntax_elements(
+    fn get_syntax_elements<S: AsRef<str>>(
         &self,
         values: &ResponsibilityValues<String, f64, f64>,
         switching_pairs: &SwitchingPairCollection,
+        group_names: &[S],
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting>;
 }
 

@@ -9,7 +9,7 @@ pub struct MinimalCoalitionCache<P: PlayerDescriptions> {
     pub minimal_coalitions: Vec<u64>,
 }
 
-impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {
+impl<P: PlayerDescriptions + Clone> MinimalCoalitionCache<P> {
     pub fn large_losing_coalitions<
         C: SimpleCooperativeGame<PlayerDescriptions = P> + MonotoneCooperativeGame,
     >(
@@ -38,7 +38,7 @@ impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {
         losing_coalitions
     }
     pub fn create<C: SimpleCooperativeGame<PlayerDescriptions = P> + MonotoneCooperativeGame>(
-        mut coop_game: C,
+        coop_game: &mut C,
     ) -> Self {
         trace!("Building minimal coalition cache");
         let mut minimal_coalitions = Vec::new();
@@ -48,7 +48,7 @@ impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {
         let mut game_counter = 0;
         let mut skipped_counter = 0;
 
-        let large_losing_coalitions = Self::large_losing_coalitions(&mut coop_game, 4);
+        let large_losing_coalitions = Self::large_losing_coalitions(coop_game, 4);
 
         std::io::stdout().flush().unwrap();
         for coalition in 0..max_coalition {
@@ -96,7 +96,7 @@ impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {
         Self {
             player_count: coop_game.get_player_count(),
             minimal_coalitions,
-            player_descriptions: coop_game.into_player_descriptions(),
+            player_descriptions: coop_game.player_descriptions().clone(),
         }
     }
 
@@ -105,7 +105,7 @@ impl<P: PlayerDescriptions> MinimalCoalitionCache<P> {
     }
 }
 
-impl<P: PlayerDescriptions> SimpleCooperativeGame for MinimalCoalitionCache<P> {
+impl<P: PlayerDescriptions + Clone> SimpleCooperativeGame for MinimalCoalitionCache<P> {
     type PlayerDescriptions = P;
 
     fn get_player_count(&self) -> usize {
@@ -118,10 +118,6 @@ impl<P: PlayerDescriptions> SimpleCooperativeGame for MinimalCoalitionCache<P> {
 
     fn player_descriptions_mut(&mut self) -> &mut Self::PlayerDescriptions {
         &mut self.player_descriptions
-    }
-
-    fn into_player_descriptions(self) -> Self::PlayerDescriptions {
-        self.player_descriptions
     }
 
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool {

@@ -101,12 +101,13 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         GroupsAndAuxiliary::new(builder.finish())
     }
 
-    fn get_syntax_elements(
+    fn get_syntax_elements<S: AsRef<str>>(
         &self,
         values: &ResponsibilityValues<String, f64, f64>,
         switching_pairs: &SwitchingPairCollection,
+        player_names: &[S],
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
-        let _ = (values, switching_pairs);
+        let _ = (values, switching_pairs, player_names);
         None
     }
 }

@@ -1,4 +1,4 @@
-use crate::shapley::{ResponsibilityValues, SwitchingPairCollection};
+use crate::shapley::{CoalitionSpecifier, ResponsibilityValues, SwitchingPairCollection};
 use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
 use chumsky::span::SimpleSpan;
@@ -283,13 +283,18 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
         GroupsAndAuxiliary::new(builder.finish())
     }
 
-    fn get_syntax_elements(
+    fn get_syntax_elements<S: AsRef<str>>(
         &self,
         values: &ResponsibilityValues<String, f64, f64>,
         switching_pairs: &SwitchingPairCollection,
+        player_names: &[S],
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
+
+        let aggregated_switching_pairs = switching_pairs
+            .clone()
+            .aggregate_by_minimal_switching_pair();
 
         for (group_index, group) in self.group_info.iter().enumerate() {
             let (value, tooltip_start) = if let Some(responsibility) = values.get(&group.name) {
@@ -303,10 +308,14 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
 
             let mut tooltip_text = vec![tooltip_start];
 
-            for switching_pair in switching_pairs.switching_pairs(group_index) {
+            for switching_pair in aggregated_switching_pairs.switching_pairs(group_index) {
+                tooltip_text.push(CoalitionSpecifier::to_string(
+                    &switching_pair.coalition,
+                    player_names,
+                ));
                 tooltip_text.push(format!(
                     "<br>{:b}: {}",
-                    switching_pair.coalition, switching_pair.contribution
+                    switching_pair.coalition, switching_pair.coalition
                 ));
             }
 
