@@ -17,7 +17,7 @@ pub fn optimistic_value_iteration_maximise<
     model: ProbabilisticModel<M>,
     objective_ap_index: usize,
     eps: f64,
-) {
+) -> f64 {
     optimistic_value_iteration(model, objective_ap_index, eps, Maximiser {})
 }
 pub fn optimistic_value_iteration_minimise<
@@ -31,7 +31,7 @@ pub fn optimistic_value_iteration_minimise<
     model: ProbabilisticModel<M>,
     objective_ap_index: usize,
     eps: f64,
-) {
+) -> f64 {
     optimistic_value_iteration(model, objective_ap_index, eps, Minimiser {})
 }
 
@@ -48,7 +48,7 @@ fn optimistic_value_iteration<
     objective_ap_index: usize,
     mut eps: f64,
     comparator: C,
-) {
+) -> f64 {
     let start_time = std::time::Instant::now();
 
     let mecs = mecs::compute_mecs(&mut model);
@@ -115,6 +115,7 @@ fn optimistic_value_iteration<
         start_time.elapsed(),
         data[0].value
     );
+    data[0].value
 }
 
 fn verify_optimistic<

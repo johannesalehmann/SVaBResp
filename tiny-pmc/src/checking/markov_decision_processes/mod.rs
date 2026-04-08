@@ -21,15 +21,15 @@ pub fn check_mdp<
     } = query
     {
         if let StateFormula::Expression(ap) = *condition {
-            if non_determinism == NonDeterminismKind::Minimise {
-                probabilistic_model_algorithms::value_iteration::mdp::optimistic_value_iteration_minimise(
+            let result = match non_determinism {
+                NonDeterminismKind::Maximise => {probabilistic_model_algorithms::value_iteration::mdp::optimistic_value_iteration_maximise(
                     model, ap.index, 0.000_001,
-                );
-            } else if non_determinism == NonDeterminismKind::Maximise {
-                probabilistic_model_algorithms::value_iteration::mdp::optimistic_value_iteration_maximise(
+                )}
+                NonDeterminismKind::Minimise => {probabilistic_model_algorithms::value_iteration::mdp::optimistic_value_iteration_minimise(
                     model, ap.index, 0.000_001,
-                );
-            }
+                )}
+            } ;
+            return Ok(result);
         }
     }
 

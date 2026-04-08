@@ -144,10 +144,10 @@ impl<M: ModelTypes> ProbabilisticModel<M> {
         res
     }
 
-    pub fn rebuild_predecessors(&mut self) {
+    fn compute_predecessors<P: Predecessors>(&self) -> Vec<P> {
         let mut new_predecessors = Vec::with_capacity(self.states.len());
         for _ in 0..self.states.len() {
-            new_predecessors.push(<<M::Predecessors as Predecessors>::Builder>::create());
+            new_predecessors.push(P::Builder::create());
         }
 
         for (state_index, state) in self.states.iter().enumerate() {
@@ -162,8 +162,43 @@ impl<M: ModelTypes> ProbabilisticModel<M> {
             }
         }
 
+        new_predecessors.into_iter().map(|p| p.finish()).collect()
+    }
+
+    pub fn rebuild_predecessors(&mut self) {
+        let new_predecessors = self.compute_predecessors();
+
         for (index, predecessors) in new_predecessors.into_iter().enumerate() {
-            self.states[index].predecessors = predecessors.finish();
+            self.states[index].predecessors = predecessors;
+        }
+    }
+    pub fn rebuild_and_transform_predecessors<
+        P2: Predecessors,
+        M2: ModelTypes<
+                Valuation = M::Valuation,
+                Distribution = M::Distribution,
+                Owners = M::Owners,
+                ActionCollection = M::ActionCollection,
+                AtomicPropositions = M::AtomicPropositions,
+                InitialStates = M::InitialStates,
+                Predecessors = P2,
+            >,
+    >(
+        self,
+    ) -> ProbabilisticModel<M2> {
+        let new_predecessors: Vec<P2> = self.compute_predecessors();
+
+        ProbabilisticModel {
+            states: self
+                .states
+                .into_iter()
+                .zip(new_predecessors.into_iter())
+                .map(|(s, p)| s.map_predecessors(|_| p))
+                .collect(),
+            initial_states: self.initial_states,
+            valuation_context: self.valuation_context,
+            atomic_proposition_count: self.atomic_proposition_count,
+            action_names: self.action_names,
         }
     }
 
@@ -193,6 +228,31 @@ impl<M: ModelTypes> State<M> {
             action_iterator,
             transition_iterator,
             action_index: 0,
+        }
+    }
+
+    pub fn map_predecessors<
+        P2: Predecessors,
+        F: FnOnce(M::Predecessors) -> P2,
+        M2: ModelTypes<
+                Valuation = M::Valuation,
+                Distribution = M::Distribution,
+                Owners = M::Owners,
+                ActionCollection = M::ActionCollection,
+                AtomicPropositions = M::AtomicPropositions,
+                InitialStates = M::InitialStates,
+                Predecessors = P2,
+            >,
+    >(
+        self,
+        map: F,
+    ) -> State<M2> {
+        State {
+            valuation: self.valuation,
+            actions: self.actions,
+            atomic_propositions: self.atomic_propositions,
+            owner: self.owner,
+            predecessors: map(self.predecessors),
         }
     }
 }
@@ -242,74 +302,132 @@ pub struct Action<D: Distribution> {
     pub action_name_index: usize,
 }
 
-pub type Mdp<P = NonTrackedPredecessors> = ProbabilisticModel<MdpType<P>>;
-pub struct MdpType<P: Predecessors = NonTrackedPredecessors> {
-    _phantom_data: PhantomData<P>,
+pub type Mdp<
+    P = NonTrackedPredecessors,
+    V = ValuationVector,
+    AP = BitFlagsAtomicPropositions,
+    I = SingleInitialState,
+> = ProbabilisticModel<MdpType<P, V, AP, I>>;
+pub struct MdpType<
+    P: Predecessors = NonTrackedPredecessors,
+    V: Valuation = ValuationVector,
+    AP: AtomicPropositions = BitFlagsAtomicPropositions,
+    I: InitialStates = SingleInitialState,
+> {
+    _phantom_data: PhantomData<(P, V, AP, I)>,
 }
-impl<P: Predecessors> ModelTypes for MdpType<P> {
-    type Valuation = ValuationVector;
+impl<P: Predecessors, V: Valuation, AP: AtomicPropositions, I: InitialStates> ModelTypes
+    for MdpType<P, V, AP, I>
+{
+    type Valuation = V;
     type Distribution = DistributionVector;
     type Owners = SinglePlayer;
     type ActionCollection = ActionVector<DistributionVector>;
-    type AtomicPropositions = BitFlagsAtomicPropositions;
-    type InitialStates = SingleInitialState;
+    type AtomicPropositions = AP;
+    type InitialStates = I;
     type Predecessors = P;
 }
 
-pub type Dtmc<P = NonTrackedPredecessors> = ProbabilisticModel<DtmcType<P>>;
-pub struct DtmcType<P: Predecessors = NonTrackedPredecessors> {
-    _phantom_data: PhantomData<P>,
+pub type Dtmc<
+    P = NonTrackedPredecessors,
+    V = ValuationVector,
+    AP = BitFlagsAtomicPropositions,
+    I = SingleInitialState,
+> = ProbabilisticModel<DtmcType<P, V, AP, I>>;
+pub struct DtmcType<
+    P: Predecessors = NonTrackedPredecessors,
+    V: Valuation = ValuationVector,
+    AP: AtomicPropositions = BitFlagsAtomicPropositions,
+    I: InitialStates = SingleInitialState,
+> {
+    _phantom_data: PhantomData<(P, V, AP, I)>,
 }
-impl<P: Predecessors> ModelTypes for DtmcType<P> {
-    type Valuation = ValuationVector;
+impl<P: Predecessors, V: Valuation, AP: AtomicPropositions, I: InitialStates> ModelTypes
+    for DtmcType<P, V, AP, I>
+{
+    type Valuation = V;
     type Distribution = DistributionVector;
     type Owners = SinglePlayer;
     type ActionCollection = SingleAction<DistributionVector>;
-    type AtomicPropositions = BitFlagsAtomicPropositions;
-    type InitialStates = SingleInitialState;
+    type AtomicPropositions = AP;
+    type InitialStates = I;
     type Predecessors = P;
 }
 
-pub type TransitionSystem<P = NonTrackedPredecessors> = ProbabilisticModel<TransitionSystemType<P>>;
-pub struct TransitionSystemType<P: Predecessors = NonTrackedPredecessors> {
-    _phantom_data: PhantomData<P>,
+pub type TransitionSystem<
+    P = NonTrackedPredecessors,
+    V = ValuationVector,
+    AP = BitFlagsAtomicPropositions,
+    I = SingleInitialState,
+> = ProbabilisticModel<TransitionSystemType<P, V, AP, I>>;
+pub struct TransitionSystemType<
+    P: Predecessors = NonTrackedPredecessors,
+    V: Valuation = ValuationVector,
+    AP: AtomicPropositions = BitFlagsAtomicPropositions,
+    I: InitialStates = SingleInitialState,
+> {
+    _phantom_data: PhantomData<(P, V, AP, I)>,
 }
-impl<P: Predecessors> ModelTypes for TransitionSystemType<P> {
-    type Valuation = ValuationVector;
+impl<P: Predecessors, V: Valuation, AP: AtomicPropositions, I: InitialStates> ModelTypes
+    for TransitionSystemType<P, V, AP, I>
+{
+    type Valuation = V;
     type Distribution = SingleStateDistribution;
     type Owners = SinglePlayer;
     type ActionCollection = ActionVector<SingleStateDistribution>;
-    type AtomicPropositions = BitFlagsAtomicPropositions;
-    type InitialStates = SingleInitialState;
+    type AtomicPropositions = AP;
+    type InitialStates = I;
     type Predecessors = P;
 }
 
-pub type TwoPlayerStochasticGame<P = NonTrackedPredecessors> =
-    ProbabilisticModel<TwoPlayerStochasticGameType<P>>;
-pub struct TwoPlayerStochasticGameType<P: Predecessors = NonTrackedPredecessors> {
-    _phantom_data: PhantomData<P>,
+pub type TwoPlayerStochasticGame<
+    P = NonTrackedPredecessors,
+    V = ValuationVector,
+    AP = BitFlagsAtomicPropositions,
+    I = SingleInitialState,
+> = ProbabilisticModel<TwoPlayerStochasticGameType<P, V, AP, I>>;
+pub struct TwoPlayerStochasticGameType<
+    P: Predecessors = NonTrackedPredecessors,
+    V: Valuation = ValuationVector,
+    AP: AtomicPropositions = BitFlagsAtomicPropositions,
+    I: InitialStates = SingleInitialState,
+> {
+    _phantom_data: PhantomData<(P, V, AP, I)>,
 }
-impl<P: Predecessors> ModelTypes for TwoPlayerStochasticGameType<P> {
-    type Valuation = ValuationVector;
+impl<P: Predecessors, V: Valuation, AP: AtomicPropositions, I: InitialStates> ModelTypes
+    for TwoPlayerStochasticGameType<P, V, AP, I>
+{
+    type Valuation = V;
     type Distribution = DistributionVector;
     type Owners = TwoPlayer;
     type ActionCollection = ActionVector<DistributionVector>;
-    type AtomicPropositions = BitFlagsAtomicPropositions;
-    type InitialStates = SingleInitialState;
+    type AtomicPropositions = AP;
+    type InitialStates = I;
     type Predecessors = P;
 }
 
-pub type TwoPlayerNonstochasticGame<P = NonTrackedPredecessors> =
-    ProbabilisticModel<TwoPlayerNonstochasticGameType<P>>;
-pub struct TwoPlayerNonstochasticGameType<P: Predecessors = NonTrackedPredecessors> {
-    _phantom_data: PhantomData<P>,
+pub type TwoPlayerNonstochasticGame<
+    P = NonTrackedPredecessors,
+    V = ValuationVector,
+    AP = BitFlagsAtomicPropositions,
+    I = SingleInitialState,
+> = ProbabilisticModel<TwoPlayerNonstochasticGameType<P, V, AP, I>>;
+pub struct TwoPlayerNonstochasticGameType<
+    P: Predecessors = NonTrackedPredecessors,
+    V: Valuation = ValuationVector,
+    AP: AtomicPropositions = BitFlagsAtomicPropositions,
+    I: InitialStates = SingleInitialState,
+> {
+    _phantom_data: PhantomData<(P, V, AP, I)>,
 }
-impl<P: Predecessors> ModelTypes for TwoPlayerNonstochasticGameType<P> {
-    type Valuation = ValuationVector;
+impl<P: Predecessors, V: Valuation, AP: AtomicPropositions, I: InitialStates> ModelTypes
+    for TwoPlayerNonstochasticGameType<P, V, AP, I>
+{
+    type Valuation = V;
     type Distribution = SingleStateDistribution;
     type Owners = TwoPlayer;
     type ActionCollection = ActionVector<SingleStateDistribution>;
-    type AtomicPropositions = BitFlagsAtomicPropositions;
-    type InitialStates = SingleInitialState;
+    type AtomicPropositions = AP;
+    type InitialStates = I;
     type Predecessors = P;
 }

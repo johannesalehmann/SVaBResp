@@ -49,6 +49,8 @@ fn checker() -> Result<(), ModelCheckerError> {
     let model = builder_output.model;
     let properties = builder_output.properties;
 
+    println!("Model has {} states", model.states.len());
+
     if properties.len() > 1 {
         panic!("Checking multiple properties is temporarily unsupported");
     }

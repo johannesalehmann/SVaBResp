@@ -13,7 +13,7 @@ pub fn check_transition_system<
         >,
 >(
     model: ProbabilisticModel<M>,
-    query: Query<i64, f64, AtomicProposition>,
+    query: &Query<i64, f64, AtomicProposition>,
 ) -> Result<f64, super::CheckerError> {
     let _ = (model, query);
     Err(super::CheckerError::NoSuitableAlgorithm)
