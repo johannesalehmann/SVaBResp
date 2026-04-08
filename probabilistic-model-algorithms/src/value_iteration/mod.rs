@@ -32,7 +32,7 @@ struct Minimiser {}
 impl ValueComparator<SinglePlayer> for Minimiser {
     fn initial_value(&self, state_owner: &SinglePlayer) -> f64 {
         let _ = state_owner;
-        0.0
+        f64::MAX
     }
 
     fn is_better(&self, state_owner: &SinglePlayer, before: f64, new: f64) -> bool {
