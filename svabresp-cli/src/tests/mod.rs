@@ -29,7 +29,7 @@ fn small_network_explicit() {
         refinement: IdentityGroupBlockingProvider::new(),
         switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
-    let result = task.run();
+    let result = task.run().shapley_output;
 
     for res in result.players.iter() {
         println!("{}: {}", res.player_info, res.value);
@@ -61,7 +61,7 @@ fn labelled_groups() {
         refinement: IdentityGroupBlockingProvider::new(),
         switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
-    let result = task.run();
+    let result = task.run().shapley_output;
 
     for res in result.players.iter() {
         println!("{}: {}", res.player_info, res.value);
@@ -92,7 +92,7 @@ fn value_groups() {
         refinement: IdentityGroupBlockingProvider::new(),
         switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
-    let result = task.run();
+    let result = task.run().shapley_output;
 
     for res in result.players.iter() {
         println!("{}: {}", res.player_info, res.value);
@@ -119,7 +119,7 @@ fn module_groups() {
         refinement: IdentityGroupBlockingProvider::new(),
         switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
-    let result = task.run();
+    let result = task.run().shapley_output;
 
     for res in result.players.iter() {
         println!("{}: {}", res.player_info, res.value);
@@ -150,7 +150,7 @@ fn action_groups() {
         refinement: IdentityGroupBlockingProvider::new(),
         switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
-    let result = task.run();
+    let result = task.run().shapley_output;
     for res in result.players.iter() {
         println!("{}: {}", res.player_info, res.value);
     }
@@ -180,7 +180,7 @@ fn simple_refinement() {
         ),
         switching_pair_collector: &mut  DiscardingSwitchingPairCollector::new()
     };
-    let result = task.run();
+    let result = task.run().shapley_output;
     for res in result.players.iter() {
         println!("{}: {}", res.player_info, res.value);
     }
@@ -208,7 +208,7 @@ fn refinement_from_paper() {
         ),
         switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
-    let result = task.run();
+    let result = task.run().shapley_output;
 
     for res in result.players.iter() {
         println!("{}: {}", res.player_info, res.value);
@@ -234,7 +234,7 @@ fn probabilistic() {
         refinement: IdentityGroupBlockingProvider::new(),
         switching_pair_collector: &mut DiscardingSwitchingPairCollector::new(),
     };
-    let result = task.run();
+    let result = task.run().shapley_output;
 
     for res in result.players.iter() {
         println!("{}: {}", res.player_info, res.value);
