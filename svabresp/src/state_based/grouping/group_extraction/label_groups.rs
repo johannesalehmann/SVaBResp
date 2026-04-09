@@ -39,10 +39,6 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         let _ = property;
         let mut label_atomic_propositions = Vec::new();
 
-        for label in &prism_model.labels.labels {
-            atomic_propositions.push(label.condition.clone());
-        }
-
         for label in &self.labels {
             let prism_label = prism_model
                 .labels
