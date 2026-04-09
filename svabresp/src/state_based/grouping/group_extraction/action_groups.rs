@@ -9,10 +9,12 @@ use probabilistic_models::{
     Successor, TwoPlayer, Valuation, VectorPredecessors,
 };
 use probabilistic_properties::Query;
+use std::collections::HashMap;
 
 pub struct ActionGroupExtractionScheme {
     action_index: Option<VariableReference>,
     in_questionmark_state: Option<VariableReference>,
+    action_name_to_spans: HashMap<String, Vec<SimpleSpan>>,
 }
 
 impl ActionGroupExtractionScheme {
@@ -20,6 +22,7 @@ impl ActionGroupExtractionScheme {
         Self {
             action_index: None,
             in_questionmark_state: None,
+            action_name_to_spans: HashMap::new(),
         }
     }
 }
@@ -64,6 +67,24 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                 ))
                 .unwrap(),
         );
+        for module in &prism_model.modules.modules {
+            for command in &module.commands {
+                let span = match &command.action {
+                    None => SimpleSpan::new(command.span.start, command.span.start + 2), // TODO: This is a hack because the PRISM parser currently does not provide the span of [].
+                    Some(action) => action.span.clone(),
+                };
+                let name = command
+                    .action
+                    .as_ref()
+                    .map(|a| a.name.clone())
+                    .unwrap_or("unnamed".to_string()); // TODO: This might break if the model builder changes the name assigned to unnamed actions. Find a more robust way to handle this.
+                if let Some(spans) = self.action_name_to_spans.get_mut(&name) {
+                    spans.push(span);
+                } else {
+                    self.action_name_to_spans.insert(name, vec![span]);
+                }
+            }
+        }
     }
 
     fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
@@ -264,9 +285,35 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
         &self,
         values: &ResponsibilityValues<String, f64, f64>,
         switching_pairs: &SwitchingPairCollection,
-        group_names: &[S],
+        player_names: &[S],
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
-        let _ = (values, switching_pairs, group_names);
-        None
+        use crate::syntax_highlighting::*;
+        let mut highlighting = SyntaxHighlighting::new();
+
+        let is_probabilistic = switching_pairs.contains_non_simple_pairs();
+
+        let aggregated_switching_pairs = switching_pairs
+            .clone()
+            .aggregate_by_minimal_switching_pair();
+
+        for (group_name, spans) in &self.action_name_to_spans {
+            let (value, tooltip) = aggregated_switching_pairs.value_and_tool_tip_text(
+                group_name,
+                &values,
+                player_names,
+                is_probabilistic,
+            );
+
+            for span in spans {
+                highlighting.add_highlight(Highlight::new(
+                    span.start,
+                    span.end,
+                    Colour::new(1, value),
+                    &tooltip,
+                ));
+            }
+        }
+
+        Some(highlighting)
     }
 }
