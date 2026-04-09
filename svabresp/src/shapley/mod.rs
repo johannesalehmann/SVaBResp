@@ -240,6 +240,82 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
             &[]
         }
     }
+
+    pub fn value_and_tool_tip_text<S: AsRef<str>, P: PartialEq, VD>(
+        &self,
+        group_name: &P,
+        values: &ResponsibilityValues<P, f64, VD>,
+        player_names: &[S],
+        is_probabilistic: bool,
+    ) -> (f64, String) {
+        fn round_float(value: f64) -> String {
+            format!("{:.3}", value)
+                .trim_end_matches("0")
+                .trim_end_matches(".")
+                .to_string()
+        }
+
+        let (value, tooltip_start) = if let Some(responsibility) = values.get(group_name) {
+            (
+                responsibility.value,
+                format!("Responsibility: {}", round_float(responsibility.value)),
+            )
+        } else {
+            (0.0, "No responsibility".to_string())
+        };
+
+        let mut tooltip_text = vec![tooltip_start];
+
+        let player_index = values.get_index(group_name);
+        if let Some(player_index) = player_index {
+            let switching_pairs = self.switching_pairs(player_index);
+            if switching_pairs.len() > 0 {
+                tooltip_text.push("\n\n**Switching pairs**".to_string());
+            }
+
+            let mut switching_pairs = switching_pairs.iter().collect::<Vec<_>>();
+            switching_pairs.sort_unstable_by(|sp1, sp2| {
+                sp2.direct_contribution
+                    .partial_cmp(&sp1.direct_contribution)
+                    .expect("Encountered NaN while sorting (aggregated) switching pairs")
+            });
+
+            for switching_pair in switching_pairs {
+                tooltip_text.push("\n\n- ".to_string());
+                tooltip_text.push(CoalitionSpecifier::to_string(
+                    &switching_pair.coalition,
+                    player_names,
+                ));
+                tooltip_text.push(format!(
+                    "\n\n    Contribution: {}",
+                    round_float(switching_pair.direct_contribution)
+                ));
+                if is_probabilistic {
+                    tooltip_text.push(format!(
+                        "\n\n    Value: {} - {} = {}",
+                        round_float(switching_pair.value_with),
+                        round_float(switching_pair.value_without),
+                        round_float(switching_pair.value()),
+                    ));
+                }
+                if switching_pair.indirect_contribution > 0.0 {
+                    let superset_pair_text = if switching_pair.aggregated_pair_count == 1 {
+                        "superset pair is"
+                    } else {
+                        "superset pairs are"
+                    };
+                    tooltip_text.push(format!(
+                        "\n\n    {} {} hidden (contribution: {})",
+                        switching_pair.aggregated_pair_count,
+                        superset_pair_text,
+                        round_float(switching_pair.indirect_contribution)
+                    ));
+                }
+            }
+        }
+
+        (value, tooltip_text.join(""))
+    }
 }
 
 pub struct AggregatedSwitchingPair<C: CoalitionSpecifier> {
