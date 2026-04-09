@@ -10,9 +10,17 @@ use probabilistic_models::{
 use probabilistic_properties::Query;
 use std::collections::HashMap;
 
+struct LabelDetails {
+    label_name: String,
+    definition_span: SimpleSpan,
+    contained_in_players: Vec<String>,
+    label_index: Option<usize>,
+}
+
 pub struct LabelGroupExtractionScheme {
     labels: Vec<String>,
     label_atomic_propositions: Option<Vec<AtomicProposition>>,
+    label_details: Vec<LabelDetails>,
 }
 
 impl LabelGroupExtractionScheme {
@@ -23,7 +31,12 @@ impl LabelGroupExtractionScheme {
         Self {
             labels,
             label_atomic_propositions: None,
+            label_details: Vec::new(),
         }
+    }
+
+    fn no_labels_text() -> &'static str {
+        "no labels"
     }
 }
 
@@ -39,7 +52,14 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         let _ = property;
         let mut label_atomic_propositions = Vec::new();
 
-        for label in &self.labels {
+        self.label_details.push(LabelDetails {
+            label_name: Self::no_labels_text().to_string(),
+            definition_span: prism_model.model_type.get_span().clone(),
+            contained_in_players: vec![],
+            label_index: None,
+        });
+
+        for (label_index, label) in self.labels.iter().enumerate() {
             let prism_label = prism_model
                 .labels
                 .by_name(label.as_str())
@@ -48,6 +68,13 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
             let index = atomic_propositions.len();
             atomic_propositions.push(prism_label.condition.clone());
             label_atomic_propositions.push(AtomicProposition::new(index));
+
+            self.label_details.push(LabelDetails {
+                label_name: label.to_string(),
+                definition_span: prism_label.name.span,
+                contained_in_players: Vec::new(),
+                label_index: Some(label_index),
+            })
         }
 
         self.label_atomic_propositions = Some(label_atomic_propositions);
@@ -80,7 +107,7 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
                     }
                 }
                 if name.is_empty() {
-                    name = "no labels".to_string();
+                    name = Self::no_labels_text().to_string();
                 }
 
                 groups.insert(index, (name, vec![i]));
@@ -90,7 +117,21 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         }
 
         let mut builder = Self::GroupType::get_builder();
-        for (_, (group_name, states)) in groups {
+        for (group_mask, (group_name, states)) in groups {
+            for label_details in &mut self.label_details {
+                if let Some(label_index) = label_details.label_index {
+                    if group_mask & (1 << (label_index)) != 0 {
+                        label_details.contained_in_players.push(group_name.clone());
+                    }
+                } else {
+                    // If this label_detail has no label_index, then it must be the label_detail
+                    // for the unlabelled states.
+                    if group_mask == 0 {
+                        label_details.contained_in_players.push(group_name.clone());
+                    }
+                }
+            }
+
             builder.create_group_from_vec(states, group_name);
         }
 
@@ -103,7 +144,61 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         switching_pairs: &SwitchingPairCollection,
         player_names: &[S],
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
-        let _ = (values, switching_pairs, player_names);
-        None
+        use crate::syntax_highlighting::*;
+        let mut highlighting = SyntaxHighlighting::new();
+
+        let is_probabilistic = switching_pairs.contains_non_simple_pairs();
+
+        let aggregated_switching_pairs = switching_pairs
+            .clone()
+            .aggregate_by_minimal_switching_pair();
+
+        for label_details in &self.label_details {
+            let mut tooltip = Vec::new();
+
+            let mut total_responsibility = 0.0;
+            let mut group_details = Vec::new();
+            for group_name in &label_details.contained_in_players {
+                let (value, details) = aggregated_switching_pairs.value_and_tool_tip_text(
+                    group_name,
+                    values,
+                    player_names,
+                    is_probabilistic,
+                );
+                total_responsibility += value;
+                let overview = format!("{}: {}", group_name, value);
+                let details = format!("Details of {}:\n\n{}", group_name, details);
+                group_details.push((value, overview, details))
+            }
+
+            tooltip.push(format!(
+                "Contained in groups with total responsibility {}",
+                total_responsibility
+            ));
+
+            group_details.sort_unstable_by(|(v1, _, _), (v2, _, _)| {
+                v1.partial_cmp(v2)
+                    .expect("Encountered NaN while sorting label groups by responsibility value")
+            });
+
+            for (_, overview, _) in &group_details {
+                tooltip.push(format!("\n\n- {}", overview));
+            }
+            // tooltip.push("\n\n**Details:**".to_string());
+            // for (_, _, details) in &group_details {
+            //     tooltip.push(format!("\n\n{}", details));
+            // }
+
+            let tooltip = tooltip.join("");
+
+            highlighting.add_highlight(Highlight::new(
+                label_details.definition_span.start,
+                label_details.definition_span.end,
+                Colour::new(2, total_responsibility),
+                tooltip,
+            ))
+        }
+
+        Some(highlighting)
     }
 }
