@@ -85,7 +85,7 @@ impl CodeDocument {
                     let tooltip = match &style.tooltip {
                         None => "".to_string(),
                         Some(tooltip) => {
-                            format!(" title=\"{}\"", tooltip)
+                            format!(" title=\"{}\"", tooltip.replace("\n\n", "\n")) // Markdown needs two newlines, whereas an HTML tooltip only needs one
                         }
                     };
                     output.push(format!(

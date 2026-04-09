@@ -141,6 +141,15 @@ where
         }
         None
     }
+
+    pub fn get_index(&self, index: &P) -> Option<usize> {
+        for (i, value) in self.players.iter().enumerate() {
+            if &value.player_info == index {
+                return Some(i);
+            }
+        }
+        None
+    }
 }
 impl<P, V, VD> ResponsibilityValues<P, V, VD> {
     pub fn map_player_info<P2, F: FnMut(P) -> P2>(

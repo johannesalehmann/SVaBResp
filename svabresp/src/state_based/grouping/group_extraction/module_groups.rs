@@ -296,11 +296,11 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
             .clone()
             .aggregate_by_minimal_switching_pair();
 
-        for (group_index, group) in self.group_info.iter().enumerate() {
+        for group in &self.group_info {
             let (value, tooltip_start) = if let Some(responsibility) = values.get(&group.name) {
                 (
                     responsibility.value,
-                    format!("Responsibility: {}", responsibility.value),
+                    format!("Responsibility: {}", round_float(responsibility.value)),
                 )
             } else {
                 (0.0, "No responsibility".to_string())
@@ -308,15 +308,43 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
 
             let mut tooltip_text = vec![tooltip_start];
 
-            for switching_pair in aggregated_switching_pairs.switching_pairs(group_index) {
-                tooltip_text.push(CoalitionSpecifier::to_string(
-                    &switching_pair.coalition,
-                    player_names,
-                ));
-                tooltip_text.push(format!(
-                    "<br>{:b}: {}",
-                    switching_pair.coalition, switching_pair.coalition
-                ));
+            let player_index = values.get_index(&group.name);
+            if let Some(player_index) = player_index {
+                let switching_pairs = aggregated_switching_pairs.switching_pairs(player_index);
+                if switching_pairs.len() > 0 {
+                    tooltip_text.push("\n\n**Switching pairs**".to_string());
+                }
+
+                for switching_pair in switching_pairs {
+                    tooltip_text.push("\n\n- ".to_string());
+                    tooltip_text.push(CoalitionSpecifier::to_string(
+                        &switching_pair.coalition,
+                        player_names,
+                    ));
+                    tooltip_text.push(format!(
+                        "\n\n    Contribution: {}",
+                        round_float(switching_pair.direct_contribution)
+                    ));
+                    tooltip_text.push(format!(
+                        "\n\n    Value: {} - {} = {}",
+                        round_float(switching_pair.value_with),
+                        round_float(switching_pair.value_without),
+                        round_float(switching_pair.value()),
+                    ));
+                    if switching_pair.indirect_contribution > 0.0 {
+                        let superset_pair_text = if switching_pair.aggregated_pair_count == 1 {
+                            "superset pair is"
+                        } else {
+                            "superset pairs are"
+                        };
+                        tooltip_text.push(format!(
+                            "\n\n    {} {} hidden (contribution: {})",
+                            switching_pair.aggregated_pair_count,
+                            superset_pair_text,
+                            round_float(switching_pair.indirect_contribution)
+                        ));
+                    }
+                }
             }
 
             let tooltip = tooltip_text.join("");
@@ -333,6 +361,10 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
 
         Some(highlighting)
     }
+}
+
+fn round_float(value: f64) -> f64 {
+    (value * 1000.0).round() * 0.001
 }
 
 struct ActionInfo {

@@ -198,10 +198,10 @@ impl SwitchingPairCollection {
                     "Found a switching pair that is neither minimal nor contains a minimal pair."
                 );
 
-                let average_contribution = pair.value() / contained_pairs.len() as f64;
+                let average_contribution = pair.contribution / contained_pairs.len() as f64;
                 for j in contained_pairs {
                     aggregated_pairs[j].aggregated_pair_count += 1;
-                    aggregated_pairs[i].indirect_contribution += average_contribution;
+                    aggregated_pairs[j].indirect_contribution += average_contribution;
                 }
             }
 
@@ -264,6 +264,14 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPair<C> {
             switching_pair.value_with,
             switching_pair.contribution,
         )
+    }
+
+    pub fn contribution(&self) -> f64 {
+        self.direct_contribution + self.indirect_contribution
+    }
+
+    pub fn value(&self) -> f64 {
+        self.value_with + self.value_without
     }
 }
 
