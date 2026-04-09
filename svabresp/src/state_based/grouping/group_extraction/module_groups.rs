@@ -315,6 +315,13 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
                     tooltip_text.push("\n\n**Switching pairs**".to_string());
                 }
 
+                let mut switching_pairs = switching_pairs.iter().collect::<Vec<_>>();
+                switching_pairs.sort_unstable_by(|sp1, sp2| {
+                    sp2.direct_contribution
+                        .partial_cmp(&sp1.direct_contribution)
+                        .expect("Encountered NaN while sorting (aggregated) switching pairs")
+                });
+
                 for switching_pair in switching_pairs {
                     tooltip_text.push("\n\n- ".to_string());
                     tooltip_text.push(CoalitionSpecifier::to_string(
@@ -363,8 +370,11 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
     }
 }
 
-fn round_float(value: f64) -> f64 {
-    (value * 1000.0).round() * 0.001
+fn round_float(value: f64) -> String {
+    format!("{:.3}", value)
+        .trim_end_matches("0")
+        .trim_end_matches(".")
+        .to_string()
 }
 
 struct ActionInfo {
