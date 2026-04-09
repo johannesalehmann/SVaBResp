@@ -292,6 +292,8 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
 
+        let is_probabilistic = switching_pairs.contains_non_simple_pairs();
+
         let aggregated_switching_pairs = switching_pairs
             .clone()
             .aggregate_by_minimal_switching_pair();
@@ -332,12 +334,14 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
                         "\n\n    Contribution: {}",
                         round_float(switching_pair.direct_contribution)
                     ));
-                    tooltip_text.push(format!(
-                        "\n\n    Value: {} - {} = {}",
-                        round_float(switching_pair.value_with),
-                        round_float(switching_pair.value_without),
-                        round_float(switching_pair.value()),
-                    ));
+                    if is_probabilistic {
+                        tooltip_text.push(format!(
+                            "\n\n    Value: {} - {} = {}",
+                            round_float(switching_pair.value_with),
+                            round_float(switching_pair.value_without),
+                            round_float(switching_pair.value()),
+                        ));
+                    }
                     if switching_pair.indirect_contribution > 0.0 {
                         let superset_pair_text = if switching_pair.aggregated_pair_count == 1 {
                             "superset pair is"

@@ -210,6 +210,17 @@ impl SwitchingPairCollection {
 
         res
     }
+
+    pub fn contains_non_simple_pairs(&self) -> bool {
+        for pairs in self.switching_pairs.values() {
+            for pair in pairs {
+                if pair.value_with != 1.0 || pair.value_without != 0.0 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 pub struct AggregatedSwitchingPairCollection<C: CoalitionSpecifier> {
