@@ -67,6 +67,7 @@ impl<AM: Default, A, E, V, S: Clone> super::Model<AM, A, E, V, S> {
                 }
                 commands.push(Command {
                     action: command.action,
+                    action_span: command.action_span,
                     guard: f(command.guard),
                     updates,
                     span: command.span,

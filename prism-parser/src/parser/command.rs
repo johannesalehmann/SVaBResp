@@ -23,6 +23,7 @@ where
     let action_parser = just(Token::LeftSqBracket)
         .ignore_then(identifier_parser().or_not())
         .then_ignore(just(Token::RightSqBracket))
+        .map_with(|i, e| (i, e.span()))
         .labelled("action")
         .as_context();
 
@@ -42,8 +43,8 @@ where
         .then_ignore(just(Token::Arrow))
         .then(updates_parser)
         .then_ignore(just(Token::Semicolon))
-        .map_with(|((action, guard), updates), e| {
-            prism_model::Command::with_updates(action, guard, updates, e.span())
+        .map_with(|(((action, action_span), guard), updates), e| {
+            prism_model::Command::with_updates(action, action_span, guard, updates, e.span())
         })
         .labelled("command")
         .as_context()

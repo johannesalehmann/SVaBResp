@@ -149,7 +149,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
                 span,
             );
 
-            let mut select_command = Command::new(None, guard, span);
+            let mut select_command = Command::new(None, span, guard, span);
             select_command.updates.push(Update::with_assignments(
                 Expression::Int(1, span),
                 vec![Assignment::new(
@@ -164,6 +164,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
 
             let mut activate_command = Command::new(
                 Some(Identifier::new(execute_action.clone(), span).unwrap()),
+                span,
                 Expression::Equals(
                     Box::new(Expression::VarOrConst(selected_module_variable, span)),
                     Box::new(Expression::Int(module_index as i64 + 1, span)),
@@ -199,7 +200,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
                     )),
                     span,
                 );
-                let mut select_command = Command::new(None, guard, span);
+                let mut select_command = Command::new(None, span, guard, span);
                 select_command.updates.push(Update::with_assignments(
                     Expression::Int(1, span),
                     vec![Assignment::new(
@@ -214,6 +215,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
 
                 let mut activate_command = Command::new(
                     Some(Identifier::new(action, span).unwrap()),
+                    span,
                     Expression::Equals(
                         Box::new(Expression::VarOrConst(selected_module_variable, span)),
                         Box::new(Expression::Int(index as i64, span)),

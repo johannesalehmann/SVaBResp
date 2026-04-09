@@ -5,15 +5,17 @@ use std::fmt::{Display, Formatter};
 
 pub struct Command<A, E, V, S: Clone> {
     pub action: Option<A>,
+    pub action_span: S,
     pub guard: E,
     pub updates: Vec<Update<E, V, S>>,
     pub span: S,
 }
 
 impl<A, E, V, S: Clone> Command<A, E, V, S> {
-    pub fn new(action: Option<A>, guard: E, span: S) -> Self {
+    pub fn new(action: Option<A>, action_span: S, guard: E, span: S) -> Self {
         Self {
             action,
+            action_span,
             guard,
             updates: Vec::new(),
             span,
@@ -22,12 +24,14 @@ impl<A, E, V, S: Clone> Command<A, E, V, S> {
 
     pub fn with_updates(
         action: Option<A>,
+        action_span: S,
         guard: E,
         updates: Vec<Update<E, V, S>>,
         span: S,
     ) -> Self {
         Self {
             action,
+            action_span,
             guard,
             updates,
             span,
@@ -42,6 +46,7 @@ impl<A, V, S: Clone> Command<A, Expression<V, S>, V, S> {
     ) -> Command<A, Expression<V, S2>, V, S2> {
         Command {
             action: self.action,
+            action_span: map(self.action_span),
             guard: self.guard.map_span(map),
             updates: self.updates.into_iter().map(|u| u.map_span(map)).collect(),
             span: map(self.span),
@@ -53,6 +58,7 @@ impl<S: Clone> Command<Identifier<S>, Expression<Identifier<S>, S>, Identifier<S
     pub fn renamed(&self, rename_rules: &RenameRules<S>) -> Self {
         Self {
             action: self.action.as_ref().map(|a| a.renamed(rename_rules)),
+            action_span: self.action_span.clone(),
             guard: self.guard.renamed(rename_rules),
             updates: self
                 .updates

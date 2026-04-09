@@ -67,10 +67,15 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                 ))
                 .unwrap(),
         );
+        prism_model.name_unnamed_actions();
+
         for module in &prism_model.modules.modules {
             for command in &module.commands {
                 let span = match &command.action {
-                    None => SimpleSpan::new(command.span.start, command.span.start + 2), // TODO: This is a hack because the PRISM parser currently does not provide the span of [].
+                    None => command.action_span.clone(),
+                    // We use action.span instead of command.action_span here so the enclosing
+                    // square brackets are not highlighted. This indicates that all instances of the
+                    // action share a single responsibility value
                     Some(action) => action.span.clone(),
                 };
                 let name = command

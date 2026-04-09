@@ -76,6 +76,25 @@ impl<AM: Default, A, E, V, S: Clone> Model<AM, A, E, V, S> {
         }
     }
 }
+impl<AM: Default, E, V, S: Clone> Model<AM, crate::Identifier<S>, E, V, S> {
+    pub fn name_unnamed_actions(&mut self) {
+        let mut counter = 0;
+        for module in &mut self.modules.modules {
+            for command in &mut module.commands {
+                if command.action.is_none() {
+                    command.action = Some(
+                        crate::Identifier::new_potentially_reserved(
+                            format!("unnamed_action_{}", counter),
+                            command.action_span.clone(),
+                        )
+                        .unwrap(),
+                    );
+                    counter += 1;
+                }
+            }
+        }
+    }
+}
 
 impl<AM, A, V, S: Clone> Model<AM, A, Expression<V, S>, V, S> {
     pub fn map_span<S2: Clone, F: Fn(S) -> S2>(

@@ -111,6 +111,7 @@ impl<S: Clone> super::Model<(), Identifier<S>, Expression<Identifier<S>, S>, Ide
                 match guard {
                     Ok(guard) => commands.push(Command {
                         action: command.action,
+                        action_span: command.action_span,
                         guard,
                         updates,
                         span: command.span,
