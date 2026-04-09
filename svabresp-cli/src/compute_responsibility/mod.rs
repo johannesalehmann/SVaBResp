@@ -273,7 +273,7 @@ impl ComputeResponsibilityCommand {
 
     fn parse_space_separated_names(a: &str, error_no_parentheses: &str) -> Vec<String> {
         let names = a.trim();
-        if !names.starts_with("(") || names.ends_with(")") {
+        if !names.starts_with("(") || !names.ends_with(")") {
             panic!("{}", error_no_parentheses);
         }
         let names = &names[1..names.len() - 1];
