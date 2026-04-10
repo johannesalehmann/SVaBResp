@@ -266,6 +266,22 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
 
         let mut tooltip_text = vec![tooltip_start];
 
+        tooltip_text.push("\n\n<grey>Test</grey>".to_string());
+        tooltip_text.push("\n\n<ColorCircle>0.7,  2</ColorCircle>".to_string());
+        tooltip_text.push("\n\n<ColorCircle>0.5 ,3</ColorCircle>".to_string());
+        tooltip_text.push("\n\n<ColorCircle>0.2, 1 </ColorCircle>".to_string());
+
+        tooltip_text.push("\n\nGo to [section 1](/#/#sec1)".to_string());
+        tooltip_text.push("\n\nGo to [section 3](#sec3)".to_string());
+        tooltip_text.push("\n\nGo to [section 5](#sec5)".to_string());
+        tooltip_text.push("\n\nGo to [section 8](#sec8)".to_string());
+        for i in 0..10 {
+            tooltip_text.push(format!(
+                "\n\n## Heading {}<a name=\"sec{}\"></a>\n\nTest 1\nTest 2\n\nTest asdf\n\nqwer werj we r ej",
+                i,i
+            ));
+        }
+
         let player_index = values.get_index(group_name);
         if let Some(player_index) = player_index {
             let switching_pairs = self.switching_pairs(player_index);

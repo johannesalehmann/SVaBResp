@@ -186,7 +186,47 @@ impl Highlight {
         indent: S2,
         ramps: &ColourRampCollection,
     ) -> String {
-        let json_tooltip = self.tooltip.replace("\n", "\\n");
+        let mut tooltip_with_grey = self
+            .tooltip
+            .replace("<grey>", "<span style=\"color:#444444;\">")
+            .replace("</grey>", "</span>");
+
+        while let Some(start_index) = tooltip_with_grey.find("<ColorCircle>") {
+            let end_index = start_index
+                + tooltip_with_grey[start_index..]
+                    .find("</ColorCircle>")
+                    .expect("Could not find matching `</ColorCircle>` for `<ColorCircle`)");
+            let text_between = &tooltip_with_grey[(start_index + "<ColorCircle>".len())..end_index];
+            let hex_colour = if text_between.contains("#") {
+                text_between.to_string()
+            } else {
+                let (first, second) = text_between.split_once(",") .unwrap_or_else(|| panic!("`<ColorCircle>` must either contain a hex colour (e.g. `#FF0088`) or an intensity between 0.0 and 1.0 and a colour ramp index, separated by a comma (e.g. `0.7, 2`). Received `{}`.",text_between) );
+                let intensity = first.trim().parse::<f64>().unwrap_or_else(|e| {
+                    panic!(
+                        "Cannot parse intensity of <ColorCircle> colour: `{}`. Error: {}",
+                        first.trim(),
+                        e
+                    )
+                });
+                let ramp_index = second.trim().parse::<usize>().unwrap_or_else(|e| {
+                    panic!(
+                        "Cannot parse colour ramp index of <ColorCircle> colour: `{}`. Error: {}",
+                        second.trim(),
+                        e
+                    )
+                });
+                let colour = Colour::new(ramp_index, intensity);
+                colour.to_hsl(ramps).to_hex()
+            };
+
+            let replacement_range = start_index..end_index + "</ColorCircle>".len();
+            tooltip_with_grey.replace_range(
+                replacement_range,
+                &format!("<span style=\"color:{};\">&#11044;</span>", hex_colour),
+            );
+        }
+
+        let json_tooltip = tooltip_with_grey.replace("\n", "\\n").replace("\"", "\\\"");
         format!(
             "{{{new_line}{indent}\"from\": {},{new_line}{indent}\"to\": {},{new_line}{indent}\"tooltip\": \"{}\",{new_line}{indent}\"colour\": \"{}\"{new_line}}}",
             self.from,
