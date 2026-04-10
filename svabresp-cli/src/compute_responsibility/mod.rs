@@ -144,7 +144,7 @@ impl ComputeResponsibilityCommand {
             "actions" => GroupingKind::Actions,
             g if g.starts_with("variables") => {
                 let variables = Self::parse_space_separated_names(
-                    &g["labels".len()..],
+                    &g["variables".len()..],
                     "--grouping variables must include a parenthesised list of variable names, e.g. --grouping variables(x y timer)",
                 );
 
