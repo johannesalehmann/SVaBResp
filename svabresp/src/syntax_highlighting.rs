@@ -186,11 +186,12 @@ impl Highlight {
         indent: S2,
         ramps: &ColourRampCollection,
     ) -> String {
+        let json_tooltip = self.tooltip.replace("\n", "\\n");
         format!(
             "{{{new_line}{indent}\"from\": {},{new_line}{indent}\"to\": {},{new_line}{indent}\"tooltip\": \"{}\",{new_line}{indent}\"colour\": \"{}\"{new_line}}}",
             self.from,
             self.to,
-            self.tooltip,
+            json_tooltip,
             self.colour.to_hsl(ramps).to_hex()
         )
     }
