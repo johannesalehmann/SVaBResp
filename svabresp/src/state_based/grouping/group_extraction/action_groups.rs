@@ -295,6 +295,8 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
 
+        let colour_ramp_index = 1;
+
         let is_probabilistic = switching_pairs.contains_non_simple_pairs();
 
         let aggregated_switching_pairs = switching_pairs
@@ -303,6 +305,8 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
 
         for (group_name, spans) in &self.action_name_to_spans {
             let (value, tooltip) = aggregated_switching_pairs.value_and_tool_tip_text(
+                "Action",
+                colour_ramp_index,
                 group_name,
                 &values,
                 player_names,
@@ -313,7 +317,7 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                 highlighting.add_highlight(Highlight::new(
                     span.start,
                     span.end,
-                    Colour::new(1, value),
+                    Colour::new(colour_ramp_index, value),
                     &tooltip,
                 ));
             }

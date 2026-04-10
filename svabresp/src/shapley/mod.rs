@@ -2,6 +2,7 @@ mod algorithms;
 
 pub use algorithms::*;
 use std::collections::HashMap;
+use std::fmt::Display;
 
 mod auxiliary;
 
@@ -241,11 +242,13 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
         }
     }
 
-    pub fn value_and_tool_tip_text<S: AsRef<str>, P: PartialEq, VD>(
+    pub fn value_and_tool_tip_text<S1: Display, S2: AsRef<str>, P: PartialEq + Display, VD>(
         &self,
+        responsibility_name: S1,
+        colour_ramp_index: usize,
         group_name: &P,
         values: &ResponsibilityValues<P, f64, VD>,
-        player_names: &[S],
+        player_names: &[S2],
         is_probabilistic: bool,
     ) -> (f64, String) {
         fn round_float(value: f64) -> String {
@@ -255,38 +258,28 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
                 .to_string()
         }
 
-        let (value, tooltip_start) = if let Some(responsibility) = values.get(group_name) {
-            (
-                responsibility.value,
-                format!("Responsibility: {}", round_float(responsibility.value)),
-            )
+        let value = if let Some(responsibility) = values.get(group_name) {
+            responsibility.value
         } else {
-            (0.0, "No responsibility".to_string())
+            0.0
         };
 
+        let tooltip_start = format!(
+            "<ColorCircle>{},{}</ColorCircle>{} responsibility for `{}`: {}",
+            value,
+            colour_ramp_index,
+            responsibility_name,
+            group_name,
+            round_float(value)
+        );
+
         let mut tooltip_text = vec![tooltip_start];
-
-        tooltip_text.push("\n\n<grey>Test</grey>".to_string());
-        tooltip_text.push("\n\n<ColorCircle>0.7,  2</ColorCircle>".to_string());
-        tooltip_text.push("\n\n<ColorCircle>0.5 ,3</ColorCircle>".to_string());
-        tooltip_text.push("\n\n<ColorCircle>0.2, 1 </ColorCircle>".to_string());
-
-        tooltip_text.push("\n\nGo to [section 1](/#/#sec1)".to_string());
-        tooltip_text.push("\n\nGo to [section 3](#sec3)".to_string());
-        tooltip_text.push("\n\nGo to [section 5](#sec5)".to_string());
-        tooltip_text.push("\n\nGo to [section 8](#sec8)".to_string());
-        for i in 0..10 {
-            tooltip_text.push(format!(
-                "\n\n## Heading {}<a name=\"sec{}\"></a>\n\nTest 1\nTest 2\n\nTest asdf\n\nqwer werj we r ej",
-                i,i
-            ));
-        }
 
         let player_index = values.get_index(group_name);
         if let Some(player_index) = player_index {
             let switching_pairs = self.switching_pairs(player_index);
             if switching_pairs.len() > 0 {
-                tooltip_text.push("\n\n**Switching pairs**".to_string());
+                tooltip_text.push("\n\n# Switching pairs".to_string());
             }
 
             let mut switching_pairs = switching_pairs.iter().collect::<Vec<_>>();
@@ -298,33 +291,39 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
 
             for switching_pair in switching_pairs {
                 tooltip_text.push("\n\n- ".to_string());
+                tooltip_text.push(format!(
+                    ": <ColorCircle>{},{}</ColorCircle> ",
+                    switching_pair.direct_contribution, colour_ramp_index,
+                ));
                 tooltip_text.push(CoalitionSpecifier::to_string(
                     &switching_pair.coalition,
                     player_names,
                 ));
                 tooltip_text.push(format!(
-                    "\n\n    Contribution: {}",
+                    ": {}",
                     round_float(switching_pair.direct_contribution)
                 ));
+                if switching_pair.indirect_contribution > 0.0 {
+                    let superset_pair_text = if switching_pair.aggregated_pair_count == 1 {
+                        "superset"
+                    } else {
+                        "supersets"
+                    };
+                    tooltip_text.push(format!(
+                        "<grey>(+ <ColorCircle>{},{}</ColorCircle> {} from {} {})</grey>",
+                        switching_pair.indirect_contribution,
+                        colour_ramp_index,
+                        switching_pair.indirect_contribution,
+                        switching_pair.aggregated_pair_count,
+                        superset_pair_text,
+                    ));
+                }
                 if is_probabilistic {
                     tooltip_text.push(format!(
-                        "\n\n    Value: {} - {} = {}",
+                        "\n\n    <grey>Value: {} - {} = {}</grey>",
                         round_float(switching_pair.value_with),
                         round_float(switching_pair.value_without),
                         round_float(switching_pair.value()),
-                    ));
-                }
-                if switching_pair.indirect_contribution > 0.0 {
-                    let superset_pair_text = if switching_pair.aggregated_pair_count == 1 {
-                        "superset pair is"
-                    } else {
-                        "superset pairs are"
-                    };
-                    tooltip_text.push(format!(
-                        "\n\n    {} {} hidden (contribution: {})",
-                        switching_pair.aggregated_pair_count,
-                        superset_pair_text,
-                        round_float(switching_pair.indirect_contribution)
                     ));
                 }
             }

@@ -222,7 +222,7 @@ impl Highlight {
             let replacement_range = start_index..end_index + "</ColorCircle>".len();
             tooltip_with_grey.replace_range(
                 replacement_range,
-                &format!("<span style=\"color:{};\">&#11044;</span>", hex_colour),
+                &format!("<span style=\"color:{};\">&#9210;</span>", hex_colour),
             );
         }
 

@@ -146,6 +146,7 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
+        let colour_ramp_index = 0;
 
         let is_probabilistic = switching_pairs.contains_non_simple_pairs();
 
@@ -160,6 +161,8 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
             let mut group_details = Vec::new();
             for group_name in &label_details.contained_in_players {
                 let (value, details) = aggregated_switching_pairs.value_and_tool_tip_text(
+                    "Label",
+                    colour_ramp_index,
                     group_name,
                     values,
                     player_names,

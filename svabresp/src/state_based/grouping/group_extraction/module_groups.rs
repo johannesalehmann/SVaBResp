@@ -293,6 +293,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
+        let colour_ramp_index = 0;
 
         let is_probabilistic = switching_pairs.contains_non_simple_pairs();
 
@@ -302,6 +303,8 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
 
         for group in &self.group_info {
             let (value, tooltip) = aggregated_switching_pairs.value_and_tool_tip_text(
+                "Module",
+                colour_ramp_index,
                 &group.name,
                 &values,
                 player_names,
@@ -312,7 +315,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
                 highlighting.add_highlight(Highlight::new(
                     span.start,
                     span.end,
-                    Colour::new(0, value),
+                    Colour::new(colour_ramp_index, value),
                     &tooltip,
                 ));
             }
