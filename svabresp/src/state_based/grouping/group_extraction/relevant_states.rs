@@ -1,6 +1,6 @@
 use probabilistic_model_algorithms::deterministic_games::winning_region;
 use probabilistic_models::{
-    ActionCollection, AtomicProposition, ModelTypes, TwoPlayer, Valuation, VectorPredecessors,
+    ActionCollection, AtomicProposition, ModelTypes, TwoPlayer, VectorPredecessors,
 };
 use probabilistic_properties::Query;
 use std::collections::HashSet;
@@ -23,10 +23,6 @@ impl RelevantStates {
                     dummy_states.push(i);
                 } else {
                     relevant_states.insert(i);
-                    println!(
-                        "Relevant: {}",
-                        state.valuation.displayable(&model.valuation_context)
-                    );
                 }
             }
         } else {

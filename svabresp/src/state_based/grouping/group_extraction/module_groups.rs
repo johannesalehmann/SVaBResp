@@ -322,13 +322,6 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
     }
 }
 
-fn round_float(value: f64) -> String {
-    format!("{:.3}", value)
-        .trim_end_matches("0")
-        .trim_end_matches(".")
-        .to_string()
-}
-
 struct ActionInfo {
     pub module_guards: Vec<Expression<VariableReference, SimpleSpan>>,
     pub spans: Vec<SimpleSpan>,

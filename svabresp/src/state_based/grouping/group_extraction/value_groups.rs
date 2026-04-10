@@ -13,6 +13,7 @@ pub struct ValueGroupExtractionScheme {
     variables: Vec<String>,
     variable_types: Option<Vec<VariableType>>,
     variable_references: Option<Vec<VariableReference>>,
+    spans: Vec<SimpleSpan>,
 }
 
 impl ValueGroupExtractionScheme {
@@ -21,6 +22,7 @@ impl ValueGroupExtractionScheme {
             variables,
             variable_types: None,
             variable_references: None,
+            spans: Vec::new(),
         }
     }
 }
@@ -43,7 +45,9 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
                 .variable_manager
                 .get_reference_by_str(variable.as_str())
                 .unwrap_or_else(|| panic!("Cannot find variable {} for grouping", variable));
-            let variable_type = match prism_model.variable_manager.get(&reference).unwrap().range {
+            let variable = prism_model.variable_manager.get(&reference).unwrap();
+            self.spans.push(variable.span.clone());
+            let variable_type = match variable.range {
                 VariableRange::BoundedInt { .. } => VariableType::BoundedInt,
                 VariableRange::UnboundedInt { .. } => VariableType::UnboundedInt,
                 VariableRange::Boolean { .. } => VariableType::Bool,
@@ -118,8 +122,32 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
         switching_pairs: &SwitchingPairCollection,
         player_names: &[S],
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
-        let _ = (values, switching_pairs, player_names);
-        None
+        let _ = (switching_pairs, player_names);
+        use crate::syntax_highlighting::*;
+        let mut highlighting = SyntaxHighlighting::new();
+
+        let mut general_info = Vec::new();
+        general_info.push("**Variable value responsibility:**".to_string());
+        for value in &values.players {
+            general_info.push(format!(
+                "\n- {}: {}",
+                value.player_info,
+                SyntaxHighlighting::round_float(value.value)
+            ));
+        }
+
+        let tooltip = general_info.join("");
+
+        for span in &self.spans {
+            highlighting.add_highlight(Highlight::new(
+                span.start,
+                span.end,
+                Colour::new(3, 0.5),
+                &tooltip,
+            ))
+        }
+
+        Some(highlighting)
     }
 }
 

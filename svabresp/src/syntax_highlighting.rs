@@ -154,6 +154,13 @@ impl SyntaxHighlighting {
             elements.join(&format!(",{new_line}{indent}"))
         )
     }
+
+    pub fn round_float(value: f64) -> String {
+        format!("{:.3}", value)
+            .trim_end_matches("0")
+            .trim_end_matches(".")
+            .to_string()
+    }
 }
 
 pub struct Highlight {
