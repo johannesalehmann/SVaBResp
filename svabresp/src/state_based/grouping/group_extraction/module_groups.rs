@@ -309,6 +309,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
                 &values,
                 player_names,
                 is_probabilistic,
+                false,
             );
 
             for span in &group.spans {

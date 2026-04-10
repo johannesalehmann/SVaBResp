@@ -167,18 +167,23 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
                     values,
                     player_names,
                     is_probabilistic,
+                    true,
                 );
                 total_responsibility += value;
-                let overview = format!("{}: {}", group_name, value);
-                let details = format!("Details of {}:\n\n{}", group_name, details);
+                let overview = format!(
+                    "<ColorCircle>{},{}</ColorCircle> `{}`: {}",
+                    value, colour_ramp_index, group_name, value
+                );
+                let details = format!("### Switching pairs for `{}`:\n\n{}", group_name, details);
                 group_details.push((value, overview, details))
             }
 
-            tooltip.push(format!("**{}:**", label_details.label_name));
-
             tooltip.push(format!(
-                "\n\nContained in groups with total responsibility {}",
-                total_responsibility
+                "<ColorCircle>{},{}</ColorCircle>Label responsibility for `{}`: {}",
+                total_responsibility,
+                colour_ramp_index,
+                label_details.label_name,
+                SyntaxHighlighting::round_float(total_responsibility)
             ));
 
             group_details.sort_unstable_by(|(v1, _, _), (v2, _, _)| {
@@ -186,13 +191,14 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
                     .expect("Encountered NaN while sorting label groups by responsibility value")
             });
 
+            tooltip.push("\n\n## Responsibility of label groups:".to_string());
             for (_, overview, _) in &group_details {
                 tooltip.push(format!("\n- {}", overview));
             }
-            // tooltip.push("\n\n**Details:**".to_string());
-            // for (_, _, details) in &group_details {
-            //     tooltip.push(format!("\n\n{}", details));
-            // }
+            tooltip.push("\n\n## Details:".to_string());
+            for (_, _, details) in &group_details {
+                tooltip.push(format!("\n\n{}", details));
+            }
 
             let tooltip = tooltip.join("");
 

@@ -311,6 +311,7 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                 &values,
                 player_names,
                 is_probabilistic,
+                false,
             );
 
             for span in spans {

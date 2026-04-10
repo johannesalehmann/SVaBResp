@@ -250,6 +250,7 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
         values: &ResponsibilityValues<P, f64, VD>,
         player_names: &[S2],
         is_probabilistic: bool,
+        only_switching_pairs: bool,
     ) -> (f64, String) {
         fn round_float(value: f64) -> String {
             format!("{:.3}", value)
@@ -273,13 +274,19 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
             round_float(value)
         );
 
-        let mut tooltip_text = vec![tooltip_start];
+        let mut tooltip_text = Vec::new();
+
+        if !only_switching_pairs {
+            tooltip_text.push(tooltip_start);
+        }
 
         let player_index = values.get_index(group_name);
         if let Some(player_index) = player_index {
             let switching_pairs = self.switching_pairs(player_index);
             if switching_pairs.len() > 0 {
-                tooltip_text.push("\n\n# Switching pairs".to_string());
+                if !only_switching_pairs {
+                    tooltip_text.push("\n\n## Switching pairs\n".to_string());
+                }
             }
 
             let mut switching_pairs = switching_pairs.iter().collect::<Vec<_>>();
@@ -289,15 +296,21 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
                     .expect("Encountered NaN while sorting (aggregated) switching pairs")
             });
 
+            let mut first = only_switching_pairs;
+
             for switching_pair in switching_pairs {
-                tooltip_text.push("\n\n- ".to_string());
+                if !first {
+                    tooltip_text.push("\n".to_string());
+                }
+                first = false;
+                tooltip_text.push("- ".to_string());
                 tooltip_text.push(format!(
-                    ": <ColorCircle>{},{}</ColorCircle> ",
+                    ": <ColorCircle>{},{}</ColorCircle>",
                     switching_pair.direct_contribution, colour_ramp_index,
                 ));
-                tooltip_text.push(CoalitionSpecifier::to_string(
-                    &switching_pair.coalition,
-                    player_names,
+                tooltip_text.push(format!(
+                    "`{}`",
+                    CoalitionSpecifier::to_string(&switching_pair.coalition, player_names,)
                 ));
                 tooltip_text.push(format!(
                     ": {}",
