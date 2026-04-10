@@ -171,8 +171,10 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
                 group_details.push((value, overview, details))
             }
 
+            tooltip.push(format!("**{}:**", label_details.label_name));
+
             tooltip.push(format!(
-                "Contained in groups with total responsibility {}",
+                "\n\nContained in groups with total responsibility {}",
                 total_responsibility
             ));
 
@@ -182,7 +184,7 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
             });
 
             for (_, overview, _) in &group_details {
-                tooltip.push(format!("\n\n- {}", overview));
+                tooltip.push(format!("\n- {}", overview));
             }
             // tooltip.push("\n\n**Details:**".to_string());
             // for (_, _, details) in &group_details {
