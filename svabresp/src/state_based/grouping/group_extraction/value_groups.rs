@@ -8,12 +8,112 @@ use probabilistic_models::{
 };
 use probabilistic_properties::Query;
 use std::collections::HashMap;
+use std::fmt::Formatter;
+
+// TODO: The entire highlighting code does many unnecessary allocations. Check if this impacts
+//  performance.
+struct VariableHighlightingInfo<V> {
+    valuations: Vec<VariableValuation<V>>,
+}
+
+impl VariableHighlightingInfo<()> {
+    fn insert_group(
+        &mut self,
+        valuation_name: String,
+        group_description: String,
+        group_name: String,
+    ) {
+        let index = self.find_or_create_valuation(valuation_name);
+        let valuation = &mut self.valuations[index];
+        valuation.entries.push(VariableValuationEntry {
+            title: group_description,
+            group_name,
+            responsibility: (),
+        })
+    }
+
+    fn find_or_create_valuation(&mut self, valuation_name: String) -> usize {
+        for (i, valuation) in self.valuations.iter().enumerate() {
+            if valuation.title == valuation_name {
+                return i;
+            }
+        }
+        let index = self.valuations.len();
+        self.valuations.push(VariableValuation {
+            title: valuation_name,
+            entries: Vec::new(),
+            total_responsibility: (),
+        });
+        index
+    }
+
+    fn add_responsibility(
+        &self,
+        values: &ResponsibilityValues<String, f64, f64>,
+    ) -> VariableHighlightingInfo<f64> {
+        VariableHighlightingInfo {
+            valuations: self
+                .valuations
+                .iter()
+                .map(|v| v.add_responsibility(values))
+                .collect(),
+        }
+    }
+}
+impl VariableHighlightingInfo<f64> {
+    fn compute_influence(&self) -> f64 {
+        let average = 1.0 / self.valuations.len() as f64;
+        let mut influence = 0.0;
+
+        for valuation in &self.valuations {
+            influence += (valuation.total_responsibility - average).abs();
+        }
+
+        influence
+    }
+}
+
+struct VariableValuation<V> {
+    title: String,
+    entries: Vec<VariableValuationEntry<V>>,
+    total_responsibility: V,
+}
+
+impl VariableValuation<()> {
+    fn add_responsibility(
+        &self,
+        values: &ResponsibilityValues<String, f64, f64>,
+    ) -> VariableValuation<f64> {
+        let entries: Vec<_> = self
+            .entries
+            .iter()
+            .map(|e| VariableValuationEntry {
+                title: e.title.clone(),
+                group_name: e.group_name.clone(),
+                responsibility: values.get(&e.group_name).map(|v| v.value).unwrap_or(0.0),
+            })
+            .collect();
+        let total_responsibility = entries.iter().map(|e| e.responsibility).sum();
+        VariableValuation {
+            title: self.title.clone(),
+            entries,
+            total_responsibility,
+        }
+    }
+}
+
+struct VariableValuationEntry<V> {
+    title: String,
+    group_name: String,
+    responsibility: V,
+}
 
 pub struct ValueGroupExtractionScheme {
     variables: Vec<String>,
     variable_types: Option<Vec<VariableType>>,
     variable_references: Option<Vec<VariableReference>>,
     spans: Vec<SimpleSpan>,
+    variable_highlighting_infos: Option<Vec<VariableHighlightingInfo<()>>>,
 }
 
 impl ValueGroupExtractionScheme {
@@ -23,6 +123,7 @@ impl ValueGroupExtractionScheme {
             variable_types: None,
             variable_references: None,
             spans: Vec::new(),
+            variable_highlighting_infos: None,
         }
     }
 }
@@ -40,6 +141,7 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
 
         let mut variable_references = Vec::with_capacity(self.variables.len());
         let mut variable_types = Vec::with_capacity(self.variables.len());
+        let mut variable_highlighting_info = Vec::with_capacity(self.variables.len());
         for variable in &self.variables {
             let reference = prism_model
                 .variable_manager
@@ -57,9 +159,13 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
             };
             variable_references.push(reference);
             variable_types.push(variable_type);
+            variable_highlighting_info.push(VariableHighlightingInfo {
+                valuations: Vec::new(),
+            })
         }
         self.variable_references = Some(variable_references);
         self.variable_types = Some(variable_types);
+        self.variable_highlighting_infos = Some(variable_highlighting_info);
     }
 
     fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
@@ -71,6 +177,7 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
 
         let variable_references = self.variable_references.as_ref().unwrap();
         let variable_types = self.variable_types.as_ref().unwrap();
+        let variable_highlighting_infos = self.variable_highlighting_infos.as_mut().unwrap();
 
         let mut groups = Vec::new();
         let mut group_indices = HashMap::new();
@@ -100,8 +207,27 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
                 }
                 name += ")";
 
+                for (variable_index, variable_name) in self.variables.iter().enumerate() {
+                    let variable_valuation_string =
+                        format!("`{}={}`", variable_name, values[variable_index]);
+                    let mut group_descriptor = Vec::new();
+                    for (other_var_index, other_var_name) in self.variables.iter().enumerate() {
+                        if other_var_index == variable_index {
+                            continue;
+                        }
+                        group_descriptor
+                            .push(format!("`{}={}`", other_var_name, values[other_var_index]));
+                    }
+                    let group_descriptor = group_descriptor.join(", ");
+
+                    variable_highlighting_infos[variable_index].insert_group(
+                        variable_valuation_string,
+                        group_descriptor,
+                        name.clone(),
+                    );
+                }
                 group_indices.insert(values, groups.len());
-                groups.push((name, vec![i]))
+                groups.push((name, vec![i]));
             } else {
                 let index = group_indices[&values];
                 groups[index].1.push(i);
@@ -126,24 +252,88 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
 
-        let mut general_info = Vec::new();
-        general_info.push("**Variable value responsibility:**".to_string());
-        for value in &values.players {
-            general_info.push(format!(
-                "\n- {}: {}",
-                value.player_info,
-                SyntaxHighlighting::round_float(value.value)
-            ));
+        let colour_ramp_index = 3;
+
+        let is_probabilistic = switching_pairs.contains_non_simple_pairs();
+
+        let variable_highlighting_infos = self
+            .variable_highlighting_infos
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|v| v.add_responsibility(values))
+            .collect::<Vec<_>>();
+
+        let aggregated_switching_pairs = switching_pairs
+            .clone()
+            .aggregate_by_minimal_switching_pair();
+
+        let mut switching_pair_section = Vec::new();
+        switching_pair_section.push("\n\n## Switching pairs".to_string());
+        for group in &values.players {
+            if group.value > 0.0 {
+                switching_pair_section.push(format!(
+                    "\n\n### Switching pairs of `{}`",
+                    group.player_info
+                ));
+                let (_, switching_pair_text) = aggregated_switching_pairs.value_and_tool_tip_text(
+                    "Variable",
+                    colour_ramp_index,
+                    &group.player_info,
+                    values,
+                    player_names,
+                    is_probabilistic,
+                    true,
+                );
+                switching_pair_section.push("\n\n".to_string());
+                switching_pair_section.push(switching_pair_text);
+            }
         }
+        let switching_pair_section = switching_pair_section.join("");
 
-        let tooltip = general_info.join("");
+        for (span, highlighting_infos) in self.spans.iter().zip(variable_highlighting_infos.iter())
+        {
+            let influence = highlighting_infos.compute_influence();
 
-        for span in &self.spans {
+            let mut tooltip = Vec::new();
+
+            tooltip.push(format!(
+                "<ColorCircle>{},{}</ColorCircle>Impact of `x`'s value on responsibility: {}",
+                influence,
+                colour_ramp_index,
+                SyntaxHighlighting::round_float(influence)
+            ));
+
+            tooltip.push("\n\n## Responsibility per variable value".to_string());
+            for valuation in &highlighting_infos.valuations {
+                tooltip.push(format!(
+                    "\n- <ColorCircle>{},{}</ColorCircle>{}: {} total responsibility",
+                    valuation.total_responsibility,
+                    colour_ramp_index,
+                    valuation.title,
+                    SyntaxHighlighting::round_float(valuation.total_responsibility)
+                ));
+
+                for group in &valuation.entries {
+                    tooltip.push(format!(
+                        "\n    - <ColorCircle>{},{}</ColorCircle>{}: {}",
+                        group.responsibility,
+                        colour_ramp_index,
+                        group.title,
+                        SyntaxHighlighting::round_float(group.responsibility)
+                    ))
+                }
+            }
+
+            tooltip.push(switching_pair_section.clone());
+
+            let tooltip = tooltip.join("");
+
             highlighting.add_highlight(Highlight::new(
                 span.start,
                 span.end,
-                Colour::new(3, 0.5),
-                &tooltip,
+                Colour::new(colour_ramp_index, influence),
+                tooltip,
             ))
         }
 
@@ -168,6 +358,22 @@ impl Value {
         match self {
             Value::Int(i) => i.to_string(),
             Value::Bool(b) => b.to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Int(val) => {
+                write!(f, "{}", val)
+            }
+            Value::Bool(true) => {
+                write!(f, "true")
+            }
+            Value::Bool(false) => {
+                write!(f, "false")
+            }
         }
     }
 }

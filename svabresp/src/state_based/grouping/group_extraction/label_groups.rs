@@ -146,7 +146,7 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
-        let colour_ramp_index = 0;
+        let colour_ramp_index = 2;
 
         let is_probabilistic = switching_pairs.contains_non_simple_pairs();
 

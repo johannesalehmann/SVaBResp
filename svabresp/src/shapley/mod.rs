@@ -305,7 +305,7 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
                 first = false;
                 tooltip_text.push("- ".to_string());
                 tooltip_text.push(format!(
-                    ": <ColorCircle>{},{}</ColorCircle>",
+                    "<ColorCircle>{},{}</ColorCircle>",
                     switching_pair.direct_contribution, colour_ramp_index,
                 ));
                 tooltip_text.push(format!(
