@@ -214,11 +214,11 @@ impl Highlight {
                     e
                 )
             });
-            let bg_colour = Colour::new(ramp_index, intensity);
+            let bg_colour = Colour::new(ramp_index, intensity.clamp(0.0, 1.0));
             let bg_hsl_colour = bg_colour.to_hsl(ramps);
             let bg_hex_colour = bg_hsl_colour.to_hex();
 
-            let fg_hex_colour = if bg_hsl_colour.lightness < 0.3 {
+            let fg_hex_colour = if bg_hsl_colour.apparent_brightness() < 0.5 {
                 "#FFFFFF"
             } else {
                 "#000000"
@@ -277,29 +277,33 @@ impl ColourRampCollection {
             ramps: vec![
                 ColourRamp::with_colour_for_zero(
                     vec![
-                        ColourRampEntry::new(0.0, HslColour::new(50.0, 0.5, 0.9)),
-                        ColourRampEntry::new(1.0, HslColour::new(-50.0, 0.9, 0.33)),
+                        ColourRampEntry::new(0.0, HslColour::new(20.0, 0.5, 0.81)),
+                        ColourRampEntry::new(0.7, HslColour::new(0.0, 0.7, 0.61)),
+                        // ColourRampEntry::new(0.7, HslColour::new(-5.0, 0.78, 0.42)),
+                        ColourRampEntry::new(1.0, HslColour::new(-20.0, 0.9, 0.42)),
                     ],
                     colour_for_zero,
                 ),
                 ColourRamp::with_colour_for_zero(
                     vec![
-                        ColourRampEntry::new(0.0, HslColour::new(80.0, 0.5, 0.9)),
-                        ColourRampEntry::new(1.0, HslColour::new(140.0, 0.9, 0.2)),
+                        ColourRampEntry::new(0.0, HslColour::new(60.0, 0.4, 0.77)),
+                        ColourRampEntry::new(0.3, HslColour::new(52.5, 0.65, 0.55)),
+                        ColourRampEntry::new(1.0, HslColour::new(45.0, 0.9, 0.28)),
                     ],
                     colour_for_zero,
                 ),
                 ColourRamp::with_colour_for_zero(
                     vec![
-                        ColourRampEntry::new(0.0, HslColour::new(150.0, 0.5, 0.97)),
-                        ColourRampEntry::new(1.0, HslColour::new(245.0, 0.9, 0.5)),
+                        ColourRampEntry::new(0.0, HslColour::new(135.0, 0.4, 0.80)),
+                        ColourRampEntry::new(0.35, HslColour::new(127.0, 0.65, 0.55)),
+                        ColourRampEntry::new(1.0, HslColour::new(120.0, 0.9, 0.28)),
                     ],
                     colour_for_zero,
                 ),
                 ColourRamp::with_colour_for_zero(
                     vec![
-                        ColourRampEntry::new(0.0, HslColour::new(315.0, 0.5, 0.97)),
-                        ColourRampEntry::new(1.0, HslColour::new(270.0, 0.9, 0.45)),
+                        ColourRampEntry::new(0.0, HslColour::new(180.0, 0.3, 0.80)),
+                        ColourRampEntry::new(1.0, HslColour::new(235.0, 0.85, 0.55)),
                     ],
                     colour_for_zero,
                 ),
@@ -401,10 +405,18 @@ impl ColourRamp {
         let mut location = from;
         while location <= to {
             let colour = self.sample(location);
+            let brightness = colour.apparent_brightness();
+            let fg_colour = if brightness > 0.5 {
+                "#000000"
+            } else {
+                "#FFFFFF"
+            };
             output.push(format!(
-                "<div style=\"background-color:{};width:200px;height:30px\">{:.3}</div>",
+                "<div style=\"color:{};background-color:{};width:200px;height:30px\">{:.3} (brightness: {:.3})</div>",
+                fg_colour,
                 colour.to_hex(),
-                location
+                location,
+                brightness
             ));
             location += step;
         }
@@ -473,7 +485,7 @@ impl HslColour {
         }
     }
 
-    pub fn to_hex(&self) -> String {
+    pub fn to_rgb(&self) -> (f64, f64, f64) {
         // https://www.rapidtables.com/convert/color/hsl-to-rgb.html
         let c = (1.0 - (2.0 * self.lightness - 1.0).abs()) * self.saturation;
         let x = c * (1.0 - ((self.hue / 60.0) % 2.0 - 1.0).abs());
@@ -494,25 +506,34 @@ impl HslColour {
             panic!("Hue must be between at least 0.0 and less than 360.0")
         };
 
+        (r + m, g + m, b + m)
+    }
+
+    pub fn to_hex(&self) -> String {
+        let (r, g, b) = self.to_rgb();
+
         fn float_to_hex(val: f64) -> String {
             format!("{:02x}", ((val * 256.0) as i64).clamp(0, 255))
         }
-
-        let (r, g, b) = (r + m, g + m, b + m);
-
         format!("#{}{}{}", float_to_hex(r), float_to_hex(g), float_to_hex(b))
+    }
+
+    pub fn apparent_brightness(&self) -> f64 {
+        let (r, g, b) = self.to_rgb();
+
+        (0.299 * r * r + 0.587 * g * g + 0.114 * b * b).sqrt()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    // This test generates sample html pages for the ramps provided by `with_predefined_ramps`
-
+    // // This test generates sample html pages for the ramps provided by `with_predefined_ramps`
+    //
     // use crate::syntax_highlighting::{ColourRampCollection, HslColour};
     //
     // #[test]
     // fn test_sample_output() {
-    //     let ramps = ColourRampCollection::with_predefined_ramps(HslColour::grey(0.9));
+    //     let ramps = ColourRampCollection::with_predefined_ramps();
     //     for i in 0..ramps.len() {
     //         ramps[i].produce_example_page(format!("ramp_{}.html", i), 0.0, 1.0, 0.025);
     //     }
