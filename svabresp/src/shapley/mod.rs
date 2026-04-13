@@ -299,9 +299,9 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
                 }
                 first = false;
                 tooltip_text.push("- ".to_string());
-                tooltip_text.push(format!(
-                    "`{}`",
-                    CoalitionSpecifier::to_string(&switching_pair.coalition, player_names,)
+                tooltip_text.push(CoalitionSpecifier::to_string(
+                    &switching_pair.coalition,
+                    player_names,
                 ));
                 tooltip_text.push(format!(
                     ": <ColoredNumber>{}, {colour_ramp_index}</ColoredNumber>",
@@ -314,7 +314,7 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
                         "supersets"
                     };
                     tooltip_text.push(format!(
-                        "<grey>(+ <ColoredNumber>{},{}</ColoredNumber> from {} {})</grey>",
+                        " <grey>(+ <ColoredNumber>{},{}</ColoredNumber> from {} {})</grey>",
                         switching_pair.indirect_contribution,
                         colour_ramp_index,
                         switching_pair.aggregated_pair_count,

@@ -703,10 +703,15 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
         // TODO: This relies on the display result of p matching the group names. This is currently
         // the case, but might not always hold.
         let string_output = &output.map_player_info(|p| format!("{}", p));
+        let ticked_player_names = groups
+            .into_names()
+            .iter()
+            .map(|n| format!("`{n}`"))
+            .collect::<Vec<_>>();
         if let Some(highlighting) = grouping_scheme.get_syntax_elements(
             string_output,
             switching_pairs,
-            &groups.into_names()[..],
+            &ticked_player_names[..],
         ) {
             println!(
                 "{}",

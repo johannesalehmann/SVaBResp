@@ -84,7 +84,7 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
             } else {
                 format!("_{}", in_line_counter)
             };
-            format!("unnamed_line_{}{}", line, suffix)
+            format!("unnamed_action_line_{}{}", line, suffix)
         });
 
         for module in &prism_model.modules.modules {

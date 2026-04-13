@@ -249,7 +249,6 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
         switching_pairs: &SwitchingPairCollection,
         player_names: &[S],
     ) -> Option<crate::syntax_highlighting::SyntaxHighlighting> {
-        let _ = (switching_pairs, player_names);
         use crate::syntax_highlighting::*;
         let mut highlighting = SyntaxHighlighting::new();
 
