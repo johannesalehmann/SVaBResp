@@ -696,7 +696,10 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
         groups: VectorStateGroups,
     ) {
         use svabresp::syntax_highlighting::*;
-        let colour_ramps = ColourRampCollection::with_predefined_ramps();
+        let tooltip_ramps = ColourRampCollection::with_predefined_ramps();
+        let mut code_colour_ramps = tooltip_ramps.clone();
+        code_colour_ramps.increase_lightness(0.6);
+
         // TODO: This relies on the display result of p matching the group names. This is currently
         // the case, but might not always hold.
         let string_output = &output.map_player_info(|p| format!("{}", p));
@@ -705,7 +708,10 @@ impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
             switching_pairs,
             &groups.into_names()[..],
         ) {
-            println!("{}", highlighting.json("\n", "    ", &colour_ramps));
+            println!(
+                "{}",
+                highlighting.json("\n", "    ", &code_colour_ramps, &tooltip_ramps)
+            );
         } else {
             println!("This grouping scheme does not support highlighting");
         }

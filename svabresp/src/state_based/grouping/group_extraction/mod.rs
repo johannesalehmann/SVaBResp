@@ -35,6 +35,7 @@ pub trait GroupExtractionScheme {
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
         atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+        character_to_line: &prism_parser::CharacterToLineMap,
     ) {
     }
 

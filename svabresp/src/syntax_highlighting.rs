@@ -142,12 +142,20 @@ impl SyntaxHighlighting {
         &self,
         new_line: S1,
         indent: S2,
-        ramps: &ColourRampCollection,
+        code_ramps: &ColourRampCollection,
+        tooltip_ramps: &ColourRampCollection,
     ) -> String {
         let elements = self
             .highlights
             .iter()
-            .map(|h| h.json(format!("{new_line}{indent}"), &indent, ramps))
+            .map(|h| {
+                h.json(
+                    format!("{new_line}{indent}"),
+                    &indent,
+                    code_ramps,
+                    tooltip_ramps,
+                )
+            })
             .collect::<Vec<_>>();
         format!(
             "[{new_line}{indent}{}{new_line}]",
@@ -177,7 +185,8 @@ impl Highlight {
         &self,
         new_line: S1,
         indent: S2,
-        ramps: &ColourRampCollection,
+        code_colour_ramps: &ColourRampCollection,
+        tooltip_colour_ramps: &ColourRampCollection,
     ) -> String {
         pub fn round_float(value: f64) -> String {
             format!("{:.3}", value)
@@ -215,7 +224,7 @@ impl Highlight {
                 )
             });
             let bg_colour = Colour::new(ramp_index, intensity.clamp(0.0, 1.0));
-            let bg_hsl_colour = bg_colour.to_hsl(ramps);
+            let bg_hsl_colour = bg_colour.to_hsl(tooltip_colour_ramps);
             let bg_hex_colour = bg_hsl_colour.to_hex();
 
             let fg_hex_colour = if bg_hsl_colour.apparent_brightness() < 0.5 {
@@ -242,7 +251,7 @@ impl Highlight {
             self.from,
             self.to,
             json_tooltip,
-            self.colour.to_hsl(ramps).to_hex()
+            self.colour.to_hsl(code_colour_ramps).to_hex()
         )
     }
 }
@@ -262,6 +271,7 @@ impl Colour {
     }
 }
 
+#[derive(Clone)]
 pub struct ColourRampCollection {
     ramps: Vec<ColourRamp>,
 }
@@ -320,6 +330,12 @@ impl ColourRampCollection {
     pub fn len(&self) -> usize {
         self.ramps.len()
     }
+
+    pub fn increase_lightness(&mut self, minimal_perceived_lightness: f64) {
+        for ramp in &mut self.ramps {
+            ramp.increase_lightness(minimal_perceived_lightness)
+        }
+    }
 }
 
 impl Index<usize> for ColourRampCollection {
@@ -330,6 +346,7 @@ impl Index<usize> for ColourRampCollection {
     }
 }
 
+#[derive(Clone)]
 pub struct ColourRamp {
     entries: Vec<ColourRampEntry>,
     colour_for_zero: Option<HslColour>,
@@ -346,6 +363,37 @@ impl ColourRamp {
         Self {
             entries,
             colour_for_zero: Some(colour_for_zero),
+        }
+    }
+    pub fn increase_lightness(&mut self, minimal_perceived_lightness: f64) {
+        let mut min_brightness = f64::MAX;
+        let mut min_brightness_index = 0;
+        for (index, entry) in self.entries.iter().enumerate() {
+            let brightness = entry.colour.apparent_brightness();
+            if brightness < min_brightness {
+                min_brightness = brightness;
+                min_brightness_index = index;
+            }
+        }
+
+        let old_lightness = self.entries[min_brightness_index].colour.lightness;
+        while self.entries[min_brightness_index]
+            .colour
+            .apparent_brightness()
+            < minimal_perceived_lightness
+            && self.entries[min_brightness_index].colour.lightness < 1.0
+        {
+            self.entries[min_brightness_index].colour.lightness =
+                (self.entries[min_brightness_index].colour.lightness + 0.01).min(1.0);
+        }
+
+        let lightness_scale = (1.0001 - self.entries[min_brightness_index].colour.lightness)
+            / (1.0 - old_lightness).max(0.00001);
+
+        for (index, entry) in self.entries.iter_mut().enumerate() {
+            if index != min_brightness_index {
+                entry.colour.lightness = 1.0 - (1.0 - entry.colour.lightness) * lightness_scale;
+            }
         }
     }
 
@@ -442,7 +490,7 @@ impl ColourRampEntry {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct HslColour {
     hue: f64,
     saturation: f64,

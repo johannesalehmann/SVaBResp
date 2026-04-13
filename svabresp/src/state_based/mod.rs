@@ -21,6 +21,7 @@ use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
 use grouping::GroupExtractionScheme;
 use prism_model_builder::UserProvidedConstValue;
+use prism_parser::CharacterToLineMap;
 use probabilistic_model_algorithms::deterministic_games::{
     BuechiAlgorithmCollection, NonstochasticGameAlgorithm,
     NonstochasticGameAndSolverExternalOwners, ReachabilityAlgorithmCollection,
@@ -40,6 +41,7 @@ pub fn compute_for_prism<
     SPC: SwitchingPairCollector,
 >(
     mut prism_model: PrismModel,
+    character_to_line_map: &CharacterToLineMap,
     mut prism_property: PrismProperty,
     grouping_scheme: &mut G,
     group_blocking_provider: B,
@@ -52,6 +54,7 @@ pub fn compute_for_prism<
         &mut prism_model,
         &mut prism_property,
         &mut atomic_propositions,
+        character_to_line_map,
     );
     let properties = tiny_pmc::building::prism_objectives_to_atomic_propositions(
         &mut atomic_propositions,

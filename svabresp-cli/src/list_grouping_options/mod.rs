@@ -30,7 +30,7 @@ impl ListGroupingOptionsCommand {
         let property = "P=? [F true]";
         let model_description = ModelFromFile::new(self.model.clone(), property);
 
-        let (prism_model, _) = model_description.get_model_and_property();
+        let (prism_model, _, _) = model_description.get_model_and_property();
 
         let mut variables = Vec::new();
         for variable in prism_model.variable_manager.variables {

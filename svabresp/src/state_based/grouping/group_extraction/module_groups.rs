@@ -57,10 +57,10 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
         &mut self,
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
-
-        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+        atomic_propositions: &mut Vec<Expression<VariableReference, SimpleSpan>>,
+        character_to_line: &prism_parser::CharacterToLineMap,
     ) {
-        let _ = (property, atomic_propositions);
+        let _ = (property, atomic_propositions, character_to_line);
 
         let span = SimpleSpan::new(0, 0);
         let selected_module_variable = prism_model

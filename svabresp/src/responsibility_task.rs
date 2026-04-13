@@ -3,7 +3,9 @@ use crate::state_based::StateBasedOutput;
 use crate::state_based::grouping::{GroupExtractionScheme, VectorStateGroups};
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
+use chumsky::text::Char;
 use log::trace;
+use prism_parser::CharacterToLineMap;
 
 pub struct ResponsibilityTask<
     'a,
@@ -35,13 +37,15 @@ impl<
 {
     pub fn run(mut self) -> StateBasedOutput<A::Output<String>, VectorStateGroups> {
         trace!("Loading model and property");
-        let (prism_model, property) = self.model_description.get_model_and_property();
+        let (prism_model, property, character_to_line_map) =
+            self.model_description.get_model_and_property();
         trace!("Parsing constants");
         let constants = tiny_pmc::parsing::parse_const_assignments(&self.constants)
             .expect("Failed to parse constants");
 
         let responsibility = crate::state_based::compute_for_prism(
             prism_model,
+            &character_to_line_map,
             property,
             self.grouping_scheme,
             self.refinement,
@@ -55,7 +59,9 @@ impl<
 }
 
 pub trait ModelAndPropertySource {
-    fn get_model_and_property(self) -> (super::PrismModel, super::PrismProperty);
+    fn get_model_and_property(
+        self,
+    ) -> (super::PrismModel, super::PrismProperty, CharacterToLineMap);
     fn get_source_code(&self) -> String;
 }
 
@@ -78,7 +84,9 @@ impl ModelFromFile {
 }
 
 impl ModelAndPropertySource for ModelFromFile {
-    fn get_model_and_property(self) -> (super::PrismModel, super::PrismProperty) {
+    fn get_model_and_property(
+        self,
+    ) -> (super::PrismModel, super::PrismProperty, CharacterToLineMap) {
         let file = self.read_file();
 
         let model_from_string = ModelFromString {
@@ -116,18 +124,19 @@ impl ModelFromString {
 }
 
 impl ModelAndPropertySource for ModelFromString {
-    fn get_model_and_property(self) -> (PrismModel, PrismProperty) {
-        let (model, properties) = tiny_pmc::parsing::parse_prism_and_print_errors(
-            Some(self.name.as_str()),
-            self.model.as_str(),
-            &[self.property.as_str()],
-        )
-        .expect("Failed to parse prism model or property");
+    fn get_model_and_property(self) -> (PrismModel, PrismProperty, CharacterToLineMap) {
+        let (model, properties, character_to_line_map) =
+            tiny_pmc::parsing::parse_prism_and_print_errors(
+                Some(self.name.as_str()),
+                self.model.as_str(),
+                &[self.property.as_str()],
+            )
+            .expect("Failed to parse prism model or property");
 
         assert_eq!(properties.len(), 1);
         let property = properties.into_iter().nth(0).unwrap();
 
-        (model, property)
+        (model, property, character_to_line_map)
     }
 
     fn get_source_code(&self) -> String {

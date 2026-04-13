@@ -785,6 +785,7 @@ dependencies = [
  "num-traits",
  "prism-model",
  "prism-model-builder",
+ "prism-parser",
  "probabilistic-model-algorithms",
  "probabilistic-models",
  "probabilistic-properties",

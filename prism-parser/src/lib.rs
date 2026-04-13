@@ -1,7 +1,9 @@
+mod character_to_line;
 mod error;
 mod lexer;
 mod parser;
 
+pub use character_to_line::CharacterToLineMap;
 use chumsky::prelude::*;
 pub use error::{PrismParserError, PrismParserValidationError};
 pub use lexer::{Span, Token};
@@ -9,6 +11,7 @@ use std::borrow::Cow;
 
 pub struct ParseResult<'a, O> {
     pub output: Option<O>,
+    pub character_to_lines: Option<CharacterToLineMap>,
     pub errors: Vec<PrismParserError<'a, Span, String>>,
 }
 
@@ -39,6 +42,9 @@ pub fn parse_prism<'a, 'b, P: AsRef<str>>(
     source: &'a str,
     properties: &[P],
 ) -> ParseResults<'b, 'b> {
+    let source_character_to_line = CharacterToLineMap::from_str(source);
+    let properties_source_to_character = properties.iter().map(|s| CharacterToLineMap::from_str(s));
+
     let mut model_errors = Vec::new();
     let mut property_errors = (0..properties.len())
         .map(|_| Vec::new())
@@ -177,8 +183,10 @@ pub fn parse_prism<'a, 'b, P: AsRef<str>>(
         let properties = properties
             .into_iter()
             .zip(property_errors.into_iter())
-            .map(|(p, e)| ParseResult {
+            .zip(properties_source_to_character.into_iter())
+            .map(|((p, e), c)| ParseResult {
                 output: p,
+                character_to_lines: Some(c),
                 errors: e,
             })
             .collect::<Vec<_>>();
@@ -186,15 +194,17 @@ pub fn parse_prism<'a, 'b, P: AsRef<str>>(
         ParseResults {
             model: ParseResult {
                 output,
+                character_to_lines: Some(source_character_to_line),
                 errors: model_errors,
             },
-            properties: properties,
+            properties,
         }
     } else {
         let properties = property_errors
             .into_iter()
             .map(|e| ParseResult {
                 output: None,
+                character_to_lines: None,
                 errors: e,
             })
             .collect::<Vec<_>>();
@@ -202,9 +212,10 @@ pub fn parse_prism<'a, 'b, P: AsRef<str>>(
         ParseResults {
             model: ParseResult {
                 output: None,
+                character_to_lines: None,
                 errors: model_errors,
             },
-            properties: properties,
+            properties,
         }
     }
 }

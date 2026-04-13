@@ -136,8 +136,9 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
         atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+        character_to_line: &prism_parser::CharacterToLineMap,
     ) {
-        let _ = (property, atomic_propositions);
+        let _ = (property, atomic_propositions, character_to_line);
 
         let mut variable_references = Vec::with_capacity(self.variables.len());
         let mut variable_types = Vec::with_capacity(self.variables.len());
@@ -268,29 +269,6 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
             .clone()
             .aggregate_by_minimal_switching_pair();
 
-        let mut switching_pair_section = Vec::new();
-        switching_pair_section.push("\n\n## Switching pairs".to_string());
-        for group in &values.players {
-            if group.value > 0.0 {
-                switching_pair_section.push(format!(
-                    "\n\n### Switching pairs of `{}`",
-                    group.player_info
-                ));
-                let (_, switching_pair_text) = aggregated_switching_pairs.value_and_tool_tip_text(
-                    "Variable",
-                    colour_ramp_index,
-                    &group.player_info,
-                    values,
-                    player_names,
-                    is_probabilistic,
-                    true,
-                );
-                switching_pair_section.push("\n\n".to_string());
-                switching_pair_section.push(switching_pair_text);
-            }
-        }
-        let switching_pair_section = switching_pair_section.join("");
-
         for ((name, span), highlighting_infos) in self
             .variables
             .iter()
@@ -305,6 +283,8 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
                 "Impact of `{}`'s value on responsibility: <ColoredNumber>{},{}</ColoredNumber>",
                 name, influence, colour_ramp_index,
             ));
+
+            let mut tooltip_switching_pairs = Vec::new();
 
             tooltip.push("\n\n## Responsibility per variable value".to_string());
             for valuation in &highlighting_infos.valuations {
@@ -326,11 +306,31 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
                         ))
                     }
                 }
+                for group in &valuation.entries {
+                    if let Some(value) = values.get(&group.group_name)
+                        && value.value > 0.0
+                    {
+                        tooltip_switching_pairs
+                            .push(format!("\n\n### Switching pairs of `{}`", group.group_name));
+                        let (_, switching_pair_text) = aggregated_switching_pairs
+                            .value_and_tool_tip_text(
+                                "Variable",
+                                colour_ramp_index,
+                                &group.group_name,
+                                values,
+                                player_names,
+                                is_probabilistic,
+                                true,
+                            );
+                        tooltip_switching_pairs.push("\n\n".to_string());
+                        tooltip_switching_pairs.push(switching_pair_text);
+                    }
+                }
             }
 
-            tooltip.push(switching_pair_section.clone());
+            tooltip.push("\n\n".to_string());
 
-            let tooltip = tooltip.join("");
+            let tooltip = tooltip.join("") + &tooltip_switching_pairs.join("");
 
             highlighting.add_highlight(Highlight::new(
                 span.start,

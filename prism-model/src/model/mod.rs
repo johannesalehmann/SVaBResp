@@ -78,13 +78,20 @@ impl<AM: Default, A, E, V, S: Clone> Model<AM, A, E, V, S> {
 }
 impl<AM: Default, E, V, S: Clone> Model<AM, crate::Identifier<S>, E, V, S> {
     pub fn name_unnamed_actions(&mut self) {
+        self.name_unnamed_actions_with_custom_name(|i, _| format!("unnamed_action_{i}"))
+    }
+
+    pub fn name_unnamed_actions_with_custom_name<F: FnMut(usize, &S) -> String>(
+        &mut self,
+        mut name_function: F,
+    ) {
         let mut counter = 0;
         for module in &mut self.modules.modules {
             for command in &mut module.commands {
                 if command.action.is_none() {
                     command.action = Some(
                         crate::Identifier::new_potentially_reserved(
-                            format!("unnamed_action_{}", counter),
+                            name_function(counter, &command.action_span),
                             command.action_span.clone(),
                         )
                         .unwrap(),

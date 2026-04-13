@@ -35,6 +35,7 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
         atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+        character_to_line: &prism_parser::CharacterToLineMap,
     ) {
         let _ = (property, atomic_propositions);
         // Add two variables to the PRISM code that will later be used during model construction to
@@ -67,7 +68,24 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                 ))
                 .unwrap(),
         );
-        prism_model.name_unnamed_actions();
+
+        let mut last_line = None;
+        let mut in_line_counter = 0;
+        prism_model.name_unnamed_actions_with_custom_name(|_, l| {
+            let line = character_to_line.get_line(l.start);
+            if last_line == Some(line) {
+                in_line_counter += 1;
+            } else {
+                in_line_counter = 0;
+            }
+            last_line = Some(line);
+            let suffix = if in_line_counter == 0 {
+                "".to_string()
+            } else {
+                format!("_{}", in_line_counter)
+            };
+            format!("unnamed_line_{}{}", line, suffix)
+        });
 
         for module in &prism_model.modules.modules {
             for command in &module.commands {

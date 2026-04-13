@@ -48,8 +48,9 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
         atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
+        character_to_line: &prism_parser::CharacterToLineMap,
     ) {
-        let _ = property;
+        let _ = (property, character_to_line);
         let mut label_atomic_propositions = Vec::new();
 
         self.label_details.push(LabelDetails {

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 prism-model = { path = "../prism-model" }
+prism-parser = { path = "../prism-parser" }
 probabilistic-models = { path = "../probabilistic-models" }
 probabilistic-model-algorithms = { path = "../probabilistic-model-algorithms" }
 probabilistic-properties = { path = "../probabilistic-properties" }

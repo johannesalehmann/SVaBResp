@@ -3,9 +3,10 @@ use ariadne::ReportBuilder;
 use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::error::RichPattern;
 use chumsky::span::SimpleSpan;
+use chumsky::text::Char;
 use chumsky::util::MaybeRef;
 use prism_model::{InvalidName, ModuleExpansionError};
-use prism_parser::{PrismParserError, PrismParserValidationError, Span};
+use prism_parser::{CharacterToLineMap, PrismParserError, PrismParserValidationError, Span};
 use std::ops::Range;
 
 mod constants;
@@ -20,7 +21,7 @@ pub fn parse_model_from_source<'a, P: AsRef<str>>(
     source: &str,
     properties: &[P],
 ) -> Result<
-    (PrismModel, Vec<crate::PrismQuery>),
+    (PrismModel, Vec<crate::PrismQuery>, CharacterToLineMap),
     Vec<(ErrorSource, PrismParserError<'a, SimpleSpan, String>)>,
 > {
     let parse_results = prism_parser::parse_prism(source, properties);
@@ -40,7 +41,11 @@ pub fn parse_model_from_source<'a, P: AsRef<str>>(
     }
     if attributed_errors.is_empty() {
         if let Some(model) = parse_results.model.output {
-            Ok((model, properties))
+            Ok((
+                model,
+                properties,
+                parse_results.model.character_to_lines.unwrap(),
+            ))
         } else {
             Err(vec![])
         }
@@ -53,7 +58,7 @@ pub fn parse_prism_and_print_errors<P: AsRef<str>>(
     file_name: Option<&str>,
     source: &str,
     properties: &[P],
-) -> Option<(PrismModel, Vec<crate::PrismQuery>)> {
+) -> Option<(PrismModel, Vec<crate::PrismQuery>, CharacterToLineMap)> {
     let parse_result = crate::parsing::parse_model_from_source(source, properties);
     match parse_result {
         Err(errors) => {
@@ -70,7 +75,9 @@ pub fn parse_prism_and_print_errors<P: AsRef<str>>(
             }
             None
         }
-        Ok((model, properties)) => Some((model, properties)),
+        Ok((model, properties, character_to_line_map)) => {
+            Some((model, properties, character_to_line_map))
+        }
     }
 }
 
