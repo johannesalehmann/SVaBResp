@@ -308,16 +308,23 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
 
             tooltip.push("\n\n## Responsibility per variable value".to_string());
             for valuation in &highlighting_infos.valuations {
-                tooltip.push(format!(
-                    "\n- {}: <ColoredNumber>{},{}</ColoredNumber> total responsibility",
-                    valuation.title, valuation.total_responsibility, colour_ramp_index,
-                ));
-
-                for group in &valuation.entries {
+                if self.variables.len() == 1 {
                     tooltip.push(format!(
-                        "\n    - {}: <ColoredNumber>{},{}</ColoredNumber>",
-                        group.title, group.responsibility, colour_ramp_index,
-                    ))
+                        "\n- {}: <ColoredNumber>{},{}</ColoredNumber>",
+                        valuation.title, valuation.total_responsibility, colour_ramp_index,
+                    ));
+                } else {
+                    tooltip.push(format!(
+                        "\n- {}: <ColoredNumber>{},{}</ColoredNumber> total responsibility",
+                        valuation.title, valuation.total_responsibility, colour_ramp_index,
+                    ));
+
+                    for group in &valuation.entries {
+                        tooltip.push(format!(
+                            "\n    - {}: <ColoredNumber>{},{}</ColoredNumber>",
+                            group.title, group.responsibility, colour_ramp_index,
+                        ))
+                    }
                 }
             }
 
