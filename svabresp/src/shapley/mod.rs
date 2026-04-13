@@ -266,7 +266,7 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
         };
 
         let tooltip_start = format!(
-            "responsibility for `{responsibility_name}`: <ColoredNumber>{value}, {colour_ramp_index}</ColoredNumber>"
+            "{responsibility_name} responsibility for `{group_name}`: <ColoredNumber>{value}, {colour_ramp_index}</ColoredNumber>"
         );
 
         let mut tooltip_text = Vec::new();
