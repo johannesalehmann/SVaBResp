@@ -390,7 +390,7 @@ impl<V: Display, S: Clone> Expression<V, S> {
             }
             Expression::Equals(lhs, rhs, _) => {
                 lhs.fmt_internal(f, precedence)?;
-                write!(f, "==")?;
+                write!(f, "=")?;
                 rhs.fmt_internal(f, precedence + 1)?;
             }
             Expression::NotEquals(lhs, rhs, _) => {
