@@ -291,36 +291,32 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
         }
         let switching_pair_section = switching_pair_section.join("");
 
-        for (span, highlighting_infos) in self.spans.iter().zip(variable_highlighting_infos.iter())
+        for ((name, span), highlighting_infos) in self
+            .variables
+            .iter()
+            .zip(self.spans.iter())
+            .zip(variable_highlighting_infos.iter())
         {
             let influence = highlighting_infos.compute_influence();
 
             let mut tooltip = Vec::new();
 
             tooltip.push(format!(
-                "<ColorCircle>{},{}</ColorCircle>Impact of `x`'s value on responsibility: {}",
-                influence,
-                colour_ramp_index,
-                SyntaxHighlighting::round_float(influence)
+                "Impact of `{}`'s value on responsibility: <ColoredNumber>{},{}</ColoredNumber>",
+                name, influence, colour_ramp_index,
             ));
 
             tooltip.push("\n\n## Responsibility per variable value".to_string());
             for valuation in &highlighting_infos.valuations {
                 tooltip.push(format!(
-                    "\n- <ColorCircle>{},{}</ColorCircle>{}: {} total responsibility",
-                    valuation.total_responsibility,
-                    colour_ramp_index,
-                    valuation.title,
-                    SyntaxHighlighting::round_float(valuation.total_responsibility)
+                    "\n- {}: <ColoredNumber>{},{}</ColoredNumber> total responsibility",
+                    valuation.title, valuation.total_responsibility, colour_ramp_index,
                 ));
 
                 for group in &valuation.entries {
                     tooltip.push(format!(
-                        "\n    - <ColorCircle>{},{}</ColorCircle>{}: {}",
-                        group.responsibility,
-                        colour_ramp_index,
-                        group.title,
-                        SyntaxHighlighting::round_float(group.responsibility)
+                        "\n    - {}: <ColoredNumber>{},{}</ColoredNumber>",
+                        group.title, group.responsibility, colour_ramp_index,
                     ))
                 }
             }

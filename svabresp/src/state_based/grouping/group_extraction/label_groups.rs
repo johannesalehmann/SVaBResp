@@ -171,19 +171,16 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
                 );
                 total_responsibility += value;
                 let overview = format!(
-                    "<ColorCircle>{},{}</ColorCircle> `{}`: {}",
-                    value, colour_ramp_index, group_name, value
+                    "`{}`: <ColoredNumber>{}, {}</ColoredNumber>",
+                    group_name, value, colour_ramp_index
                 );
                 let details = format!("### Switching pairs for `{}`:\n\n{}", group_name, details);
                 group_details.push((value, overview, details))
             }
 
             tooltip.push(format!(
-                "<ColorCircle>{},{}</ColorCircle>Label responsibility for `{}`: {}",
-                total_responsibility,
-                colour_ramp_index,
-                label_details.label_name,
-                SyntaxHighlighting::round_float(total_responsibility)
+                "Label responsibility for `{}`: <ColoredNumber>{}, {}</ColoredNumber>",
+                label_details.label_name, total_responsibility, colour_ramp_index,
             ));
 
             group_details.sort_unstable_by(|(v1, _, _), (v2, _, _)| {

@@ -154,13 +154,6 @@ impl SyntaxHighlighting {
             elements.join(&format!(",{new_line}{indent}"))
         )
     }
-
-    pub fn round_float(value: f64) -> String {
-        format!("{:.3}", value)
-            .trim_end_matches("0")
-            .trim_end_matches(".")
-            .to_string()
-    }
 }
 
 pub struct Highlight {
@@ -186,43 +179,60 @@ impl Highlight {
         indent: S2,
         ramps: &ColourRampCollection,
     ) -> String {
+        pub fn round_float(value: f64) -> String {
+            format!("{:.3}", value)
+                .trim_end_matches("0")
+                .trim_end_matches(".")
+                .to_string()
+        }
+
         let mut tooltip_with_grey = self
             .tooltip
-            .replace("<grey>", "<span style=\"color:#444444;\">")
+            .replace("<grey>", "<span style=\"color:#888888;\">")
             .replace("</grey>", "</span>");
 
-        while let Some(start_index) = tooltip_with_grey.find("<ColorCircle>") {
+        while let Some(start_index) = tooltip_with_grey.find("<ColoredNumber>") {
             let end_index = start_index
                 + tooltip_with_grey[start_index..]
-                    .find("</ColorCircle>")
-                    .expect("Could not find matching `</ColorCircle>` for `<ColorCircle`)");
-            let text_between = &tooltip_with_grey[(start_index + "<ColorCircle>".len())..end_index];
-            let hex_colour = if text_between.contains("#") {
-                text_between.to_string()
+                    .find("</ColoredNumber>")
+                    .expect("Could not find matching `</ColoredNumber>` for `<ColoredNumber`)");
+            let text_between =
+                &tooltip_with_grey[(start_index + "<ColoredNumber>".len())..end_index];
+
+            let (first, second) = text_between.split_once(",") .unwrap_or_else(|| panic!("`<ColoredNumber>` must contain an intensity between 0.0 and 1.0 and a colour ramp index, separated by a comma (e.g. `0.7, 2`). Received `{}`.",text_between) );
+            let intensity = first.trim().parse::<f64>().unwrap_or_else(|e| {
+                panic!(
+                    "Cannot parse intensity of <ColoredNumber> colour: `{}`. Error: {}",
+                    first.trim(),
+                    e
+                )
+            });
+            let ramp_index = second.trim().parse::<usize>().unwrap_or_else(|e| {
+                panic!(
+                    "Cannot parse colour ramp index of <ColoredNumber> colour: `{}`. Error: {}",
+                    second.trim(),
+                    e
+                )
+            });
+            let bg_colour = Colour::new(ramp_index, intensity);
+            let bg_hsl_colour = bg_colour.to_hsl(ramps);
+            let bg_hex_colour = bg_hsl_colour.to_hex();
+
+            let fg_hex_colour = if bg_hsl_colour.lightness < 0.3 {
+                "#FFFFFF"
             } else {
-                let (first, second) = text_between.split_once(",") .unwrap_or_else(|| panic!("`<ColorCircle>` must either contain a hex colour (e.g. `#FF0088`) or an intensity between 0.0 and 1.0 and a colour ramp index, separated by a comma (e.g. `0.7, 2`). Received `{}`.",text_between) );
-                let intensity = first.trim().parse::<f64>().unwrap_or_else(|e| {
-                    panic!(
-                        "Cannot parse intensity of <ColorCircle> colour: `{}`. Error: {}",
-                        first.trim(),
-                        e
-                    )
-                });
-                let ramp_index = second.trim().parse::<usize>().unwrap_or_else(|e| {
-                    panic!(
-                        "Cannot parse colour ramp index of <ColorCircle> colour: `{}`. Error: {}",
-                        second.trim(),
-                        e
-                    )
-                });
-                let colour = Colour::new(ramp_index, intensity);
-                colour.to_hsl(ramps).to_hex()
+                "#000000"
             };
 
-            let replacement_range = start_index..end_index + "</ColorCircle>".len();
+            let replacement_range = start_index..end_index + "</ColoredNumber>".len();
             tooltip_with_grey.replace_range(
                 replacement_range,
-                &format!("<span style=\"color:{};\">&#9210;</span>", hex_colour),
+                &format!(
+                    "<span style=\"color:{};background-color:{};\">&thinsp;{}&thinsp;</span>",
+                    fg_hex_colour,
+                    bg_hex_colour,
+                    round_float(intensity)
+                ),
             );
         }
 

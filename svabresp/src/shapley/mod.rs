@@ -266,12 +266,7 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
         };
 
         let tooltip_start = format!(
-            "<ColorCircle>{},{}</ColorCircle>{} responsibility for `{}`: {}",
-            value,
-            colour_ramp_index,
-            responsibility_name,
-            group_name,
-            round_float(value)
+            "responsibility for `{responsibility_name}`: <ColoredNumber>{value}, {colour_ramp_index}</ColoredNumber>"
         );
 
         let mut tooltip_text = Vec::new();
@@ -305,16 +300,12 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
                 first = false;
                 tooltip_text.push("- ".to_string());
                 tooltip_text.push(format!(
-                    "<ColorCircle>{},{}</ColorCircle>",
-                    switching_pair.direct_contribution, colour_ramp_index,
-                ));
-                tooltip_text.push(format!(
                     "`{}`",
                     CoalitionSpecifier::to_string(&switching_pair.coalition, player_names,)
                 ));
                 tooltip_text.push(format!(
-                    ": {}",
-                    round_float(switching_pair.direct_contribution)
+                    ": <ColoredNumber>{}, {colour_ramp_index}</ColoredNumber>",
+                    switching_pair.direct_contribution
                 ));
                 if switching_pair.indirect_contribution > 0.0 {
                     let superset_pair_text = if switching_pair.aggregated_pair_count == 1 {
@@ -323,10 +314,9 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPairCollection<C> {
                         "supersets"
                     };
                     tooltip_text.push(format!(
-                        "<grey>(+ <ColorCircle>{},{}</ColorCircle> {} from {} {})</grey>",
+                        "<grey>(+ <ColoredNumber>{},{}</ColoredNumber> from {} {})</grey>",
                         switching_pair.indirect_contribution,
                         colour_ramp_index,
-                        switching_pair.indirect_contribution,
                         switching_pair.aggregated_pair_count,
                         superset_pair_text,
                     ));
