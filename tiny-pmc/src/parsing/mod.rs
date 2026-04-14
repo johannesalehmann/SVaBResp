@@ -3,7 +3,6 @@ use ariadne::ReportBuilder;
 use ariadne::{Label, Report, ReportKind, Source};
 use chumsky::error::RichPattern;
 use chumsky::span::SimpleSpan;
-use chumsky::text::Char;
 use chumsky::util::MaybeRef;
 use prism_model::{InvalidName, ModuleExpansionError};
 use prism_parser::{CharacterToLineMap, PrismParserError, PrismParserValidationError, Span};

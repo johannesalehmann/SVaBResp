@@ -3,7 +3,6 @@ use crate::state_based::StateBasedOutput;
 use crate::state_based::grouping::{GroupExtractionScheme, VectorStateGroups};
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
-use chumsky::text::Char;
 use log::trace;
 use prism_parser::CharacterToLineMap;
 
