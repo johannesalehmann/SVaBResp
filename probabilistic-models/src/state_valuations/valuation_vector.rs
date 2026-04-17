@@ -144,6 +144,15 @@ impl super::Context for Context {
     fn is_float(&self, index: usize) -> bool {
         self.details[index].variable_type == VariableType::Float
     }
+
+    fn get_index_by_name(&self, name: &str) -> Option<usize> {
+        for (index, details) in self.details.iter().enumerate() {
+            if details.name == name {
+                return Some(index);
+            }
+        }
+        None
+    }
 }
 
 pub struct VariableInfo {

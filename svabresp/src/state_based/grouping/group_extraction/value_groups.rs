@@ -4,7 +4,8 @@ use crate::{PrismModel, PrismProperty};
 use chumsky::prelude::SimpleSpan;
 use prism_model::{VariableRange, VariableReference};
 use probabilistic_models::{
-    AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation, VectorPredecessors,
+    AtomicProposition, Context, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation,
+    VectorPredecessors,
 };
 use probabilistic_properties::Query;
 use std::collections::HashMap;
@@ -111,7 +112,6 @@ struct VariableValuationEntry<V> {
 pub struct ValueGroupExtractionScheme {
     variables: Vec<String>,
     variable_types: Option<Vec<VariableType>>,
-    variable_references: Option<Vec<VariableReference>>,
     spans: Vec<SimpleSpan>,
     variable_highlighting_infos: Option<Vec<VariableHighlightingInfo<()>>>,
 }
@@ -121,7 +121,6 @@ impl ValueGroupExtractionScheme {
         Self {
             variables,
             variable_types: None,
-            variable_references: None,
             spans: Vec::new(),
             variable_highlighting_infos: None,
         }
@@ -140,7 +139,6 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
     ) {
         let _ = (property, atomic_propositions, character_to_line);
 
-        let mut variable_references = Vec::with_capacity(self.variables.len());
         let mut variable_types = Vec::with_capacity(self.variables.len());
         let mut variable_highlighting_info = Vec::with_capacity(self.variables.len());
         for variable in &self.variables {
@@ -158,13 +156,11 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
                     panic!("Cannot group by variable value for variables of type `float`")
                 }
             };
-            variable_references.push(reference);
             variable_types.push(variable_type);
             variable_highlighting_info.push(VariableHighlightingInfo {
                 valuations: Vec::new(),
             })
         }
-        self.variable_references = Some(variable_references);
         self.variable_types = Some(variable_types);
         self.variable_highlighting_infos = Some(variable_highlighting_info);
     }
@@ -176,25 +172,34 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
     ) -> GroupsAndAuxiliary<Self::GroupType> {
         let _ = property;
 
-        let variable_references = self.variable_references.as_ref().unwrap();
         let variable_types = self.variable_types.as_ref().unwrap();
         let variable_highlighting_infos = self.variable_highlighting_infos.as_mut().unwrap();
 
         let mut groups = Vec::new();
         let mut group_indices = HashMap::new();
 
+        let indices = self
+            .variables
+            .iter()
+            .map(|v| {
+                game.valuation_context
+                    .get_index_by_name(v)
+                    .expect("Variable {} is omitted in the model")
+            })
+            .collect::<Vec<_>>();
+
         for (i, state) in game.states.iter().enumerate() {
             let mut values = Vec::new();
-            for (var_ref, var_type) in variable_references.iter().zip(variable_types.iter()) {
+            for (&index, var_type) in indices.iter().zip(variable_types.iter()) {
                 match var_type {
-                    VariableType::BoundedInt => values.push(Value::Int(
-                        state.valuation.evaluate_bounded_int(var_ref.index),
-                    )),
-                    VariableType::UnboundedInt => values.push(Value::Int(
-                        state.valuation.evaluate_unbounded_int(var_ref.index),
-                    )),
+                    VariableType::BoundedInt => {
+                        values.push(Value::Int(state.valuation.evaluate_bounded_int(index)))
+                    }
+                    VariableType::UnboundedInt => {
+                        values.push(Value::Int(state.valuation.evaluate_unbounded_int(index)))
+                    }
                     VariableType::Bool => {
-                        values.push(Value::Bool(state.valuation.evaluate_bool(var_ref.index)))
+                        values.push(Value::Bool(state.valuation.evaluate_bool(index)))
                     }
                 }
             }

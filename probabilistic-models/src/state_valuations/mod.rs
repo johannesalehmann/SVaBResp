@@ -55,6 +55,7 @@ pub trait Context {
     fn is_bool(&self, index: usize) -> bool;
     fn is_unbounded_int(&self, index: usize) -> bool;
     fn is_float(&self, index: usize) -> bool;
+    fn get_index_by_name(&self, name: &str) -> Option<usize>;
 }
 
 pub trait ContextBuilder<C> {
