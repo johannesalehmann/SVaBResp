@@ -61,6 +61,14 @@ impl<C: CoalitionSpecifier> SwitchingPair<C> {
     }
 }
 
+impl<C: CoalitionSpecifier> SwitchingPair<C> {
+    pub fn is_superset_pair_of(&self, other: &Self) -> bool {
+        self.coalition.to_mask() | other.coalition.to_mask() == self.coalition.to_mask()
+            && self.value_with == other.value_with
+            && self.value_without == other.value_without
+    }
+}
+
 pub struct FullSwitchingPairCollector {
     switching_pairs: HashMap<usize, Vec<SwitchingPair<u64>>>,
 }
@@ -162,10 +170,7 @@ impl SwitchingPairCollection {
                 let mut is_minimal = true;
                 for (j, other_pair) in switching_pairs.iter().enumerate() {
                     if i != j {
-                        // Check whether other_pair.coalition is a subset of pair.coalition
-                        if switching_pair.coalition.to_mask() | other_pair.coalition.to_mask() // TODO: Add a function to CoalitionSpecifier to check subset inclusion
-                            == switching_pair.coalition.to_mask()
-                        {
+                        if switching_pair.is_superset_pair_of(other_pair) {
                             is_minimal = false;
                             break;
                         }
@@ -185,10 +190,7 @@ impl SwitchingPairCollection {
                 let pair = &switching_pairs[i];
                 for (j, other_pair) in aggregated_pairs.iter().enumerate() {
                     if i != j {
-                        // Check whether other_pair.coalition is a subset of pair.coalition
-                        if pair.coalition.to_mask() | other_pair.coalition.to_mask()
-                            == pair.coalition.to_mask()
-                        {
+                        if other_pair.is_base_of_switching_pair(pair) {
                             contained_pairs.push(j);
                         }
                     }
@@ -377,6 +379,12 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPair<C> {
 
     pub fn value(&self) -> f64 {
         self.value_with + self.value_without
+    }
+
+    pub fn is_base_of_switching_pair(&self, other: &SwitchingPair<C>) -> bool {
+        self.coalition.to_mask() | other.coalition.to_mask() == other.coalition.to_mask()
+            && self.value_with == other.value_with
+            && self.value_without == other.value_without
     }
 }
 
