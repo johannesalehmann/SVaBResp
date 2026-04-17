@@ -32,7 +32,7 @@ fn checker() -> Result<(), ModelCheckerError> {
     );
     let (mut prism_model, properties) = match parsed_model_and_objectives {
         None => return Err(ModelCheckerError::ModelAndPropertyParsingError),
-        Some((prism_model, properties)) => (prism_model, properties),
+        Some((prism_model, properties, _)) => (prism_model, properties),
     };
 
     let mut atomic_propositions = Vec::new();
