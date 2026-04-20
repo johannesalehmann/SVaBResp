@@ -77,7 +77,7 @@ impl Benchmark {
         );
         let (mut prism_model, properties) = match parsed_model_and_objectives {
             None => panic!("Error parsing model"),
-            Some((prism_model, properties)) => (prism_model, properties),
+            Some((prism_model, properties, _)) => (prism_model, properties),
         };
         let parsing = start.elapsed();
 
