@@ -1,0 +1,37 @@
+mdp
+
+label "obj" = loc=6;
+
+label "l1" = loc=1 | loc=3;
+label "l2" = loc=1 | loc=2;
+label "l3" = loc=5 | loc=6;
+label "dummy" = false;
+
+// This is a really silly constant, but its purpose is just to test that label grouping does not rely on a variable's
+// index to correspond to its index in the valuation.
+const int loc_count = 6;
+
+const int test_const_1 = 1;
+const int test_const_2 = 2;
+const int test_const_3 = 3;
+
+module main
+    loc: [1..loc_count];
+
+    [] (loc=1) -> (loc'=2);
+    [] (loc=1) -> (loc'=3);
+
+    [] (loc=2) -> (loc'=3);
+    [] (loc=2) -> (loc'=4);
+
+    [] (loc=3) -> (loc'=4);
+    [] (loc=3) -> (loc'=5);
+
+    [] (loc=4) -> (loc'=5);
+    [] (loc=4) -> (loc'=6);
+
+    [] (loc=5) -> (loc'=5);
+
+    [] (loc=6) -> (loc'=6);
+    [] (loc=6) -> (loc'=5);
+endmodule

@@ -43,12 +43,23 @@ fn small_network_explicit() {
 
 #[test]
 fn labelled_groups() {
+    labelled_groups_internal(
+        "labelled-groups.prism",
+        include_str!("files/labelled-groups.prism"),
+    )
+}
+
+#[test]
+fn labelled_groups_with_consts() {
+    labelled_groups_internal(
+        "labelled-groups-with-consts.prism",
+        include_str!("files/labelled-groups-with-consts.prism"),
+    )
+}
+
+fn labelled_groups_internal(filename: &'static str, source: &'static str) {
     let task = ResponsibilityTask {
-        model_description: ModelFromString::new(
-            "labelled-groups.prism",
-            include_str!("files/labelled-groups.prism"),
-            "P>=1 [F \"obj\"]",
-        ),
+        model_description: ModelFromString::new(filename, source, "P>=1 [F \"obj\"]"),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
@@ -75,12 +86,23 @@ fn labelled_groups() {
 
 #[test]
 fn value_groups() {
+    value_groups_internal(
+        "value-groups.prism",
+        include_str!("files/value-groups.prism"),
+    )
+}
+
+#[test]
+fn value_groups_with_consts() {
+    value_groups_internal(
+        "value-groups-with-consts.prism",
+        include_str!("files/value-groups-with-consts.prism"),
+    )
+}
+
+fn value_groups_internal(filename: &'static str, source: &'static str) {
     let task = ResponsibilityTask {
-        model_description: ModelFromString::new(
-            "value-groups.prism",
-            include_str!("files/value-groups.prism"),
-            "P>=1 [F \"obj\"]",
-        ),
+        model_description: ModelFromString::new(filename, source, "P>=1 [F \"obj\"]"),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
@@ -106,12 +128,23 @@ fn value_groups() {
 
 #[test]
 fn module_groups() {
+    module_groups_internal(
+        "module-groups.prism",
+        include_str!("files/module-groups.prism"),
+    )
+}
+
+#[test]
+fn module_groups_with_consts() {
+    module_groups_internal(
+        "module-groups-with-consts.prism",
+        include_str!("files/module-groups-with-consts.prism"),
+    )
+}
+
+fn module_groups_internal(filename: &'static str, source: &'static str) {
     let task = ResponsibilityTask {
-        model_description: ModelFromString::new(
-            "module-groups.prism",
-            include_str!("files/module-groups.prism"),
-            "P>=1 [G !\"obj\"]",
-        ),
+        model_description: ModelFromString::new(filename, source, "P>=1 [G !\"obj\"]"),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),
@@ -137,12 +170,23 @@ fn module_groups() {
 
 #[test]
 fn action_groups() {
+    action_groups_internal(
+        "action-groups.prism",
+        include_str!("files/action-groups.prism"),
+    )
+}
+
+#[test]
+fn action_groups_with_consts() {
+    action_groups_internal(
+        "action-groups-with-consts.prism",
+        include_str!("files/action-groups-with-consts.prism"),
+    )
+}
+
+fn action_groups_internal(filename: &'static str, source: &'static str) {
     let task = ResponsibilityTask {
-        model_description: ModelFromString::new(
-            "action-groups.prism",
-            include_str!("files/action-groups.prism"),
-            "P>=1 [G !\"obj\"]",
-        ),
+        model_description: ModelFromString::new(filename, source, "P>=1 [G !\"obj\"]"),
         constants: "".to_string(),
         coop_game_type: svabresp::CoopGameType::<CounterexampleFile>::Forward,
         algorithm: BruteForceAlgorithm::new(),

@@ -1,0 +1,23 @@
+mdp
+
+label "obj" = counter!=60&steps=20;
+
+const int counter_size = 61;
+const int step_count = 21;
+
+const int test_const_1 = 1;
+const int test_const_2 = 2;
+const int test_const_3 = 3;
+
+module PuzzleBox
+	counter: [0..counter_size] init 0;
+	steps: [0..step_count] init 0;
+
+	[button1] (counter+2<=counter_size) -> (counter'=counter+2) & (steps'=min(step_count, steps+1));
+	[button2] (counter*6+1<=counter_size)-> (counter'=counter*6+1) & (steps'=min(step_count, steps+1));
+	[button3] (counter*counter<=counter_size) -> (counter'=counter*counter) & (steps'=min(step_count, steps+1));
+
+	[button1] (counter+2>counter_size) -> (counter'=counter_size) & (steps'=min(step_count, steps+1));
+	[button2] (counter*6+1>counter_size) -> (counter'=counter_size) & (steps'=min(step_count, steps+1));
+	[button3] (counter*counter>counter_size) -> (counter'=counter_size) & (steps'=min(step_count, steps+1));
+endmodule
