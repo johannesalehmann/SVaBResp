@@ -148,11 +148,6 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
             let mut targets = Vec::new();
             let mut action_name_indices = Vec::new();
             for action in state.actions.iter() {
-                assert_eq!(
-                    action.successors.number_of_successors(),
-                    1,
-                    "The action grouping construction does not support probabilistic choice"
-                );
                 let mut successors = Vec::new();
                 for successor in action.successors.iter() {
                     successors.push(successor.clone());
