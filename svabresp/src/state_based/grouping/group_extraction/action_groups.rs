@@ -153,7 +153,11 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                     1,
                     "The action grouping construction does not support probabilistic choice"
                 );
-                targets.push(action.successors.get_successor(0).index);
+                let mut successors = Vec::new();
+                for successor in action.successors.iter() {
+                    successors.push(successor.clone());
+                }
+                targets.push(successors);
                 action_name_indices.push(action.action_name_index);
             }
 
@@ -230,10 +234,9 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                     });
 
                     let mut follow_action = <M::Distribution>::get_builder();
-                    follow_action.add_successor(Successor {
-                        index: targets[action_index],
-                        probability: 1.0,
-                    });
+                    for successor in &targets[action_index] {
+                        follow_action.add_successor(successor.clone());
+                    }
                     questionmark_actions.add_action(Action {
                         successors: follow_action.finish(),
                         action_name_index: action_name_indices[action_index],
@@ -260,13 +263,11 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
 
             {
                 let mut adversarial_actions = <M::ActionCollection>::get_builder();
-                for (&action_name_index, &target) in action_name_indices.iter().zip(targets.iter())
-                {
+                for (&action_name_index, target) in action_name_indices.iter().zip(targets.iter()) {
                     let mut target_distribution = <M::Distribution>::get_builder();
-                    target_distribution.add_successor(Successor {
-                        index: target,
-                        probability: 1.0,
-                    });
+                    for successor in target {
+                        target_distribution.add_successor(successor.clone());
+                    }
                     adversarial_actions.add_action(Action {
                         successors: target_distribution.finish(),
                         action_name_index,
