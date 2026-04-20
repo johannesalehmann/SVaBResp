@@ -378,7 +378,7 @@ impl<C: CoalitionSpecifier> AggregatedSwitchingPair<C> {
     }
 
     pub fn value(&self) -> f64 {
-        self.value_with + self.value_without
+        self.value_with - self.value_without
     }
 
     pub fn is_base_of_switching_pair(&self, other: &SwitchingPair<C>) -> bool {
