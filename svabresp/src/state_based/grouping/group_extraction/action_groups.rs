@@ -4,24 +4,20 @@ use crate::{PrismModel, PrismProperty};
 use chumsky::prelude::SimpleSpan;
 use prism_model::{Expression, VariableRange, VariableReference};
 use probabilistic_models::{
-    Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, Distribution,
-    DistributionBuilder, ModelTypes, Predecessors, PredecessorsBuilder, ProbabilisticModel, State,
-    Successor, TwoPlayer, Valuation, VectorPredecessors,
+    Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, Context,
+    Distribution, DistributionBuilder, ModelTypes, Predecessors, PredecessorsBuilder,
+    ProbabilisticModel, State, Successor, TwoPlayer, Valuation, VectorPredecessors,
 };
 use probabilistic_properties::Query;
 use std::collections::HashMap;
 
 pub struct ActionGroupExtractionScheme {
-    action_index: Option<VariableReference>,
-    in_questionmark_state: Option<VariableReference>,
     action_name_to_spans: HashMap<String, Vec<SimpleSpan>>,
 }
 
 impl ActionGroupExtractionScheme {
     pub fn new() -> Self {
         Self {
-            action_index: None,
-            in_questionmark_state: None,
             action_name_to_spans: HashMap::new(),
         }
     }
@@ -43,31 +39,29 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
         // is easier than adding them after the model builder has run
         use prism_model::{Identifier, VariableInfo};
         let span = chumsky::span::SimpleSpan::new(0, 0);
-        self.action_index = Some(
-            prism_model
-                .variable_manager
-                .add_variable(VariableInfo::with_initial_value(
-                    Identifier::new("action_index", span).unwrap(),
-                    VariableRange::UnboundedInt { span },
-                    false,
-                    None,
-                    Expression::Int(0, span),
-                    span,
-                ))
-                .unwrap(),
-        );
-        self.in_questionmark_state = Some(
-            prism_model
-                .variable_manager
-                .add_variable(VariableInfo::new(
-                    Identifier::new("in_questionmark_state", span).unwrap(),
-                    VariableRange::Boolean { span },
-                    false,
-                    None,
-                    span,
-                ))
-                .unwrap(),
-        );
+
+        prism_model
+            .variable_manager
+            .add_variable(VariableInfo::with_initial_value(
+                Identifier::new("action_index_internal_var", span).unwrap(),
+                VariableRange::UnboundedInt { span },
+                false,
+                None,
+                Expression::Int(0, span),
+                span,
+            ))
+            .unwrap();
+
+        prism_model
+            .variable_manager
+            .add_variable(VariableInfo::new(
+                Identifier::new("in_questionmark_state_internal_variable", span).unwrap(),
+                VariableRange::Boolean { span },
+                false,
+                None,
+                span,
+            ))
+            .unwrap();
 
         let mut last_line = None;
         let mut in_line_counter = 0;
@@ -124,8 +118,14 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
         let mut helper_state_group = Vec::new();
         let mut adversary_state_group = Vec::new();
 
-        let action_index_variable = self.action_index.unwrap();
-        let in_questionmark_state_variable = self.in_questionmark_state.unwrap();
+        let action_index_variable = game
+            .valuation_context
+            .get_index_by_name("action_index_internal_var")
+            .unwrap();
+        let in_questionmark_state_variable = game
+            .valuation_context
+            .get_index_by_name("in_questionmark_state_internal_variable")
+            .unwrap();
 
         let continue_action_index = game.action_names.len();
         game.action_names
@@ -190,7 +190,7 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                     });
 
                     let mut valuation = base_valuation.clone();
-                    valuation.set_unbounded_int(action_index_variable.index, action_index as i64);
+                    valuation.set_unbounded_int(action_index_variable, action_index as i64);
                     let normal_state = State {
                         valuation,
                         actions: normal_state_actions.finish(),
@@ -238,8 +238,8 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                     });
 
                     let mut valuation = base_valuation.clone();
-                    valuation.set_unbounded_int(action_index_variable.index, action_index as i64);
-                    valuation.set_bool(in_questionmark_state_variable.index, true);
+                    valuation.set_unbounded_int(action_index_variable, action_index as i64);
+                    valuation.set_bool(in_questionmark_state_variable, true);
                     let questionmark_state = State {
                         valuation,
                         actions: questionmark_actions.finish(),
@@ -270,7 +270,7 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
                 }
 
                 let mut valuation = base_valuation.clone();
-                valuation.set_unbounded_int(action_index_variable.index, action_count as i64);
+                valuation.set_unbounded_int(action_index_variable, action_count as i64);
                 let adversarial_state = State {
                     valuation,
                     actions: adversarial_actions.finish(),
