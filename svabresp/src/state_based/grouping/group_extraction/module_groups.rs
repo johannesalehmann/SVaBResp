@@ -333,7 +333,7 @@ struct ActionInfo {
 
 impl ActionInfo {
     fn is_synchronising(&self) -> bool {
-        self.module_guards.len() > 0
+        self.module_guards.len() >= 2
     }
 
     fn get_guard(self) -> Expression<VariableReference, SimpleSpan> {

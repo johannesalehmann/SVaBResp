@@ -101,6 +101,32 @@ impl<AM: Default, E, V, S: Clone> Model<AM, crate::Identifier<S>, E, V, S> {
             }
         }
     }
+
+    pub fn actually_synchronising_actions(&self) -> std::collections::HashSet<String> {
+        use std::collections::HashSet;
+        let mut seen_before = HashSet::new();
+        let mut actually_synchronising = HashSet::new();
+        for module in &self.modules.modules {
+            let mut module_actions = HashSet::new();
+            for command in &module.commands {
+                if let Some(command) = &command.action {
+                    if !module_actions.contains(&command.name) {
+                        module_actions.insert(command.name.clone());
+                    }
+                }
+            }
+
+            for action in module_actions {
+                if seen_before.contains(&action) {
+                    actually_synchronising.insert(action);
+                } else {
+                    seen_before.insert(action);
+                }
+            }
+        }
+
+        actually_synchronising
+    }
 }
 
 impl<AM, A, V, S: Clone> Model<AM, A, Expression<V, S>, V, S> {
