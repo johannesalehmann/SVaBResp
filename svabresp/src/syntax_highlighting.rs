@@ -267,7 +267,7 @@ impl Colour {
     }
 
     pub fn to_hsl(&self, ramps: &ColourRampCollection) -> HslColour {
-        ramps[self.group].sample(self.intensity)
+        ramps[self.group].sample(self.intensity.clamp(0.0, 1.0))
     }
 }
 
