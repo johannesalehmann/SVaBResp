@@ -5,24 +5,20 @@ use std::collections::HashMap;
 pub struct GameValueCache<P: PlayerDescriptions> {
     player_descriptions: P,
     player_count: usize,
-    pub values: HashMap<u64, f64>,
+    pub values: Vec<f64>,
 }
 
 impl<P: PlayerDescriptions + Clone> GameValueCache<P> {
     pub fn create<C: CooperativeGame<PlayerDescriptions = P>>(coop_game: &mut C) -> Self {
-        let mut values = HashMap::new();
+        let mut values = Vec::new();
 
         let n = coop_game.get_player_count();
 
         info!("Building game value cache for n={} players", n);
         let start = std::time::Instant::now();
-        for size in 0..=n {
-            for coalition in 0..1u64 << n {
-                if coalition.count_ones() as usize == size {
-                    let value = coop_game.get_value(coalition);
-                    values.insert(coalition, value);
-                }
-            }
+        for coalition in 0..1u64 << n {
+            let value = coop_game.get_value(coalition);
+            values.push(value);
         }
         info!(
             "Finished building game value cache in {:?}",
@@ -53,6 +49,6 @@ impl<P: PlayerDescriptions + Clone> CooperativeGame for GameValueCache<P> {
     }
 
     fn get_value<C: CoalitionSpecifier>(&mut self, coalition: C) -> f64 {
-        self.values[&coalition.to_mask()]
+        self.values[coalition.to_mask() as usize]
     }
 }
