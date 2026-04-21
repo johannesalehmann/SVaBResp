@@ -1,4 +1,7 @@
+mod game_value_cache;
 mod minimal_coalition_cache;
+
+pub use game_value_cache::GameValueCache;
 pub use minimal_coalition_cache::MinimalCoalitionCache;
 
 pub trait PlayerDescriptions {

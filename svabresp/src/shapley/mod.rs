@@ -8,8 +8,8 @@ mod auxiliary;
 
 mod coop_game;
 pub use coop_game::{
-    CoalitionSpecifier, CooperativeGame, MinimalCoalitionCache, MonotoneCooperativeGame,
-    PlayerDescriptions, SimpleCooperativeGame,
+    CoalitionSpecifier, CooperativeGame, GameValueCache, MinimalCoalitionCache,
+    MonotoneCooperativeGame, PlayerDescriptions, SimpleCooperativeGame,
 };
 
 mod responsibility_values;

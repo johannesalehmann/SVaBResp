@@ -1,6 +1,6 @@
 use crate::shapley::responsibility_values::{CriticalPairCounter, ResponsibilityValues};
 use crate::shapley::{CooperativeGame, PlayerDescriptions, SimpleCooperativeGame};
-use log::{info, trace};
+use log::info;
 use num_traits::ToPrimitive;
 
 pub struct BruteForceAlgorithm {}
@@ -12,7 +12,7 @@ impl BruteForceAlgorithm {
 
     fn get_n_and_coalition_count<G: CooperativeGame>(&self, game: &G) -> (usize, u64) {
         let n = game.get_player_count();
-        trace!("Running brute-force algorithm for n={} groups", n);
+        info!("Running brute-force algorithm for n={} groups", n);
         if n >= 64 {
             panic!(
                 "The brute-force Shapley algorithm can only handle cooperative games with up to 63 players "
@@ -79,6 +79,8 @@ impl super::super::ShapleyAlgorithm for BruteForceAlgorithm {
                 }
             }
         }
+
+        info!("Finished brute-force algorithm in {:?}", start.elapsed());
 
         counts.to_responsibility_values(weights, game.player_descriptions().clone())
     }

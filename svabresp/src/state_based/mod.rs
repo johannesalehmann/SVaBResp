@@ -15,7 +15,9 @@ pub use group_names::GroupNames;
 pub mod refinement;
 mod stochastic_game;
 
-use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm, SwitchingPairCollector};
+use crate::shapley::{
+    GameValueCache, MinimalCoalitionCache, ShapleyAlgorithm, SwitchingPairCollector,
+};
 use crate::state_based::grouping::{StateGroups, VectorStateGroups};
 use crate::state_based::refinement::GroupBlockingProvider;
 use crate::{PrismModel, PrismProperty};
@@ -100,8 +102,10 @@ pub fn compute_for_prism<
             // let blocking = group_blocking_provider.compute_blocks(&mut coop_game);
             // let coop_game = coop_game.map_grouping(|g| blocking.apply_to_grouping(g));
 
-            let shapley_output =
-                shapley.compute_with_switching_pairs(&mut coop_game, switching_pair_collector);
+            let mut cached_value_game = GameValueCache::create(&mut coop_game);
+
+            let shapley_output = shapley
+                .compute_with_switching_pairs(&mut cached_value_game, switching_pair_collector);
 
             StateBasedOutput {
                 shapley_output,
