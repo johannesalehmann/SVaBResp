@@ -1,4 +1,4 @@
-use crate::{Expression, Identifier};
+use crate::{Displayable, Expression, Identifier};
 use std::fmt::{Display, Formatter};
 
 pub struct RewardsManager<A, E, S: Clone> {
@@ -79,15 +79,16 @@ impl<A, V, S: Clone> Rewards<A, Expression<V, S>, S> {
     }
 }
 
-impl<A: Display, E: Display, S: Clone> Display for Rewards<A, E, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<A, E, S: Clone> crate::private::Sealed for Rewards<A, E, S> {}
+impl<Ctx, A: Display, E: Displayable<Ctx>, S: Clone> Displayable<Ctx> for Rewards<A, E, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
         write!(f, "rewards")?;
         if let Some(name) = &self.name {
             write!(f, " \"{}\"", name)?;
         }
         writeln!(f)?;
         for element in &self.entries {
-            writeln!(f, "    {}", element)?;
+            writeln!(f, "    {}", element.displayable(context))?;
         }
         writeln!(f, "endrewards")
     }
@@ -159,8 +160,15 @@ impl<A, V, S: Clone> RewardsElement<A, Expression<V, S>, S> {
     }
 }
 
-impl<A: Display, E: Display, S: Clone> Display for RewardsElement<A, E, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}:{};", self.target, self.condition, self.value)
+impl<A, E, S: Clone> crate::private::Sealed for RewardsElement<A, E, S> {}
+impl<Ctx, A: Display, E: Displayable<Ctx>, S: Clone> Displayable<Ctx> for RewardsElement<A, E, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}:{};",
+            self.target,
+            self.condition.displayable(context),
+            self.value.displayable(context)
+        )
     }
 }

@@ -809,6 +809,7 @@ dependencies = [
  "clap",
  "env_logger",
  "log",
+ "prism-model",
  "svabresp",
 ]
 

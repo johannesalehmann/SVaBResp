@@ -1,15 +1,15 @@
 mod label_substitution;
 mod maps;
 
-pub use maps::*;
-use std::fmt::{Display, Formatter};
-
 use crate::expressions::label_substitution::LabelSubstitutionVisitor;
 use crate::expressions::map_variable::MapVariable;
 use crate::module::RenameRules;
 use crate::{
-    CyclicDependency, FormulaManager, Identifier, LabelManager, VariableManager, VariableReference,
+    CyclicDependency, Displayable, FormulaManager, Identifier, LabelManager, VariableManager,
+    VariableReference,
 };
+pub use maps::*;
+use std::fmt::{Display, Formatter};
 
 #[derive(PartialEq, Clone)]
 pub struct GlobalVariableReference {
@@ -304,30 +304,6 @@ impl<S: Clone> Expression<Identifier<S>, S> {
     }
 }
 
-pub struct DisplayableExpression<'a, 'b, S: Clone> {
-    expression: &'a Expression<VariableReference, S>,
-    variable_manager: &'b VariableManager<Expression<VariableReference, S>, S>,
-}
-
-impl<'a, 'b, S: Clone> Display for DisplayableExpression<'a, 'b, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.expression
-            .fmt_internal(f, 0, |v| v.displayable(self.variable_manager))
-    }
-}
-
-impl<S: Clone> Expression<VariableReference, S> {
-    pub fn displayable<'a, 'b>(
-        &'a self,
-        variable_manager: &'b VariableManager<Self, S>,
-    ) -> DisplayableExpression<'a, 'b, S> {
-        DisplayableExpression {
-            expression: self,
-            variable_manager,
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct UnknownVariableError<S: Clone> {
     pub identifier: Identifier<S>,
@@ -553,8 +529,9 @@ impl<V: std::fmt::Debug, S: Clone> std::fmt::Debug for Expression<V, S> {
     }
 }
 
-impl<V: Display, S: Clone> Display for Expression<V, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.fmt_internal(f, 0, |v| format!("{}", v))
+impl<V, S: Clone> crate::private::Sealed for Expression<V, S> {}
+impl<Ctx, V: Displayable<Ctx>, S: Clone> Displayable<Ctx> for Expression<V, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
+        self.fmt_internal(f, 0, |v| format!("{}", v.displayable(context)))
     }
 }

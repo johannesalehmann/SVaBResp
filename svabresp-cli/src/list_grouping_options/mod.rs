@@ -1,4 +1,5 @@
 use clap::{Arg, ArgMatches, Command};
+use prism_model::Displayable;
 use std::fmt::{Display, Formatter};
 use svabresp::{ModelAndPropertySource, ModelFromFile};
 

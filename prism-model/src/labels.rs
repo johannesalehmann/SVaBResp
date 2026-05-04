@@ -1,5 +1,5 @@
-use crate::{Expression, Identifier};
-use std::fmt::{Display, Formatter};
+use crate::{Displayable, Expression, Identifier};
+use std::fmt::Formatter;
 
 pub struct LabelManager<E, S: Clone> {
     pub labels: Vec<Label<E, S>>,
@@ -54,10 +54,11 @@ impl<V, S: Clone> LabelManager<Expression<V, S>, S> {
     }
 }
 
-impl<E: Display, S: Clone> Display for LabelManager<E, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<E, S: Clone> crate::private::Sealed for LabelManager<E, S> {}
+impl<Ctx, E: Displayable<Ctx>, S: Clone> Displayable<Ctx> for LabelManager<E, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
         for formula in &self.labels {
-            writeln!(f, "{}", formula)?;
+            writeln!(f, "{}", formula.displayable(context))?;
         }
         if self.labels.len() > 0 {
             writeln!(f)?;
@@ -96,8 +97,14 @@ impl<V, S: Clone> Label<Expression<V, S>, S> {
     }
 }
 
-impl<V: Display, S: Clone> Display for Label<V, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "label \"{}\" = {};", self.name, self.condition)
+impl<V, S: Clone> crate::private::Sealed for Label<V, S> {}
+impl<Ctx, E: Displayable<Ctx>, S: Clone> Displayable<Ctx> for Label<E, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
+        writeln!(
+            f,
+            "label \"{}\" = {};",
+            self.name,
+            self.condition.displayable(context)
+        )
     }
 }

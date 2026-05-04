@@ -1,6 +1,5 @@
 use crate::shapley::{CoalitionSpecifier, CooperativeGame, PlayerDescriptions};
 use log::info;
-use std::collections::HashMap;
 
 pub struct GameValueCache<P: PlayerDescriptions> {
     player_descriptions: P,

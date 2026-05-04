@@ -12,7 +12,10 @@ pub use renamed_module_expansion::ModuleExpansionError;
 use crate::formulas::FormulaManager;
 use crate::module::RenamedModule;
 use crate::rewards::RewardsManager;
-use crate::{Expression, LabelManager, ModuleManager, VariableManager};
+use crate::{
+    Displayable, Expression, Identifier, LabelManager, ModuleManager, VariableManager,
+    VariablePrintingStyle, VariableReference,
+};
 use std::fmt::{Display, Formatter};
 
 pub struct Model<AM, A, E, V, S: Clone> {
@@ -206,29 +209,62 @@ impl<S> Display for ModelType<S> {
     }
 }
 
-impl<AM, A: Display, E: Display, V: Display, S: Clone> Display for Model<AM, A, E, V, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<AM, A, E, V, S: Clone> crate::private::Sealed for Model<AM, A, E, V, S> {}
+impl<Ctx, AM, A: Display, E: Displayable<Ctx>, V: Displayable<Ctx>, S: Clone> Displayable<Ctx>
+    for Model<AM, A, E, V, S>
+{
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
         writeln!(f, "{}", self.model_type)?;
         writeln!(f, "")?;
-        write!(f, "{}", self.variable_manager.format_as_consts())?;
-        write!(f, "{}", self.variable_manager.format_as_global_vars())?;
-        write!(f, "{}", self.formulas)?;
-        write!(f, "{}", self.labels)?;
+        write!(
+            f,
+            "{}",
+            self.variable_manager
+                .displayable(&(VariablePrintingStyle::Const, &context))
+        )?;
+        write!(
+            f,
+            "{}",
+            self.variable_manager
+                .displayable(&(VariablePrintingStyle::GlobalVar, &context))
+        )?;
+        write!(f, "{}", self.formulas.displayable(context))?;
+        write!(f, "{}", self.labels.displayable(context))?;
         if let Some(init) = &self.init_constraint {
             writeln!(f, "init")?;
-            writeln!(f, "    {}", init)?;
+            writeln!(f, "    {}", init.displayable(context))?;
             writeln!(f, "endinit")?;
         }
         for (i, module) in self.modules.modules.iter().enumerate() {
-            writeln!(f, "{}", module.format(&self.variable_manager, i))?;
+            writeln!(
+                f,
+                "{}",
+                module.displayable(&(i, &self.variable_manager, context))
+            )?;
         }
         for renamed_module in &self.renamed_modules {
             writeln!(f, "{}", renamed_module)?;
         }
         for rewards in &self.rewards.rewards {
-            writeln!(f, "{}", rewards)?;
+            writeln!(f, "{}", rewards.displayable(context))?;
         }
 
         Ok(())
+    }
+}
+
+impl<AM, A: Display, S: Clone> Display
+    for Model<AM, A, Expression<VariableReference, S>, VariableReference, S>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.displayable(&self.variable_manager).fmt(f)
+    }
+}
+
+impl<AM, A: Display, S: Clone> Display
+    for Model<AM, A, Expression<Identifier<S>, S>, Identifier<S>, S>
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.displayable(&()).fmt(f)
     }
 }

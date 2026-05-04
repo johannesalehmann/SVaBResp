@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 svabresp = { path = "../svabresp" }
+prism-model = { path = "../prism-model" }
 clap = "4.5.54"
 env_logger = "0.11.8"
 log = "0.4.29"

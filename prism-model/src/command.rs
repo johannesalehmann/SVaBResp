@@ -1,6 +1,6 @@
-use crate::Identifier;
 use crate::expressions::Expression;
 use crate::module::RenameRules;
+use crate::{Displayable, Identifier};
 use std::fmt::{Display, Formatter};
 
 pub struct Command<A, E, V, S: Clone> {
@@ -70,24 +70,25 @@ impl<S: Clone> Command<Identifier<S>, Expression<Identifier<S>, S>, Identifier<S
     }
 }
 
-impl<A: Display, E: Display, V: Display, S: Clone> Display for Command<A, E, V, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<A, E, V, S: Clone> crate::private::Sealed for Command<A, E, V, S> {}
+impl<Ctx, A: Display, E: Displayable<Ctx>, V: Displayable<Ctx>, S: Clone> Displayable<Ctx>
+    for Command<A, E, V, S>
+{
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
         write!(f, "[")?;
         if let Some(action) = &self.action {
             write!(f, "{}", action)?;
         }
         write!(f, "] ")?;
-        write!(f, "{} -> ", self.guard)?;
+        write!(f, "{} -> ", self.guard.displayable(context))?;
         if self.updates.len() == 0 {
             write!(f, "true")?;
         } else {
-            let mut is_first = true;
-            for update in &self.updates {
-                if !is_first {
+            for (i, update) in self.updates.iter().enumerate() {
+                if i > 0 {
                     write!(f, " + ")?;
                 }
-                is_first = false;
-                write!(f, "{}", update)?;
+                write!(f, "{}", update.displayable(context))?;
             }
         }
 
@@ -145,8 +146,9 @@ impl<S: Clone> Update<Expression<Identifier<S>, S>, Identifier<S>, S> {
     }
 }
 
-impl<E: Display, V: Display, S: Clone> Display for Update<E, V, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<E, V, S: Clone> crate::private::Sealed for Update<E, V, S> {}
+impl<Ctx, E: Displayable<Ctx>, V: Displayable<Ctx>, S: Clone> Displayable<Ctx> for Update<E, V, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
         // This would produce nicer output, but require E to provide some way of inspecting its
         // value, e.g. by requiring a separate IsOne trait.
         // match &self.probability {
@@ -155,7 +157,7 @@ impl<E: Display, V: Display, S: Clone> Display for Update<E, V, S> {
         //         write!(f, "{} : ", e)?;
         //     }
         // }
-        write!(f, "{} : ", self.probability)?;
+        write!(f, "{} : ", self.probability.displayable(context))?;
 
         let mut is_first = true;
         for assignment in &self.assignments {
@@ -163,7 +165,7 @@ impl<E: Display, V: Display, S: Clone> Display for Update<E, V, S> {
                 write!(f, " & ")?;
             }
             is_first = false;
-            write!(f, "({})", assignment)?;
+            write!(f, "({})", assignment.displayable(context))?;
         }
 
         Ok(())
@@ -211,8 +213,16 @@ impl<S: Clone> Assignment<Expression<Identifier<S>, S>, Identifier<S>, S> {
     }
 }
 
-impl<E: Display, V: Display, S: Clone> Display for Assignment<E, V, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}'={}", self.target, self.value)
+impl<E, V, S: Clone> crate::private::Sealed for Assignment<E, V, S> {}
+impl<Ctx, E: Displayable<Ctx>, V: Displayable<Ctx>, S: Clone> Displayable<Ctx>
+    for Assignment<E, V, S>
+{
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
+        write!(
+            f,
+            "{}'={}",
+            self.target.displayable(context),
+            self.value.displayable(context)
+        )
     }
 }

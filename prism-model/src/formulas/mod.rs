@@ -1,9 +1,9 @@
 mod formula_dependencies;
 
 pub use formula_dependencies::*;
-use std::fmt::{Display, Formatter};
+use std::fmt::Formatter;
 
-use crate::{Expression, Identifier};
+use crate::{Displayable, Expression, Identifier};
 
 pub struct FormulaManager<E, S: Clone> {
     pub formulas: Vec<Formula<E, S>>,
@@ -42,10 +42,11 @@ impl<V, S: Clone> FormulaManager<Expression<V, S>, S> {
     }
 }
 
-impl<E: Display, S: Clone> Display for FormulaManager<E, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl<E, S: Clone> crate::private::Sealed for FormulaManager<E, S> {}
+impl<Ctx, E: Displayable<Ctx>, S: Clone> Displayable<Ctx> for FormulaManager<E, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
         for formula in &self.formulas {
-            writeln!(f, "{}", formula)?;
+            writeln!(f, "{}", formula.displayable(context))?;
         }
         if self.formulas.len() > 0 {
             writeln!(f)?;
@@ -85,8 +86,14 @@ impl<V, S: Clone> Formula<Expression<V, S>, S> {
     }
 }
 
-impl<E: Display, S: Clone> Display for Formula<E, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "formula {} = {};", self.name, self.condition)
+impl<E, S: Clone> crate::private::Sealed for Formula<E, S> {}
+impl<Ctx, E: Displayable<Ctx>, S: Clone> Displayable<Ctx> for Formula<E, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
+        write!(
+            f,
+            "formula {} = {};",
+            self.name,
+            self.condition.displayable(context)
+        )
     }
 }

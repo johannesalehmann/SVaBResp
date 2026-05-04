@@ -1,7 +1,7 @@
 use crate::expressions::UnknownVariableError;
 use crate::module::RenameRules;
-use crate::{DisplayableExpression, Expression, Identifier};
-use std::fmt::{Display, Formatter};
+use crate::{Displayable, Expression, Identifier};
+use std::fmt::Formatter;
 
 pub struct VariableManager<E, S: Clone> {
     pub variables: Vec<VariableInfo<E, S>>,
@@ -51,27 +51,51 @@ impl<E, S: Clone> VariableManager<E, S> {
     }
 }
 
-impl<E: Display, S: Clone> VariableManager<E, S> {
-    pub fn format_as_consts(&self) -> PrintableVariableManager<'_, E, S> {
-        PrintableVariableManager {
-            vm: &self,
-            display_kind: VariablePrintingStyle::Const,
-            filter: VariableFilter::Constant,
+impl<E, S: Clone> crate::private::Sealed for VariableManager<E, S> {}
+impl<Ctx, E: Displayable<Ctx>, S: Clone> Displayable<(VariablePrintingStyle, &Ctx)>
+    for VariableManager<E, S>
+{
+    fn fmt_internal(
+        &self,
+        f: &mut Formatter<'_>,
+        (printing_style, context): &(VariablePrintingStyle, &Ctx),
+    ) -> std::fmt::Result {
+        for variable in &self.variables {
+            if !printing_style.accepts(variable) {
+                continue;
+            }
+            if printing_style == &VariablePrintingStyle::Const {
+                write!(
+                    f,
+                    "const {} {}",
+                    variable.range.displayable(context),
+                    variable.name
+                )?;
+                if let Some(initial) = &variable.initial_value {
+                    write!(f, " = {}", initial.displayable(context))?;
+                }
+            } else {
+                if printing_style == &VariablePrintingStyle::GlobalVar {
+                    write!(f, "global ")?;
+                } else {
+                    write!(f, "    ")?;
+                }
+                write!(
+                    f,
+                    "{} : {}",
+                    variable.name,
+                    variable.range.displayable(context)
+                )?;
+                if let Some(initial) = &variable.initial_value {
+                    write!(f, " init {}", initial.displayable(context))?;
+                }
+            }
+            writeln!(f, ";")?;
         }
-    }
-    pub fn format_as_global_vars(&self) -> PrintableVariableManager<'_, E, S> {
-        PrintableVariableManager {
-            vm: &self,
-            display_kind: VariablePrintingStyle::GlobalVar,
-            filter: VariableFilter::GlobalVar,
+        if self.variables.len() > 0 {
+            writeln!(f, "")?;
         }
-    }
-    pub fn format_as_local_vars(&self, module: usize) -> PrintableVariableManager<'_, E, S> {
-        PrintableVariableManager {
-            vm: &self,
-            display_kind: VariablePrintingStyle::LocalVar,
-            filter: VariableFilter::LocalVar(module),
-        }
+        Ok(())
     }
 }
 
@@ -295,22 +319,27 @@ impl<V, S: Clone> VariableRange<Expression<V, S>, S> {
     }
 }
 
-impl<S: Clone> VariableRange<Expression<VariableReference, S>, S> {
-    pub fn displayable<'a>(
-        &self,
-        variable_manager: &'a VariableManager<Expression<VariableReference, S>, S>,
-    ) -> VariableRange<DisplayableExpression<'_, 'a, S>, S> {
+impl<E, S: Clone> crate::private::Sealed for VariableRange<E, S> {}
+impl<Ctx, E: Displayable<Ctx>, S: Clone> Displayable<Ctx> for VariableRange<E, S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &Ctx) -> std::fmt::Result {
         match self {
-            VariableRange::BoundedInt { min, max, span } => VariableRange::BoundedInt {
-                min: min.displayable(variable_manager),
-                max: max.displayable(variable_manager),
-                span: span.clone(),
-            },
-            VariableRange::UnboundedInt { span } => {
-                VariableRange::UnboundedInt { span: span.clone() }
+            VariableRange::BoundedInt { min, max, .. } => {
+                write!(
+                    f,
+                    "[{}..{}]",
+                    min.displayable(context),
+                    max.displayable(context)
+                )
             }
-            VariableRange::Boolean { span } => VariableRange::Boolean { span: span.clone() },
-            VariableRange::Float { span } => VariableRange::Float { span: span.clone() },
+            VariableRange::UnboundedInt { .. } => {
+                write!(f, "int")
+            }
+            VariableRange::Boolean { .. } => {
+                write!(f, "bool")
+            }
+            VariableRange::Float { .. } => {
+                write!(f, "double")
+            }
         }
     }
 }
@@ -369,25 +398,6 @@ impl<S: Clone> VariableRange<Expression<Identifier<S>, S>, S> {
     }
 }
 
-impl<E: Display, S: Clone> Display for VariableRange<E, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            VariableRange::BoundedInt { min, max, .. } => {
-                write!(f, "[{}..{}]", min, max)
-            }
-            VariableRange::UnboundedInt { .. } => {
-                write!(f, "int")
-            }
-            VariableRange::Boolean { .. } => {
-                write!(f, "bool")
-            }
-            VariableRange::Float { .. } => {
-                write!(f, "double")
-            }
-        }
-    }
-}
-
 #[derive(PartialEq, Clone, Copy)]
 pub struct VariableReference {
     pub index: usize,
@@ -397,16 +407,6 @@ impl VariableReference {
     pub fn new(index: usize) -> Self {
         Self { index }
     }
-
-    pub fn displayable<'a, S: Clone>(
-        &self,
-        variable_manager: &'a VariableManager<Expression<VariableReference, S>, S>,
-    ) -> DisplayableVariableReference<'a, S> {
-        DisplayableVariableReference {
-            reference: *self,
-            variable_manager,
-        }
-    }
 }
 
 impl std::fmt::Debug for VariableReference {
@@ -415,76 +415,35 @@ impl std::fmt::Debug for VariableReference {
     }
 }
 
-pub struct DisplayableVariableReference<'a, S: Clone> {
-    reference: VariableReference,
-    variable_manager: &'a VariableManager<Expression<VariableReference, S>, S>,
-}
-
-impl<'a, S: Clone> Display for DisplayableVariableReference<'a, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let variable = self.variable_manager.get(&self.reference).unwrap();
+impl crate::private::Sealed for VariableReference {}
+impl<S: Clone> Displayable<VariableManager<Expression<VariableReference, S>, S>>
+    for VariableReference
+{
+    fn fmt_internal(
+        &self,
+        f: &mut Formatter<'_>,
+        context: &VariableManager<Expression<VariableReference, S>, S>,
+    ) -> std::fmt::Result {
+        let variable = context.get(&self).unwrap();
         write!(f, "{}", variable.name)
     }
 }
 
-#[derive(PartialEq)]
-enum VariablePrintingStyle {
+#[derive(PartialEq, Copy, Clone)]
+pub enum VariablePrintingStyle {
     Const,
     GlobalVar,
-    LocalVar,
+    LocalVar { module_index: usize },
 }
 
-enum VariableFilter {
-    Constant,
-    GlobalVar,
-    LocalVar(usize),
-}
-
-impl VariableFilter {
+impl VariablePrintingStyle {
     fn accepts<V, S: Clone>(&self, variable: &VariableInfo<V, S>) -> bool {
         match self {
-            VariableFilter::Constant => variable.is_constant,
-            VariableFilter::GlobalVar => !variable.is_constant && variable.scope.is_none(),
-            VariableFilter::LocalVar(index) => {
-                !variable.is_constant && variable.scope == Some(*index)
+            VariablePrintingStyle::Const => variable.is_constant,
+            VariablePrintingStyle::GlobalVar => !variable.is_constant && variable.scope.is_none(),
+            VariablePrintingStyle::LocalVar { module_index } => {
+                !variable.is_constant && variable.scope == Some(*module_index)
             }
         }
-    }
-}
-
-pub struct PrintableVariableManager<'a, E: Display, S: Clone> {
-    vm: &'a VariableManager<E, S>,
-    display_kind: VariablePrintingStyle,
-    filter: VariableFilter,
-}
-
-impl<'a, E: Display, S: Clone> Display for PrintableVariableManager<'a, E, S> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for variable in &self.vm.variables {
-            if !self.filter.accepts(variable) {
-                continue;
-            }
-            if self.display_kind == VariablePrintingStyle::Const {
-                write!(f, "const {} {}", variable.range, variable.name)?;
-                if let Some(initial) = &variable.initial_value {
-                    write!(f, " = {}", initial)?;
-                }
-            } else {
-                if self.display_kind == VariablePrintingStyle::GlobalVar {
-                    write!(f, "global ")?;
-                } else {
-                    write!(f, "    ")?;
-                }
-                write!(f, "{} : {}", variable.name, variable.range)?;
-                if let Some(initial) = &variable.initial_value {
-                    write!(f, " init {}", initial)?;
-                }
-            }
-            writeln!(f, ";")?;
-        }
-        if self.vm.variables.len() > 0 {
-            writeln!(f, "")?;
-        }
-        Ok(())
     }
 }

@@ -1,5 +1,5 @@
-use crate::expressions::MapExpression;
 use crate::Identifier;
+use crate::expressions::MapExpression;
 
 #[allow(unused_variables)]
 pub trait DefaultMapExpression<V, S: Clone, T: Default> {

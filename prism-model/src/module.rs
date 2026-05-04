@@ -1,4 +1,4 @@
-use crate::{Command, Expression, Identifier, VariableManager};
+use crate::{Command, Displayable, Expression, Identifier, VariableManager, VariablePrintingStyle};
 use std::fmt::{Display, Formatter};
 
 pub struct ModuleManager<A, E, V, S: Clone> {
@@ -88,38 +88,28 @@ impl<A, V, S: Clone> Module<A, Expression<V, S>, V, S> {
     }
 }
 
-impl<A: Display, E: Display, V: Display, S: Clone> Module<A, E, V, S> {
-    pub fn format<'a, 'b>(
-        &'a self,
-        variable_manager: &'b VariableManager<E, S>,
-        own_index: usize,
-    ) -> PrintableModule<'a, 'b, A, E, V, S> {
-        PrintableModule {
-            module: self,
-            variable_manager,
-            own_index,
-        }
-    }
-}
-
-pub struct PrintableModule<'a, 'b, A: Display, E: Display, V: Display, S: Clone> {
-    module: &'a Module<A, E, V, S>,
-    variable_manager: &'b VariableManager<E, S>,
-    own_index: usize,
-}
-
-impl<'a, 'b, A: Display, E: Display, V: Display, S: Clone> Display
-    for PrintableModule<'a, 'b, A, E, V, S>
+impl<A, E, V, S: Clone> crate::private::Sealed for Module<A, E, V, S> {}
+impl<'a, 'b, Ctx, A: Display, E: Displayable<Ctx>, V: Displayable<Ctx>, S: Clone>
+    Displayable<(usize, &VariableManager<E, S>, &Ctx)> for Module<A, E, V, S>
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "module {}", self.module.name)?;
+    fn fmt_internal(
+        &self,
+        f: &mut Formatter<'_>,
+        (own_index, variable_manager, context): &(usize, &VariableManager<E, S>, &Ctx),
+    ) -> std::fmt::Result {
+        writeln!(f, "module {}", self.name)?;
         write!(
             f,
             "{}",
-            self.variable_manager.format_as_local_vars(self.own_index)
+            variable_manager.displayable(&(
+                VariablePrintingStyle::LocalVar {
+                    module_index: *own_index
+                },
+                context
+            ))
         )?;
-        for command in &self.module.commands {
-            writeln!(f, "    {}", command)?;
+        for command in &self.commands {
+            writeln!(f, "    {}", command.displayable(context))?;
         }
         writeln!(f, "endmodule")
     }

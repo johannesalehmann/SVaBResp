@@ -1,3 +1,4 @@
+use crate::Displayable;
 use crate::module::RenameRules;
 use std::fmt::{Display, Formatter};
 
@@ -16,6 +17,14 @@ impl<S: Clone> std::fmt::Debug for Identifier<S> {
 impl<S: Clone> Display for Identifier<S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
+    }
+}
+
+impl<S: Clone> crate::private::Sealed for Identifier<S> {}
+impl<S: Clone> Displayable<()> for Identifier<S> {
+    fn fmt_internal(&self, f: &mut Formatter<'_>, context: &()) -> std::fmt::Result {
+        let _ = context;
+        self.fmt(f)
     }
 }
 
