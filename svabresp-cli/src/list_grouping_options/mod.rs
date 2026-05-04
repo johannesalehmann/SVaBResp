@@ -33,16 +33,20 @@ impl ListGroupingOptionsCommand {
         let (prism_model, _, _) = model_description.get_model_and_property();
 
         let mut variables = Vec::new();
-        for variable in prism_model.variable_manager.variables {
+        for variable in prism_model.variable_manager.variables.iter() {
             if !variable.is_constant {
                 variables.push(GroupingOptionValue {
                     name: format!(
                         "{} ({}{})",
                         variable.name.name,
-                        variable.range,
+                        variable.range.displayable(&prism_model.variable_manager),
                         variable
                             .initial_value
-                            .map_or("".to_string(), |i| format!(" init {}", i))
+                            .as_ref()
+                            .map_or("".to_string(), |i| format!(
+                                " init {}",
+                                i.displayable(&prism_model.variable_manager)
+                            ))
                     ),
                     value: variable.name.name.clone(),
                 });
@@ -52,7 +56,11 @@ impl ListGroupingOptionsCommand {
         let mut labels = Vec::new();
         for label in prism_model.labels.labels {
             labels.push(GroupingOptionValue {
-                name: format!("{} ({})", label.name.name, label.condition),
+                name: format!(
+                    "{} ({})",
+                    label.name.name,
+                    label.condition.displayable(&prism_model.variable_manager)
+                ),
                 value: label.name.name.clone(),
             });
         }

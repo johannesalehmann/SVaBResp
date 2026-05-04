@@ -91,6 +91,11 @@ impl<V, S: Clone> Expression<V, S> {
         self.visit(&mut visitor)
     }
 
+    pub fn map_variable<V2, F: Fn(V) -> V2>(self, map: &F) -> Expression<V2, S> {
+        let mut visitor = maps::map_variable::MapVariable::new(|v, _| map(v), ());
+        self.visit(&mut visitor)
+    }
+
     fn get_precedence(&self) -> usize {
         // As per https://www.prismmodelchecker.org/manual/ThePRISMLanguage/Expressions
         // ranging from 1 (for ternary) to 11 (for unary minus)
@@ -299,16 +304,41 @@ impl<S: Clone> Expression<Identifier<S>, S> {
     }
 }
 
+pub struct DisplayableExpression<'a, 'b, S: Clone> {
+    expression: &'a Expression<VariableReference, S>,
+    variable_manager: &'b VariableManager<Expression<VariableReference, S>, S>,
+}
+
+impl<'a, 'b, S: Clone> Display for DisplayableExpression<'a, 'b, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.expression
+            .fmt_internal(f, 0, |v| v.displayable(self.variable_manager))
+    }
+}
+
+impl<S: Clone> Expression<VariableReference, S> {
+    pub fn displayable<'a, 'b>(
+        &'a self,
+        variable_manager: &'b VariableManager<Self, S>,
+    ) -> DisplayableExpression<'a, 'b, S> {
+        DisplayableExpression {
+            expression: self,
+            variable_manager,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct UnknownVariableError<S: Clone> {
     pub identifier: Identifier<S>,
 }
 
-impl<V: Display, S: Clone> Expression<V, S> {
-    fn fmt_internal(
+impl<V, S: Clone> Expression<V, S> {
+    fn fmt_internal<VD: Display, F: Fn(&V) -> VD + Clone>(
         &self,
         f: &mut Formatter<'_>,
         surrounding_precedence: usize,
+        variable_to_display: F,
     ) -> std::fmt::Result {
         let precedence = self.get_precedence();
         if surrounding_precedence > precedence {
@@ -325,109 +355,107 @@ impl<V: Display, S: Clone> Expression<V, S> {
                 write!(f, "true")?;
             }
             Expression::VarOrConst(name, _) => {
-                write!(f, "{}", name)?;
+                write!(f, "{}", variable_to_display(name))?;
             }
             Expression::Label(name, _) => {
-                write!(f, "\"{}\"", name)?;
+                write!(f, "\"{}\"", variable_to_display(name))?;
             }
             Expression::Bool(false, _) => {
                 write!(f, "false")?;
             }
             Expression::Function(n, a, _) => {
-                write!(
-                    f,
-                    "{}({})",
-                    n,
-                    a.iter()
-                        .map(|e| format!("{}", e))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )?;
+                write!(f, "{}", n)?;
+                for (index, argument) in a.iter().enumerate() {
+                    if index > 0 {
+                        write!(f, ", ")?;
+                    }
+                    argument.fmt_internal(f, 0, variable_to_display.clone())?;
+                }
             }
             Expression::Minus(inner, _) => {
                 write!(f, "-")?;
-                inner.fmt_internal(f, precedence)?;
+                inner.fmt_internal(f, precedence, variable_to_display)?;
             }
             Expression::Multiplication(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "*")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Division(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "/")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Addition(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "+")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Subtraction(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "-")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::LessThan(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "<")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::LessOrEqual(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "<=")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::GreaterThan(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, ">")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::GreaterOrEqual(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, ">=")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Equals(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "=")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::NotEquals(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "!=")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Negation(inner, _) => {
                 write!(f, "!")?;
-                inner.fmt_internal(f, precedence + 1)?;
+                inner.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Conjunction(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "&")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Disjunction(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "|")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::IfAndOnlyIf(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "<=>")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Implies(lhs, rhs, _) => {
-                lhs.fmt_internal(f, precedence)?;
+                lhs.fmt_internal(f, precedence, variable_to_display.clone())?;
                 write!(f, "=>")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
             Expression::Ternary(cond, lhs, rhs, _) => {
-                cond.fmt_internal(f, precedence + 1)?;
+                cond.fmt_internal(f, precedence + 1, variable_to_display.clone())?;
                 write!(f, "?")?;
-                lhs.fmt_internal(f, precedence + 1)?;
+                lhs.fmt_internal(f, precedence + 1, variable_to_display.clone())?;
                 write!(f, ":")?;
-                rhs.fmt_internal(f, precedence + 1)?;
+                rhs.fmt_internal(f, precedence + 1, variable_to_display)?;
             }
         }
 
@@ -527,6 +555,6 @@ impl<V: std::fmt::Debug, S: Clone> std::fmt::Debug for Expression<V, S> {
 
 impl<V: Display, S: Clone> Display for Expression<V, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.fmt_internal(f, 0)
+        self.fmt_internal(f, 0, |v| format!("{}", v))
     }
 }

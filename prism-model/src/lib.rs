@@ -3,8 +3,8 @@ pub use command::{Assignment, Command, Update};
 
 mod expressions;
 pub use expressions::{
-    DefaultMapExpression, Expression, GlobalVariableReference, IdentityMapExpression,
-    MapExpression, VariableScope,
+    DefaultMapExpression, DisplayableExpression, Expression, GlobalVariableReference,
+    IdentityMapExpression, MapExpression, VariableScope,
 };
 
 mod module;

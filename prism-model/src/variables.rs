@@ -1,6 +1,6 @@
 use crate::expressions::UnknownVariableError;
 use crate::module::RenameRules;
-use crate::{Expression, Identifier};
+use crate::{DisplayableExpression, Expression, Identifier};
 use std::fmt::{Display, Formatter};
 
 pub struct VariableManager<E, S: Clone> {
@@ -294,6 +294,26 @@ impl<V, S: Clone> VariableRange<Expression<V, S>, S> {
         }
     }
 }
+
+impl<S: Clone> VariableRange<Expression<VariableReference, S>, S> {
+    pub fn displayable<'a>(
+        &self,
+        variable_manager: &'a VariableManager<Expression<VariableReference, S>, S>,
+    ) -> VariableRange<DisplayableExpression<'_, 'a, S>, S> {
+        match self {
+            VariableRange::BoundedInt { min, max, span } => VariableRange::BoundedInt {
+                min: min.displayable(variable_manager),
+                max: max.displayable(variable_manager),
+                span: span.clone(),
+            },
+            VariableRange::UnboundedInt { span } => {
+                VariableRange::UnboundedInt { span: span.clone() }
+            }
+            VariableRange::Boolean { span } => VariableRange::Boolean { span: span.clone() },
+            VariableRange::Float { span } => VariableRange::Float { span: span.clone() },
+        }
+    }
+}
 impl<S: Clone> VariableRange<Expression<Identifier<S>, S>, S> {
     pub fn renamed(&self, rename_rules: &RenameRules<S>) -> Self {
         match self {
@@ -377,17 +397,33 @@ impl VariableReference {
     pub fn new(index: usize) -> Self {
         Self { index }
     }
-}
 
-impl Display for VariableReference {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "var_{}", self.index)
+    pub fn displayable<'a, S: Clone>(
+        &self,
+        variable_manager: &'a VariableManager<Expression<VariableReference, S>, S>,
+    ) -> DisplayableVariableReference<'a, S> {
+        DisplayableVariableReference {
+            reference: *self,
+            variable_manager,
+        }
     }
 }
 
 impl std::fmt::Debug for VariableReference {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "var_{}", self.index)
+    }
+}
+
+pub struct DisplayableVariableReference<'a, S: Clone> {
+    reference: VariableReference,
+    variable_manager: &'a VariableManager<Expression<VariableReference, S>, S>,
+}
+
+impl<'a, S: Clone> Display for DisplayableVariableReference<'a, S> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let variable = self.variable_manager.get(&self.reference).unwrap();
+        write!(f, "{}", variable.name)
     }
 }
 
