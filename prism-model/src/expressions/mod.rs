@@ -340,13 +340,14 @@ impl<V, S: Clone> Expression<V, S> {
                 write!(f, "false")?;
             }
             Expression::Function(n, a, _) => {
-                write!(f, "{}", n)?;
+                write!(f, "{}(", n)?;
                 for (index, argument) in a.iter().enumerate() {
                     if index > 0 {
                         write!(f, ", ")?;
                     }
                     argument.fmt_internal(f, 0, variable_to_display.clone())?;
                 }
+                write!(f, ")")?;
             }
             Expression::Minus(inner, _) => {
                 write!(f, "-")?;
