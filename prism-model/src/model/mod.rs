@@ -14,7 +14,7 @@ use crate::module::RenamedModule;
 use crate::rewards::RewardsManager;
 use crate::{
     Displayable, Expression, Identifier, LabelManager, ModuleManager, VariableManager,
-    VariablePrintingStyle, VariableReference,
+    VariablePrintingStyle, VariableRange, VariableReference,
 };
 use std::fmt::{Display, Formatter};
 
@@ -166,6 +166,76 @@ impl<AM, A, V, S: Clone> Model<AM, A, Expression<V, S>, V, S> {
                 }
             }
         }
+    }
+
+    pub fn add_missing_init_statements(&mut self)
+    where
+        V: Clone,
+    {
+        if self.init_constraint.is_some() {
+            panic!(
+                "Cannot add missing init statements because the model uses an init constraint instead of init statements"
+            );
+        }
+
+        for variable in &mut self.variable_manager.variables {
+            if !variable.is_constant {
+                if variable.initial_value.is_none() {
+                    variable.initial_value = Some(match &variable.range {
+                        VariableRange::BoundedInt { min, .. } => min.clone(),
+                        VariableRange::UnboundedInt { .. } => {
+                            panic!("Unbounded integers must have an initial value.")
+                        }
+                        VariableRange::Boolean { .. } => {
+                            Expression::Bool(false, variable.range.span().clone())
+                        }
+                        VariableRange::Float { .. } => {
+                            panic!("Unbounded integers must have an initial value.")
+                        }
+                    });
+                }
+            }
+        }
+    }
+
+    pub fn init_statements_to_init_block(&mut self)
+    where
+        V: Clone,
+    {
+        if self.init_constraint.is_some() {
+            panic!(
+                "Cannot transform init statements to init block because the model already uses an init block"
+            );
+        }
+
+        let mut init_constraint: Option<Expression<V, S>> = None;
+
+        self.add_missing_init_statements();
+
+        for variable in &mut self.variable_manager.variables {
+            if !variable.is_constant {
+                match std::mem::replace(&mut variable.initial_value, None) {
+                    Some(value) => {
+                        if let Some(prev_init) = init_constraint.take() {
+                            let span = prev_init.span().clone();
+                            init_constraint = Some(Expression::Conjunction(
+                                Box::new(prev_init),
+                                Box::new(value),
+                                span,
+                            ));
+                        } else {
+                            init_constraint = Some(value);
+                        }
+                        variable.initial_value = None;
+                    }
+                    None => {
+                        panic!("Variable {} does not have initial value.", variable.name)
+                    }
+                }
+            }
+        }
+
+        self.init_constraint = init_constraint;
     }
 }
 
