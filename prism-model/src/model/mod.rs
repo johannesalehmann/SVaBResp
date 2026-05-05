@@ -13,8 +13,8 @@ use crate::formulas::FormulaManager;
 use crate::module::RenamedModule;
 use crate::rewards::RewardsManager;
 use crate::{
-    Displayable, Expression, Identifier, LabelManager, ModuleManager, VariableManager,
-    VariablePrintingStyle, VariableRange, VariableReference,
+    Displayable, Expression, Identifier, LabelManager, ModuleManager, VariableInfo,
+    VariableManager, VariablePrintingStyle, VariableRange, VariableReference,
 };
 use std::fmt::{Display, Formatter};
 
@@ -197,11 +197,37 @@ impl<AM, A, V, S: Clone> Model<AM, A, Expression<V, S>, V, S> {
             }
         }
     }
+}
 
+// TODO: This trait is only used to enable init_statements_to_init_block to work both when `V` is
+//  `Identifier` and when `V` is `VariableReference`. Perhaps we can use some more general mechanism
+//  or expose this trait more broadly?
+trait VariableIdentifierProvider<E, S: Clone> {
+    fn get_variable_identifier(info: &VariableInfo<E, S>, index: usize) -> Self;
+}
+
+impl<E, S: Clone> VariableIdentifierProvider<E, S> for VariableReference {
+    fn get_variable_identifier(info: &VariableInfo<E, S>, index: usize) -> Self {
+        let _ = info;
+        VariableReference::new(index)
+    }
+}
+
+impl<E, S: Clone> VariableIdentifierProvider<E, S> for Identifier<S> {
+    fn get_variable_identifier(info: &VariableInfo<E, S>, index: usize) -> Self {
+        let _ = index;
+        info.name.clone()
+    }
+}
+
+impl<AM, A, V: VariableIdentifierProvider<Expression<V, S>, S>, S: Clone>
+    Model<AM, A, Expression<V, S>, V, S>
+{
     pub fn init_statements_to_init_block(&mut self)
     where
         V: Clone,
     {
+        // TODO: Fix how new spans are created
         if self.init_constraint.is_some() {
             panic!(
                 "Cannot transform init statements to init block because the model already uses an init block"
@@ -212,19 +238,25 @@ impl<AM, A, V, S: Clone> Model<AM, A, Expression<V, S>, V, S> {
 
         self.add_missing_init_statements();
 
-        for variable in &mut self.variable_manager.variables {
+        for (variable_index, variable) in self.variable_manager.variables.iter_mut().enumerate() {
             if !variable.is_constant {
                 match std::mem::replace(&mut variable.initial_value, None) {
                     Some(value) => {
+                        let identifier = V::get_variable_identifier(variable, variable_index);
+                        let variable_constraint = Expression::Equals(
+                            Box::new(Expression::VarOrConst(identifier, self.span.clone())),
+                            Box::new(value),
+                            self.span.clone(),
+                        );
                         if let Some(prev_init) = init_constraint.take() {
                             let span = prev_init.span().clone();
                             init_constraint = Some(Expression::Conjunction(
                                 Box::new(prev_init),
-                                Box::new(value),
+                                Box::new(variable_constraint),
                                 span,
                             ));
                         } else {
-                            init_constraint = Some(value);
+                            init_constraint = Some(variable_constraint);
                         }
                         variable.initial_value = None;
                     }
