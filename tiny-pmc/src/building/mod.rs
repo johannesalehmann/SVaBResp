@@ -1,2 +1,0 @@
-mod atomic_propositions;
-pub use atomic_propositions::prism_objectives_to_atomic_propositions;

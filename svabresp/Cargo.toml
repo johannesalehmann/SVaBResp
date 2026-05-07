@@ -4,13 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-prism-model = { path = "../prism-model" }
-prism-parser = { path = "../prism-parser" }
-probabilistic-models = { path = "../probabilistic-models" }
-probabilistic-model-algorithms = { path = "../probabilistic-model-algorithms" }
-probabilistic-properties = { path = "../probabilistic-properties" }
-tiny-pmc = { path = "../tiny-pmc" }
-prism-model-builder = { path = "../prism-model-builder" }
+prism-model = { workspace = true }
+prism-parser = { workspace = true }
+probabilistic-models = { workspace = true }
+probabilistic-model-algorithms = { workspace = true }
+probabilistic-properties = { workspace = true }
+tiny-pmc = { workspace = true }
+prism-model-builder = { workspace = true }
 num-bigint = "0.4.6"
 chumsky = "1.0.0-alpha.8"
 num-rational = "0.4.2"

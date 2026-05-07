@@ -1,7 +1,16 @@
 [workspace]
 resolver = "3"
-members = ["prism-model", "prism-model-builder", "prism-parser", "probabilistic-model-algorithms", "probabilistic-models", "probabilistic-properties", "svabresp", "svabresp-benchmarking", "svabresp-cli", "tiny-pmc", "tiny-pmc-benchmarking", "tiny-pmc-cli"]
+members = ["svabresp", "svabresp-benchmarking", "svabresp-cli"]
 
 [profile.release]
 lto = "fat"
 codegen-units = 1
+
+[workspace.dependencies]
+prism-model = { git = "https://github.com/johannesalehmann/tiny-pmc" }
+prism-model-builder = { git = "https://github.com/johannesalehmann/tiny-pmc" }
+prism-parser = { git = "https://github.com/johannesalehmann/tiny-pmc" }
+probabilistic-model-algorithms = { git = "https://github.com/johannesalehmann/tiny-pmc" }
+probabilistic-models = { git = "https://github.com/johannesalehmann/tiny-pmc" }
+probabilistic-properties = { git = "https://github.com/johannesalehmann/tiny-pmc" }
+tiny-pmc = { git = "https://github.com/johannesalehmann/tiny-pmc" }
