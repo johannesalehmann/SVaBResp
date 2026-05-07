@@ -1,0 +1,74 @@
+mdp
+
+label "incorrect" = state=8 & analysis_result!=is_infected;
+
+const int temp1max = 20;
+
+module SampleProvider
+    sample_provider_state: [0..1] init 0; // 0: Able to provide sample, 1: provided sample
+    is_infected: bool init false; // false: Sample is clean, true: Sample is infected
+
+    [ProvideSample] (sample_provider_state=0) -> 0.5: (sample_provider_state'=1)&(is_infected'=false) + 0.5: (sample_provider_state'=1)&(is_infected'=true);
+endmodule
+
+module AnalysisMachine
+    // 0: Waiting to receive sample
+    // 1: Choosing analysis method
+    // 2 and 3: analysis method 1 (sampling strip)
+    // 4, 5, 6 and 7: analysis method 2 (counting independent samples)
+    // 8: done
+    state: [0..8] init 0;
+    analysis_result: bool init false;
+
+    time: [0..10] init 0;
+    temp1: [0..temp1max] init 0;
+
+    [ProvideSample] (state=0) -> (state'=1);
+
+    [] (state=1) -> 0.5: (state'=2) + 0.5: (state'=4);
+
+    [Sample] (state=2 & time<4) -> true;
+    [TakeSample] (state=2 & time<4) -> (time'=time+1)&(temp1'=min(temp1max, temp1+sample_value));
+    [] (state=2 & time=4 & !sample_ready) -> (state'=3);
+
+    [] (state=3 & temp1 < 9) -> (state'=8)&(analysis_result'=false)&(temp1'=0)&(time'=0);
+    [] (state=3 & temp1 >= 9) -> (state'=8)&(analysis_result'=true)&(temp1'=0)&(time'=0);
+
+    // Non-deterministically choose sampling duration
+    // To compensate for different sampling durations, we add an initial count to temp1
+    [] (state=4) -> (state'=5)&(time'=6);
+    [] (state=4) -> (state'=5)&(time'=7);
+    [] (state=4) -> (state'=5)&(time'=8);
+
+    [] (state=5) -> (state'=6)&(temp1'=max(min(floor((9-time)/2), temp1max), 0));
+    [] (state=5) -> (state'=6)&(temp1'=max(min(floor((10-time)/2), temp1max), 0));
+
+    [Sample] (state=6 & time>0) -> true;
+    [TakeSample] (state=6 & time>0 & sample_value<2) -> (time'=time-1);
+    [TakeSample] (state=6 & time>0 & sample_value=2) -> true; // Sample is inconclusive – ignore it.
+    [TakeSample] (state=6 & time>0 & sample_value>2) -> (time'=time-1)&(temp1'=min(temp1max, temp1+1));
+    [] (state=6 & time=0 & !sample_ready) -> (state'=7);
+
+    [] (state=7 & temp1<=5) -> (state'=8)&(analysis_result'=false)&(temp1'=0)&(time'=0);
+    [] (state=7 & temp1>5) -> (state'=8)&(analysis_result'=true)&(temp1'=0)&(time'=0);
+
+    [] (state=8) -> true;
+endmodule
+
+module Sampler
+    sample_value: [0..4] init 0;
+    sample_ready: bool init false;
+
+    [Sample] (!sample_ready & !is_infected)
+            ->0.25: (sample_value'=0)&(sample_ready'=true)
+            + 0.5: (sample_value'=1)&(sample_ready'=true)
+            + 0.18: (sample_value'=2)&(sample_ready'=true)
+            + 0.07: (sample_value'=3)&(sample_ready'=true);
+    [Sample] (!sample_ready & is_infected)
+            -> 0.07: (sample_value'=1)&(sample_ready'=true)
+            + 0.18: (sample_value'=2)&(sample_ready'=true)
+            + 0.5: (sample_value'=3)&(sample_ready'=true)
+            + 0.25: (sample_value'=4)&(sample_ready'=true);
+
+    [TakeSample] (sample_ready) -> (sample_value'=0)&(sample_ready'=false);
+endmodule

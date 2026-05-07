@@ -1,0 +1,24 @@
+mdp
+
+label "goal" = x=2 & y=false;
+label "special" = (x=0&y=false) | (x=1&y=true);
+
+module main
+    x: [0..2] init 0;
+    y: bool init false;
+
+    [alpha] (x=0 & y=false) -> 0.2: (x'=1)&(y'=false) + 0.8: (x'=1)&(y'=true);
+    [beta] (x=0 & y=false) -> (x'=0)&(y'=true);
+
+    [alpha] (x=0 & y=true) -> 0.5: (x'=1)&(y'=false) + 0.5: (x'=1)&(y'=true);
+
+    [alpha] (x=1 & y=false) -> 0.9: (x'=2)&(y'=false) + 0.1: (x'=2)&(y'=true);
+    [beta] (x=1 & y=false) -> 0.5: (x'=2)&(y'=false) + 0.5: (x'=2)&(y'=true);
+
+    [alpha] (x=1 & y=true) ->(x'=1)&(y'=true);
+    [beta] (x=1 & y=true) ->(x'=2)&(y'=true);
+
+    [alpha] (x=2 & y=false) -> true;
+
+    [alpha] (x=2 & y=true) -> true;
+endmodule
