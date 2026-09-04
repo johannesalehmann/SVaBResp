@@ -3,18 +3,18 @@ use crate::shapley::{
     CoalitionSpecifier, MonotoneCooperativeGame, PlayerDescriptions, SimpleCooperativeGame,
 };
 use crate::state_based::{StateBasedResponsibilityNonstochasticGame, grouping::StateGroups};
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
-use probabilistic_models::TwoPlayer;
+use probabilistic_models::owners::TwoPlayer;
+use crate::state_based::game::{Objective, WinningRegion};
 
-pub struct GroupedGame<'a, G: StateGroups, A: SolvableNonstochasticGame> {
-    game: &'a mut StateBasedResponsibilityNonstochasticGame<G, A>,
+pub struct GroupedGame<'a, G: StateGroups, O: Objective> {
+    game: &'a mut StateBasedResponsibilityNonstochasticGame<G, O>,
     partition: &'a PlayerPartition,
     player_description: GroupedGamePlayerDescriptions,
 }
 
-impl<'a, G: StateGroups, A: SolvableNonstochasticGame> GroupedGame<'a, G, A> {
+impl<'a, G: StateGroups, O: Objective> GroupedGame<'a, G, O> {
     pub fn new(
-        game: &'a mut StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &'a mut StateBasedResponsibilityNonstochasticGame<G, O>,
         partition: &'a PlayerPartition,
     ) -> Self {
         let players = GroupedGamePlayerDescriptions::new(partition.entries.len());
@@ -30,11 +30,11 @@ impl<'a, G: StateGroups, A: SolvableNonstochasticGame> GroupedGame<'a, G, A> {
         for (player_index, player) in self.partition.entries.iter().enumerate() {
             if coalition.is_in_coalition(player_index) {
                 for &entry in &player.players {
-                    self.game.set_group_owners(entry, TwoPlayer::PlayerOne);
+                    self.game.set_group_owners(entry, TwoPlayer::Eve);
                 }
             } else {
                 for &entry in &player.players {
-                    self.game.set_group_owners(entry, TwoPlayer::PlayerTwo);
+                    self.game.set_group_owners(entry, TwoPlayer::Adam);
                 }
             }
         }
@@ -43,15 +43,15 @@ impl<'a, G: StateGroups, A: SolvableNonstochasticGame> GroupedGame<'a, G, A> {
     pub fn get_winning_region<C: CoalitionSpecifier>(
         &mut self,
         coalition: C,
-    ) -> A::WinningRegionType {
+    ) -> WinningRegion {
         self.set_owners(coalition);
 
         self.game.get_winning_region_with_current_owners()
     }
 }
 
-impl<'a, G: StateGroups, A: SolvableNonstochasticGame> SimpleCooperativeGame
-    for GroupedGame<'a, G, A>
+impl<'a, G: StateGroups, O: Objective> SimpleCooperativeGame
+    for GroupedGame<'a, G, O>
 {
     type PlayerDescriptions = GroupedGamePlayerDescriptions;
 
@@ -75,8 +75,8 @@ impl<'a, G: StateGroups, A: SolvableNonstochasticGame> SimpleCooperativeGame
     }
 }
 
-impl<'a, G: StateGroups, A: SolvableNonstochasticGame> MonotoneCooperativeGame
-    for GroupedGame<'a, G, A>
+impl<'a, G: StateGroups, O: Objective> MonotoneCooperativeGame
+    for GroupedGame<'a, G, O>
 {
 }
 

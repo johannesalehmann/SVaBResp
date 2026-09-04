@@ -12,16 +12,15 @@ mod partition;
 
 use super::StateBasedResponsibilityNonstochasticGame;
 use crate::shapley::MinimalCoalitionCache;
+use crate::state_based::game::{Objective, WinningRegion};
 use crate::state_based::grouping::StateGroups;
 use log::trace;
 pub use partition::{PlayerPartition, PlayerPartitionEntry};
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
-use probabilistic_model_algorithms::regions::StateRegion;
 
 pub trait GroupBlockingProvider {
-    fn compute_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn compute_blocks<G: StateGroups, O: Objective>(
         self,
-        game: &mut StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &mut StateBasedResponsibilityNonstochasticGame<G, O>,
     ) -> PlayerPartition;
 }
 
@@ -34,9 +33,9 @@ impl IdentityGroupBlockingProvider {
 }
 
 impl GroupBlockingProvider for IdentityGroupBlockingProvider {
-    fn compute_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn compute_blocks<G: StateGroups, O: Objective>(
         self,
-        game: &mut StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &mut StateBasedResponsibilityNonstochasticGame<G, O>,
     ) -> PlayerPartition {
         let mut partition = PlayerPartition::new();
         for player in 0..game.get_grouping().get_count() {
@@ -82,9 +81,9 @@ impl<
 > GroupBlockingProvider
     for RefinementGroupBlockingProvider<InitialPartition, SelectionHeuristics, SplittingHeuristics>
 {
-    fn compute_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn compute_blocks<G: StateGroups, O: Objective>(
         self,
-        game: &mut StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &mut StateBasedResponsibilityNonstochasticGame<G, O>,
     ) -> PlayerPartition {
         let mut algorithm = RefinementAlgorithm::new(
             game,
@@ -97,16 +96,16 @@ impl<
     }
 }
 
-pub struct BlockSwitchingPair<R: StateRegion> {
+pub struct BlockSwitchingPair {
     block_index: usize,
     #[allow(unused)]
     // It might be useful to have the coalition available in the future, even if it currently is not used
     coalition_bitmap: u64,
-    winning_region_without: R,
-    winning_region_with: R,
+    winning_region_without: WinningRegion,
+    winning_region_with: WinningRegion,
 }
 
-impl<R: StateRegion> BlockSwitchingPair<R> {
+impl BlockSwitchingPair {
     fn winning_region_size_delta(&self) -> usize {
         self.winning_region_with.size() - self.winning_region_without.size()
     }
@@ -115,11 +114,11 @@ impl<R: StateRegion> BlockSwitchingPair<R> {
 pub struct RefinementAlgorithm<
     'a,
     G: StateGroups,
-    A: SolvableNonstochasticGame,
+    O: Objective,
     SelectionHeuristics: BlockSelectionHeuristics,
     SplittingHeuristics: BlockSplittingHeuristics,
 > {
-    game: &'a mut StateBasedResponsibilityNonstochasticGame<G, A>,
+    game: &'a mut StateBasedResponsibilityNonstochasticGame<G, O>,
     current_partition: PlayerPartition,
     selection_heuristics: SelectionHeuristics,
     splitting_heuristics: SplittingHeuristics,
@@ -128,13 +127,13 @@ pub struct RefinementAlgorithm<
 impl<
     'a,
     G: StateGroups,
-    A: SolvableNonstochasticGame,
+    O: Objective,
     SelectionHeuristics: BlockSelectionHeuristics,
     SplittingHeuristics: BlockSplittingHeuristics,
-> RefinementAlgorithm<'a, G, A, SelectionHeuristics, SplittingHeuristics>
+> RefinementAlgorithm<'a, G, O, SelectionHeuristics, SplittingHeuristics>
 {
     pub fn new<I: InitialPartitionProvider>(
-        game: &'a mut StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &'a mut StateBasedResponsibilityNonstochasticGame<G, O>,
         initial_coalition_provider: I,
         selection_heuristics: SelectionHeuristics,
         splitting_heuristics: SplittingHeuristics,
@@ -158,7 +157,7 @@ impl<
         trace!("Finished refinement");
     }
 
-    pub fn iteration(&mut self, bsps: Vec<BlockSwitchingPair<A::WinningRegionType>>) {
+    pub fn iteration(&mut self, bsps: Vec<BlockSwitchingPair>) {
         trace!("Performing refinement iteration");
         trace!("Selecting refinement targets");
         let to_refine =
@@ -180,7 +179,7 @@ impl<
 
     pub fn compute_refinement_candidates(
         &mut self,
-    ) -> Option<Vec<BlockSwitchingPair<A::WinningRegionType>>> {
+    ) -> Option<Vec<BlockSwitchingPair>> {
         trace!("Computing refinement candidates");
         let mut bsps = Vec::with_capacity(self.current_partition.entries.len());
         for _ in 0..self.current_partition.entries.len() {

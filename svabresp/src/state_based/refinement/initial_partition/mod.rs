@@ -6,11 +6,11 @@ pub use singleton::SingletonInitialPartition;
 
 use super::PlayerPartition;
 use crate::state_based::{StateBasedResponsibilityNonstochasticGame, grouping::StateGroups};
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
+use crate::state_based::game::Objective;
 
 pub trait InitialPartitionProvider {
-    fn get_initial_coalition<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn get_initial_coalition<G: StateGroups, O: Objective>(
         self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
     ) -> PlayerPartition;
 }

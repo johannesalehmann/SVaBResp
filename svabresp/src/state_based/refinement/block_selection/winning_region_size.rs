@@ -1,9 +1,9 @@
 use crate::state_based::StateBasedResponsibilityNonstochasticGame;
 use crate::state_based::grouping::StateGroups;
+use crate::state_based::game::Objective;
 use crate::state_based::refinement::{
     BlockSelectionHeuristics, BlockSwitchingPair, PlayerPartition,
 };
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
 
 pub struct WinningRegionSizeSelectionHeuristics {
     blocks_per_iteration: usize,
@@ -31,12 +31,12 @@ impl WinningRegionSizeSelectionHeuristics {
 }
 
 impl BlockSelectionHeuristics for WinningRegionSizeSelectionHeuristics {
-    fn select_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn select_blocks<G: StateGroups, O: Objective>(
         &mut self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
         partition: &PlayerPartition,
-        mut refinement_candidates: Vec<BlockSwitchingPair<A::WinningRegionType>>,
-    ) -> Vec<BlockSwitchingPair<A::WinningRegionType>> {
+        mut refinement_candidates: Vec<BlockSwitchingPair>,
+    ) -> Vec<BlockSwitchingPair> {
         let _ = (game, partition);
 
         refinement_candidates.sort_by(|r1, r2| {

@@ -6,13 +6,13 @@ pub use random::RandomSplittingHeuristics;
 
 use super::PlayerPartition;
 use crate::state_based::{StateBasedResponsibilityNonstochasticGame, grouping::StateGroups};
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
+use crate::state_based::game::Objective;
 
 pub trait BlockSplittingHeuristics {
-    fn split_block<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn split_block<G: StateGroups, O: Objective>(
         &mut self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
         partition: &mut PlayerPartition,
-        bsp: super::BlockSwitchingPair<A::WinningRegionType>,
+        bsp: super::BlockSwitchingPair,
     );
 }

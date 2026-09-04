@@ -1,24 +1,22 @@
 use crate::shapley::{CoalitionSpecifier, MonotoneCooperativeGame, SimpleCooperativeGame};
+use crate::state_based::game::{Game, Objective, SolvableGame, StateIdx, WinningRegion};
 use crate::state_based::grouping::StateGroups;
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
-use probabilistic_models::TwoPlayer;
+use probabilistic_models::owners::TwoPlayer;
 
-pub struct StateBasedResponsibilityNonstochasticGame<G: StateGroups, A: SolvableNonstochasticGame> {
-    solvable: A,
+pub struct StateBasedResponsibilityNonstochasticGame<G: StateGroups, O: Objective> {
+    solvable: SolvableGame<O>,
     pub grouping: G,
-    always_helping: Vec<usize>,
-    always_adversarial: Vec<usize>,
+    always_helping: Vec<StateIdx>,
+    always_adversarial: Vec<StateIdx>,
     group_names: super::GroupNames,
 }
 
-impl<'a, G: StateGroups, A: SolvableNonstochasticGame>
-    StateBasedResponsibilityNonstochasticGame<G, A>
-{
+impl<G: StateGroups, O: Objective> StateBasedResponsibilityNonstochasticGame<G, O> {
     pub fn new(
-        solvable: A,
+        solvable: SolvableGame<O>,
         grouping: G,
-        always_helping: Vec<usize>,
-        always_adversarial: Vec<usize>,
+        always_helping: Vec<StateIdx>,
+        always_adversarial: Vec<StateIdx>,
     ) -> Self {
         let group_names = super::GroupNames::from_grouping(&grouping);
         Self {
@@ -33,7 +31,7 @@ impl<'a, G: StateGroups, A: SolvableNonstochasticGame>
     pub fn map_grouping<G2: StateGroups, F: Fn(G) -> G2>(
         self,
         map: F,
-    ) -> StateBasedResponsibilityNonstochasticGame<G2, A> {
+    ) -> StateBasedResponsibilityNonstochasticGame<G2, O> {
         let grouping = map(self.grouping);
         let group_names = super::GroupNames::from_grouping(&grouping);
 
@@ -50,30 +48,30 @@ impl<'a, G: StateGroups, A: SolvableNonstochasticGame>
         &self.grouping
     }
 
-    pub fn get_solvable(&self) -> &A {
-        &self.solvable
+    pub fn get_game(&self) -> &Game {
+        self.solvable.game()
     }
 
     pub fn set_state_owners<C: CoalitionSpecifier>(&mut self, coalition: C) {
         self.set_auxiliary_state_owners();
         for i in 0..self.grouping.get_count() {
             if coalition.is_in_coalition(i) {
-                self.set_group_owners(i, TwoPlayer::PlayerOne);
+                self.set_group_owners(i, TwoPlayer::Eve);
             } else {
-                self.set_group_owners(i, TwoPlayer::PlayerTwo);
+                self.set_group_owners(i, TwoPlayer::Adam);
             }
         }
     }
 
     pub fn set_auxiliary_state_owners(&mut self) {
         for state in self.grouping.get_dummy_states() {
-            self.solvable.set_owner(state, TwoPlayer::PlayerOne);
+            self.solvable.set_owner(state, TwoPlayer::Eve);
         }
         for &state in &self.always_helping {
-            self.solvable.set_owner(state, TwoPlayer::PlayerOne);
+            self.solvable.set_owner(state, TwoPlayer::Eve);
         }
         for &state in &self.always_adversarial {
-            self.solvable.set_owner(state, TwoPlayer::PlayerTwo);
+            self.solvable.set_owner(state, TwoPlayer::Adam);
         }
     }
 
@@ -87,24 +85,21 @@ impl<'a, G: StateGroups, A: SolvableNonstochasticGame>
     // would be nicer if this were handled by passing a suitable CoalitionSpecifier to the main
     // function instead of setting the owners explicitly.
     pub fn is_winning_with_current_owners(&mut self) -> bool {
-        self.solvable.get_winner() == TwoPlayer::PlayerOne
+        self.solvable.winner() == TwoPlayer::Eve
     }
 
-    pub fn get_winning_region<C: CoalitionSpecifier>(
-        &mut self,
-        coalition: C,
-    ) -> A::WinningRegionType {
+    pub fn get_winning_region<C: CoalitionSpecifier>(&mut self, coalition: C) -> WinningRegion {
         self.set_state_owners(coalition);
-        self.solvable.get_winning_region()
+        self.solvable.winning_region()
     }
 
-    pub fn get_winning_region_with_current_owners(&mut self) -> A::WinningRegionType {
-        self.solvable.get_winning_region()
+    pub fn get_winning_region_with_current_owners(&mut self) -> WinningRegion {
+        self.solvable.winning_region()
     }
 }
 
-impl<G: StateGroups, A: SolvableNonstochasticGame> SimpleCooperativeGame
-    for StateBasedResponsibilityNonstochasticGame<G, A>
+impl<G: StateGroups, O: Objective> SimpleCooperativeGame
+    for StateBasedResponsibilityNonstochasticGame<G, O>
 {
     type PlayerDescriptions = super::GroupNames;
 
@@ -122,11 +117,11 @@ impl<G: StateGroups, A: SolvableNonstochasticGame> SimpleCooperativeGame
 
     fn is_winning<C: CoalitionSpecifier>(&mut self, coalition: C) -> bool {
         self.set_state_owners(coalition);
-        self.solvable.get_winner() == TwoPlayer::PlayerOne
+        self.solvable.winner() == TwoPlayer::Eve
     }
 }
 
-impl<G: StateGroups, A: SolvableNonstochasticGame> MonotoneCooperativeGame
-    for StateBasedResponsibilityNonstochasticGame<G, A>
+impl<G: StateGroups, O: Objective> MonotoneCooperativeGame
+    for StateBasedResponsibilityNonstochasticGame<G, O>
 {
 }

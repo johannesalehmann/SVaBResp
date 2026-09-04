@@ -12,18 +12,16 @@ pub mod syntax_highlighting;
 
 pub use prism_model_builder::UserProvidedConstValue;
 
-use chumsky::span::SimpleSpan;
-use prism_model::{Expression, Identifier, VariableReference};
+use prism_model::{Expression, FullSpan, Identifier, VariableReference};
 
 type PrismModel = prism_model::Model<
-    (),
-    Identifier<SimpleSpan>,
-    Expression<VariableReference, SimpleSpan>,
     VariableReference,
-    SimpleSpan,
+    FullSpan,
+    Expression<VariableReference, FullSpan>,
+    Identifier<FullSpan>,
 >;
 type PrismProperty = probabilistic_properties::Query<
-    Expression<VariableReference, SimpleSpan>,
-    Expression<VariableReference, SimpleSpan>,
-    Expression<VariableReference, SimpleSpan>,
+    Expression<VariableReference, FullSpan>,
+    Expression<VariableReference, FullSpan>,
+    Expression<VariableReference, FullSpan>,
 >;

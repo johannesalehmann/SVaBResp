@@ -9,13 +9,13 @@ pub use winning_region_size::{WinningRegionSizeCriterion, WinningRegionSizeSelec
 
 use super::{BlockSwitchingPair, PlayerPartition};
 use crate::state_based::{StateBasedResponsibilityNonstochasticGame, grouping::StateGroups};
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
+use crate::state_based::game::Objective;
 
 pub trait BlockSelectionHeuristics {
-    fn select_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn select_blocks<G: StateGroups, O: Objective>(
         &mut self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
         partition: &PlayerPartition,
-        block_switching_pairs: Vec<BlockSwitchingPair<A::WinningRegionType>>,
-    ) -> Vec<BlockSwitchingPair<A::WinningRegionType>>;
+        block_switching_pairs: Vec<BlockSwitchingPair>,
+    ) -> Vec<BlockSwitchingPair>;
 }

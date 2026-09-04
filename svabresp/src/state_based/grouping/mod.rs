@@ -1,8 +1,10 @@
 mod group_extraction;
 pub use group_extraction::*;
 
+use super::game::StateIdx;
+
 pub trait StateGroups {
-    type Iter<'a>: Iterator<Item = usize>
+    type Iter<'a>: Iterator<Item = StateIdx>
     where
         Self: 'a;
 
@@ -29,14 +31,14 @@ impl VectorStateGroups {
 }
 
 pub struct VectorStateGroup {
-    states: Vec<usize>,
+    states: Vec<StateIdx>,
     label: String,
 }
 
 pub struct VectorStateGroupBuilder {
     groups: Vec<VectorStateGroup>,
-    group_in_progress: Vec<usize>,
-    dummy_states: Vec<usize>,
+    group_in_progress: Vec<StateIdx>,
+    dummy_states: Vec<StateIdx>,
 }
 
 impl VectorStateGroupBuilder {
@@ -48,15 +50,15 @@ impl VectorStateGroupBuilder {
         }
     }
 
-    pub fn add_state(&mut self, state: usize) {
+    pub fn add_state(&mut self, state: StateIdx) {
         self.group_in_progress.push(state);
     }
 
-    pub fn add_dummy_state(&mut self, state: usize) {
+    pub fn add_dummy_state(&mut self, state: StateIdx) {
         self.dummy_states.push(state);
     }
 
-    pub fn create_group_from_vec(&mut self, states: Vec<usize>, label: String) {
+    pub fn create_group_from_vec(&mut self, states: Vec<StateIdx>, label: String) {
         if self.group_in_progress.len() > 0 {
             panic!("must finish previous group before creating a state group from a vector");
         }
@@ -83,7 +85,7 @@ impl VectorStateGroupBuilder {
 }
 
 impl StateGroups for VectorStateGroups {
-    type Iter<'a> = std::iter::Cloned<std::slice::Iter<'a, usize>>;
+    type Iter<'a> = std::iter::Cloned<std::slice::Iter<'a, StateIdx>>;
 
     fn get_count(&self) -> usize {
         self.groups.len()

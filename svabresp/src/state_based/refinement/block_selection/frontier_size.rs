@@ -3,9 +3,8 @@ use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{
     BlockSelectionHeuristics, BlockSwitchingPair, PlayerPartition,
 };
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
-use probabilistic_model_algorithms::regions::StateRegion;
-use probabilistic_models::{ActionCollection, Distribution};
+use probabilistic_models::traits::ReadStateSpace;
+use crate::state_based::game::Objective;
 
 pub struct FrontierSizeSelectionHeuristics {
     blocks_per_iteration: usize,
@@ -20,34 +19,30 @@ impl FrontierSizeSelectionHeuristics {
 }
 
 impl BlockSelectionHeuristics for FrontierSizeSelectionHeuristics {
-    fn select_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn select_blocks<G: StateGroups, O: Objective>(
         &mut self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
         partition: &PlayerPartition,
-        refinement_candidates: Vec<BlockSwitchingPair<A::WinningRegionType>>,
-    ) -> Vec<BlockSwitchingPair<A::WinningRegionType>> {
+        refinement_candidates: Vec<BlockSwitchingPair>,
+    ) -> Vec<BlockSwitchingPair> {
         let _ = (game, partition);
 
         let mut res = Vec::new();
 
-        let game = game.get_solvable().get_game();
+        let game = game.get_game();
         for refinement_candidate in refinement_candidates {
             let mut frontier_size = 0;
-            for state in 0..game.states.len() {
+            for state in game.states() {
                 if refinement_candidate.winning_region_with.contains(state)
                     && !refinement_candidate.winning_region_without.contains(state)
                 {
-                    for action in game.states[state].actions.iter() {
-                        for transition in action.successors.iter() {
-                            if refinement_candidate
-                                .winning_region_with
-                                .contains(transition.index)
-                                || !refinement_candidate
-                                    .winning_region_without
-                                    .contains(transition.index)
-                            {
-                                frontier_size += 1;
-                            }
+                    for destination in game.successors_of_state(state) {
+                        if refinement_candidate.winning_region_with.contains(destination)
+                            || !refinement_candidate
+                                .winning_region_without
+                                .contains(destination)
+                        {
+                            frontier_size += 1;
                         }
                     }
                 }

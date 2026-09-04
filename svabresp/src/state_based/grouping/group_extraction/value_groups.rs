@@ -1,12 +1,10 @@
 use crate::shapley::{ResponsibilityValues, SwitchingPairCollection};
 use crate::state_based::grouping::GroupsAndAuxiliary;
+use crate::state_based::game::{ApIdx, Game, variable_index};
 use crate::{PrismModel, PrismProperty};
-use chumsky::prelude::SimpleSpan;
-use prism_model::{VariableRange, VariableReference};
-use probabilistic_models::{
-    AtomicProposition, Context, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation,
-    VectorPredecessors,
-};
+use prism_model::{FullSpan, Span, VariableRange};
+use probabilistic_models::traits::{ReadStateSpace, ReadValuations};
+use probabilistic_models::valuations::ValuationBits;
 use probabilistic_properties::Query;
 use std::collections::HashMap;
 use std::fmt::Formatter;
@@ -112,7 +110,7 @@ struct VariableValuationEntry<V> {
 pub struct ValueGroupExtractionScheme {
     variables: Vec<String>,
     variable_types: Option<Vec<VariableType>>,
-    spans: Vec<SimpleSpan>,
+    spans: Vec<FullSpan>,
     variable_highlighting_infos: Option<Vec<VariableHighlightingInfo<()>>>,
 }
 
@@ -134,10 +132,9 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
         &mut self,
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
-        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
         character_to_line: &prism_parser::CharacterToLineMap,
     ) {
-        let _ = (property, atomic_propositions, character_to_line);
+        let _ = (property, character_to_line);
 
         let mut variable_types = Vec::with_capacity(self.variables.len());
         let mut variable_highlighting_info = Vec::with_capacity(self.variables.len());
@@ -165,11 +162,11 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
         self.variable_highlighting_infos = Some(variable_highlighting_info);
     }
 
-    fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
+    fn create_groups(
         &mut self,
-        game: &mut ProbabilisticModel<M>,
-        property: &Query<i64, f64, AtomicProposition>,
-    ) -> GroupsAndAuxiliary<Self::GroupType> {
+        game: Game,
+        property: &Query<i64, f64, ApIdx>,
+    ) -> (Game, GroupsAndAuxiliary<Self::GroupType>) {
         let _ = property;
 
         let variable_types = self.variable_types.as_ref().unwrap();
@@ -182,25 +179,20 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
             .variables
             .iter()
             .map(|v| {
-                game.valuation_context
-                    .get_index_by_name(v)
-                    .expect("Variable {} is omitted in the model")
+                variable_index(&game.state_valuations, v)
+                    .unwrap_or_else(|| panic!("Variable {} is omitted in the model", v))
             })
             .collect::<Vec<_>>();
 
-        for (i, state) in game.states.iter().enumerate() {
+        for state in game.states() {
+            let valuation = game.state_valuation(state);
             let mut values = Vec::new();
             for (&index, var_type) in indices.iter().zip(variable_types.iter()) {
                 match var_type {
-                    VariableType::BoundedInt => {
-                        values.push(Value::Int(state.valuation.evaluate_bounded_int(index)))
+                    VariableType::BoundedInt | VariableType::UnboundedInt => {
+                        values.push(Value::Int(valuation.evaluate_int(index)))
                     }
-                    VariableType::UnboundedInt => {
-                        values.push(Value::Int(state.valuation.evaluate_unbounded_int(index)))
-                    }
-                    VariableType::Bool => {
-                        values.push(Value::Bool(state.valuation.evaluate_bool(index)))
-                    }
+                    VariableType::Bool => values.push(Value::Bool(valuation.evaluate_bool(index))),
                 }
             }
             if !group_indices.contains_key(&values) {
@@ -233,10 +225,10 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
                     );
                 }
                 group_indices.insert(values, groups.len());
-                groups.push((name, vec![i]));
+                groups.push((name, vec![state]));
             } else {
                 let index = group_indices[&values];
-                groups[index].1.push(i);
+                groups[index].1.push(state);
             }
         }
 
@@ -245,7 +237,7 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
             builder.create_group_from_vec(states, group_name);
         }
 
-        GroupsAndAuxiliary::new(builder.finish())
+        (game, GroupsAndAuxiliary::new(builder.finish()))
     }
 
     fn get_syntax_elements<S: AsRef<str>>(
@@ -279,6 +271,9 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
             .zip(self.spans.iter())
             .zip(variable_highlighting_infos.iter())
         {
+            let Some(range) = span.range() else {
+                continue;
+            };
             let influence = highlighting_infos.compute_influence();
 
             let mut tooltip = Vec::new();
@@ -337,8 +332,8 @@ impl super::GroupExtractionScheme for ValueGroupExtractionScheme {
             let tooltip = tooltip.join("") + &tooltip_switching_pairs.join("");
 
             highlighting.add_highlight(Highlight::new(
-                span.start,
-                span.end,
+                range.start,
+                range.end,
                 Colour::new(colour_ramp_index, influence),
                 tooltip,
             ))

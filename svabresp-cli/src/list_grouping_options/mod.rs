@@ -35,7 +35,7 @@ impl ListGroupingOptionsCommand {
 
         let mut variables = Vec::new();
         for variable in prism_model.variable_manager.variables.iter() {
-            if !variable.is_constant {
+            if !variable.is_constant() {
                 variables.push(GroupingOptionValue {
                     name: format!(
                         "{} ({}{})",
@@ -55,7 +55,7 @@ impl ListGroupingOptionsCommand {
         }
 
         let mut labels = Vec::new();
-        for label in prism_model.labels.labels {
+        for label in prism_model.labels.iter() {
             labels.push(GroupingOptionValue {
                 name: format!(
                     "{} ({})",

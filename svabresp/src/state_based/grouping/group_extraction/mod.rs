@@ -1,8 +1,5 @@
+use crate::state_based::game::{ApIdx, Game, StateIdx};
 use crate::{PrismModel, PrismProperty};
-use chumsky::span::SimpleSpan;
-use probabilistic_models::{
-    AtomicProposition, ModelTypes, ProbabilisticModel, TwoPlayer, VectorPredecessors,
-};
 
 mod action_groups;
 pub use action_groups::ActionGroupExtractionScheme;
@@ -18,7 +15,6 @@ pub use value_groups::ValueGroupExtractionScheme;
 
 mod label_groups;
 pub use label_groups::LabelGroupExtractionScheme;
-use prism_model::VariableReference;
 use probabilistic_properties::Query;
 
 mod relevant_states;
@@ -34,16 +30,16 @@ pub trait GroupExtractionScheme {
         &mut self,
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
-        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
         character_to_line: &prism_parser::CharacterToLineMap,
     ) {
     }
 
-    fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
+    // TODO: Pass game by &mut reference again.
+    fn create_groups(
         &mut self,
-        game: &mut ProbabilisticModel<M>,
-        property: &Query<i64, f64, AtomicProposition>,
-    ) -> GroupsAndAuxiliary<Self::GroupType>;
+        game: Game,
+        property: &Query<i64, f64, ApIdx>,
+    ) -> (Game, GroupsAndAuxiliary<Self::GroupType>);
 
     fn get_syntax_elements<S: AsRef<str>>(
         &self,
@@ -55,8 +51,8 @@ pub trait GroupExtractionScheme {
 
 pub struct GroupsAndAuxiliary<G: super::super::grouping::StateGroups> {
     pub groups: G,
-    pub always_helping: Vec<usize>,
-    pub always_adversarial: Vec<usize>,
+    pub always_helping: Vec<StateIdx>,
+    pub always_adversarial: Vec<StateIdx>,
 }
 
 impl<G: super::super::grouping::StateGroups> GroupsAndAuxiliary<G> {
@@ -69,8 +65,8 @@ impl<G: super::super::grouping::StateGroups> GroupsAndAuxiliary<G> {
     }
     pub fn with_auxiliary(
         groups: G,
-        always_helping: Vec<usize>,
-        always_adversarial: Vec<usize>,
+        always_helping: Vec<StateIdx>,
+        always_adversarial: Vec<StateIdx>,
     ) -> Self {
         Self {
             groups,

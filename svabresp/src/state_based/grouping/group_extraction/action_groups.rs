@@ -1,18 +1,31 @@
 use crate::shapley::{ResponsibilityValues, SwitchingPairCollection};
+use crate::state_based::game::{
+    ActionIdx, ApIdx, Game, GameChoiceLabels, PredecessorIdx, StateIdx, single_valuation_class,
+    variable_index,
+};
 use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
-use chumsky::prelude::SimpleSpan;
-use prism_model::{Expression, VariableRange, VariableReference};
-use probabilistic_models::{
-    Action, ActionCollection, AtomicProposition, AtomicPropositions, Builder, Context,
-    Distribution, DistributionBuilder, ModelTypes, Predecessors, PredecessorsBuilder,
-    ProbabilisticModel, State, Successor, TwoPlayer, Valuation, VectorPredecessors,
-};
+use prism_model::{Expression, FullSpan, Identifier, Span, VariableInfo, VariableRange};
+use probabilistic_models::base_model::TwoPlayerTurnBasedGame;
+use probabilistic_models::labels::ReadLabels;
+use probabilistic_models::traits::{ReadStateSpace, ReadValuations};
+use probabilistic_models::typed_index_collections::Index;
+use probabilistic_models::valuations::{BareStandaloneValuation, ValuationBitsMut};
 use probabilistic_properties::Query;
 use std::collections::HashMap;
 
+// TODO: Instead of using constants for the variable names, store them in the extraction schemes.
+//  That way, we can handle the case where a variable with the name is already present.
+
+/// The PRISM variable that distinguishes the auxiliary states belonging to one original state.
+const ACTION_INDEX_VARIABLE: &str = "action_index_internal_var";
+
+/// The PRISM variable that marks the auxiliary states in which the coalition is offered the
+/// corresponding action.
+const QUESTIONMARK_VARIABLE: &str = "in_questionmark_state_internal_variable";
+
 pub struct ActionGroupExtractionScheme {
-    action_name_to_spans: HashMap<String, Vec<SimpleSpan>>,
+    action_name_to_spans: HashMap<String, Vec<FullSpan>>,
 }
 
 impl ActionGroupExtractionScheme {
@@ -30,43 +43,38 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
         &mut self,
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
-        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
         character_to_line: &prism_parser::CharacterToLineMap,
     ) {
-        let _ = (property, atomic_propositions);
+        let _ = property;
         // Add two variables to the PRISM code that will later be used during model construction to
         // assign unique values to additional auxiliary states. Adding the variables at this stage
         // is easier than adding them after the model builder has run
-        use prism_model::{Identifier, VariableInfo};
-        let span = chumsky::span::SimpleSpan::new(0, 0);
-
         prism_model
             .variable_manager
-            .add_variable(VariableInfo::with_initial_value(
-                Identifier::new("action_index_internal_var", span).unwrap(),
-                VariableRange::UnboundedInt { span },
-                false,
-                None,
-                Expression::Int(0, span),
-                span,
-            ))
+            .add_variable(
+                VariableInfo::global_var(
+                    Identifier::new(ACTION_INDEX_VARIABLE).unwrap(),
+                    VariableRange::unbounded_int(),
+                )
+                .initial_value(Expression::int(0)),
+            )
             .unwrap();
 
         prism_model
             .variable_manager
-            .add_variable(VariableInfo::new(
-                Identifier::new("in_questionmark_state_internal_variable", span).unwrap(),
-                VariableRange::Boolean { span },
-                false,
-                None,
-                span,
+            .add_variable(VariableInfo::global_var(
+                Identifier::new(QUESTIONMARK_VARIABLE).unwrap(),
+                VariableRange::bool(),
             ))
             .unwrap();
 
         let mut last_line = None;
         let mut in_line_counter = 0;
-        prism_model.name_unnamed_actions_with_custom_name(|_, l| {
-            let line = character_to_line.get_line(l.start);
+        prism_model.name_unnamed_actions_with_custom_name(|span| {
+            let line = span
+                .range()
+                .map(|range| character_to_line.get_line(range.start))
+                .unwrap_or(0);
             if last_line == Some(line) {
                 in_line_counter += 1;
             } else {
@@ -78,10 +86,10 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
             } else {
                 format!("_{}", in_line_counter)
             };
-            format!("unnamed_action_line_{}{}", line, suffix)
+            Identifier::new(format!("unnamed_action_line_{}{}", line, suffix)).unwrap()
         });
 
-        for module in &prism_model.modules.modules {
+        for module in prism_model.modules.iter() {
             for command in &module.commands {
                 let span = match &command.action {
                     None => command.action_span.clone(),
@@ -104,199 +112,285 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
         }
     }
 
-    fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
+    fn create_groups(
         &mut self,
-        game: &mut ProbabilisticModel<M>,
-        property: &Query<i64, f64, AtomicProposition>,
-    ) -> GroupsAndAuxiliary<Self::GroupType> {
+        game: Game,
+        property: &Query<i64, f64, ApIdx>,
+    ) -> (Game, GroupsAndAuxiliary<Self::GroupType>) {
         let _ = property;
 
-        let mut state_groups = Vec::with_capacity(game.action_names.len());
-        for action_name in &game.action_names {
-            state_groups.push((action_name.clone(), Vec::new()));
-        }
-        let mut helper_state_group = Vec::new();
-        let mut adversary_state_group = Vec::new();
+        // TODO: This function is largely AI-written after a major refactor. At the time of writing,
+        //  tiny-pmc does not expose a robust interface to modify existing models. Thus, it is not
+        //  possible to refactor the existing code in a nice way, thus yielding the highly complex
+        //  and hard-to-reason-about code that follows.
+        //  Once an interface to modify existing models exists, this function should likely be
+        //  rewritten from scratch (based off the old function from before the refactor). Until this
+        //  is the case, keep in mind that what follows has not been vetted as thoroughly as the
+        //  rest of the refactor.
 
-        let action_index_variable = game
-            .valuation_context
-            .get_index_by_name("action_index_internal_var")
-            .unwrap();
-        let in_questionmark_state_variable = game
-            .valuation_context
-            .get_index_by_name("in_questionmark_state_internal_variable")
-            .unwrap();
+        // Every original state `s` with actions `a_0, ..., a_{k-1}` is expanded into a chain in
+        // which the coalition is offered one action at a time:
+        //
+        //   N_j --try--> Q_j --a_j--> (original successors of a_j)
+        //    |            |
+        //    | continue   | do_not_use
+        //    v            v
+        //   N_{j+1} (or A_s once every action has been offered)
+        //
+        // `N_j` belongs to the group of action `a_j`, `Q_j` is always controlled by the coalition
+        // and `A_s`, which offers every action, is always controlled by the adversary. `N_0` keeps
+        // the index of the original state so that transitions into `s` need not be rewritten; the
+        // remaining states are appended after all original states.
+        let old_state_count = game.states().len();
 
-        let continue_action_index = game.action_names.len();
-        game.action_names
-            .push("continue_to_next_action".to_string());
+        let choice_count_of_state: Vec<usize> = game
+            .states()
+            .into_iter()
+            .map(|state| game.choices_of_state(state).len())
+            .collect();
 
-        let try_action_index = game.action_names.len();
-        game.action_names.push("try_activate_action".to_string());
-
-        let back_action_index = game.action_names.len();
-        game.action_names.push("do_not_use_action".to_string());
-
-        for state_index in 0..game.states.len() {
-            let state = &game.states[state_index];
-            let base_owner = state.owner;
-            let base_atomic_propositions = M::AtomicPropositions::from_other(
-                game.atomic_proposition_count,
-                &state.atomic_propositions,
-            );
-            let base_valuation = state.valuation.clone();
-            let mut targets = Vec::new();
-            let mut action_name_indices = Vec::new();
-            for action in state.actions.iter() {
-                let mut successors = Vec::new();
-                for successor in action.successors.iter() {
-                    successors.push(successor.clone());
-                }
-                targets.push(successors);
-                action_name_indices.push(action.action_name_index);
-            }
-
-            let action_count = state.actions.get_number_of_actions();
-            if action_count == 0 {
-                adversary_state_group.push(state_index);
-            }
-
-            for action_index in 0..action_count {
-                let n = if action_index == 0 {
-                    game.states.len()
-                } else {
-                    game.states.len() + 1
-                };
-                {
-                    let mut normal_state_actions = <M::ActionCollection>::get_builder();
-                    let mut next_normal = <M::Distribution>::get_builder();
-                    next_normal.add_successor(Successor {
-                        index: n + 1,
-                        probability: 1.0,
-                    });
-                    normal_state_actions.add_action(Action {
-                        successors: next_normal.finish(),
-                        action_name_index: continue_action_index,
-                    });
-
-                    let mut questionmark = <M::Distribution>::get_builder();
-                    questionmark.add_successor(Successor {
-                        index: n,
-                        probability: 1.0,
-                    });
-                    normal_state_actions.add_action(Action {
-                        successors: questionmark.finish(),
-                        action_name_index: try_action_index,
-                    });
-
-                    let mut valuation = base_valuation.clone();
-                    valuation.set_unbounded_int(action_index_variable, action_index as i64);
-                    let normal_state = State {
-                        valuation,
-                        actions: normal_state_actions.finish(),
-                        atomic_propositions: M::AtomicPropositions::from_other(
-                            game.atomic_proposition_count,
-                            &base_atomic_propositions,
-                        ),
-                        owner: base_owner,
-                        predecessors: <<M::Predecessors as Predecessors>::Builder>::create()
-                            .finish(),
-                    };
-
-                    if action_index == 0 {
-                        state_groups[action_name_indices[action_index]]
-                            .1
-                            .push(state_index);
-                        game.states[state_index] = normal_state;
-                    } else {
-                        state_groups[action_name_indices[action_index]]
-                            .1
-                            .push(game.states.len());
-                        game.states.push(normal_state);
-                    }
-                }
-
-                {
-                    let mut questionmark_actions = <M::ActionCollection>::get_builder();
-                    let mut next_normal = <M::Distribution>::get_builder();
-                    next_normal.add_successor(Successor {
-                        index: n + 1,
-                        probability: 1.0,
-                    });
-                    questionmark_actions.add_action(Action {
-                        successors: next_normal.finish(),
-                        action_name_index: back_action_index,
-                    });
-
-                    let mut follow_action = <M::Distribution>::get_builder();
-                    for successor in &targets[action_index] {
-                        follow_action.add_successor(successor.clone());
-                    }
-                    questionmark_actions.add_action(Action {
-                        successors: follow_action.finish(),
-                        action_name_index: action_name_indices[action_index],
-                    });
-
-                    let mut valuation = base_valuation.clone();
-                    valuation.set_unbounded_int(action_index_variable, action_index as i64);
-                    valuation.set_bool(in_questionmark_state_variable, true);
-                    let questionmark_state = State {
-                        valuation,
-                        actions: questionmark_actions.finish(),
-                        atomic_propositions: M::AtomicPropositions::from_other(
-                            game.atomic_proposition_count,
-                            &base_atomic_propositions,
-                        ),
-                        owner: base_owner,
-                        predecessors: <<M::Predecessors as Predecessors>::Builder>::create()
-                            .finish(),
-                    };
-                    helper_state_group.push(game.states.len());
-                    game.states.push(questionmark_state);
-                }
-            }
-
-            {
-                let mut adversarial_actions = <M::ActionCollection>::get_builder();
-                for (&action_name_index, target) in action_name_indices.iter().zip(targets.iter()) {
-                    let mut target_distribution = <M::Distribution>::get_builder();
-                    for successor in target {
-                        target_distribution.add_successor(successor.clone());
-                    }
-                    adversarial_actions.add_action(Action {
-                        successors: target_distribution.finish(),
-                        action_name_index,
-                    });
-                }
-
-                let mut valuation = base_valuation.clone();
-                valuation.set_unbounded_int(action_index_variable, action_count as i64);
-                let adversarial_state = State {
-                    valuation,
-                    actions: adversarial_actions.finish(),
-                    atomic_propositions: M::AtomicPropositions::from_other(
-                        game.atomic_proposition_count,
-                        &base_atomic_propositions,
-                    ),
-                    owner: base_owner,
-                    predecessors: <<M::Predecessors as Predecessors>::Builder>::create().finish(),
-                };
-                adversary_state_group.push(game.states.len());
-                game.states.push(adversarial_state);
-            }
+        // The first index of the auxiliary states belonging to each original state. A state with
+        // `k >= 1` actions contributes `Q_0, N_1, Q_1, ..., N_{k-1}, Q_{k-1}, A_s`, i.e. `2k`
+        // states; a state without actions contributes only its (unreachable) `A_s`.
+        let mut extras_start = Vec::with_capacity(old_state_count);
+        let mut new_state_count = old_state_count;
+        for &k in &choice_count_of_state {
+            extras_start.push(new_state_count);
+            new_state_count += if k == 0 { 1 } else { 2 * k };
         }
 
-        game.rebuild_predecessors();
+        let index = |i: usize| StateIdx::from_raw(i as u32);
+        let normal = |s: usize, j: usize| {
+            if j == 0 {
+                index(s)
+            } else {
+                index(extras_start[s] + 2 * j - 1)
+            }
+        };
+        let questionmark = |s: usize, j: usize| index(extras_start[s] + 2 * j);
+        let adversary = |s: usize| {
+            let k = choice_count_of_state[s];
+            index(extras_start[s] + if k == 0 { 0 } else { 2 * k - 1 })
+        };
+        // Where `N_j` and `Q_j` go once action `a_j` has been declined.
+        let after = |s: usize, j: usize| {
+            if j + 1 < choice_count_of_state[s] {
+                normal(s, j + 1)
+            } else {
+                adversary(s)
+            }
+        };
+
+        // --- Choice labels ------------------------------------------------------------------
+        // Actions are copied in order, so the original action indices stay valid.
+        let original_action_count = game
+            .choices()
+            .into_iter()
+            .map(|choice| game.choice_labels.action_index(choice).raw() + 1)
+            .max()
+            .unwrap_or(0);
+
+        let mut labels = GameChoiceLabels::new();
+        let mut group_names = Vec::with_capacity(original_action_count);
+        for action in 0..original_action_count {
+            let label = game
+                .choice_labels
+                .label_of_action(ActionIdx::from_raw(action))
+                .clone();
+            group_names.push(label.clone().unwrap_or_else(|| "unnamed".to_string()));
+            labels.add_action(label);
+        }
+        let continue_action = labels.add_action(Some("continue_to_next_action".to_string()));
+        let try_action = labels.add_action(Some("try_activate_action".to_string()));
+        let back_action = labels.add_action(Some("do_not_use_action".to_string()));
+
+        // --- Transition structure -----------------------------------------------------------
+        let mut base = TwoPlayerTurnBasedGame::<StateIdx, _, _>::default();
+        let mut state_groups: Vec<Vec<StateIdx>> = vec![Vec::new(); original_action_count];
+        let mut helper_states = Vec::new();
+        let mut adversary_states = Vec::new();
+        // The original state each auxiliary state is derived from, in index order. Used below to
+        // copy valuations and atomic propositions.
+        let mut extra_base_states = Vec::with_capacity(new_state_count - old_state_count);
+        // Whether each auxiliary state is a "questionmark" state, and which action it belongs to.
+        let mut extra_action_index = Vec::with_capacity(new_state_count - old_state_count);
+        let mut extra_is_questionmark = Vec::with_capacity(new_state_count - old_state_count);
+
+        let action_of = |s: usize, j: usize| {
+            game.choice_labels
+                .action_index(game.choices_of_state(index(s)).index(j))
+        };
+
+        let add_choice = |base: &mut TwoPlayerTurnBasedGame<_, _, _>,
+                          labels: &mut GameChoiceLabels,
+                          action: ActionIdx| {
+            let choice = base.add_choice();
+            labels.label_entity(choice, action);
+        };
+
+        // Copy the branches of the `j`-th original choice of state `s`.
+        let copy_branches =
+            |base: &mut TwoPlayerTurnBasedGame<StateIdx, _, _>, s: usize, j: usize| {
+                let choice = game.choices_of_state(index(s)).index(j);
+                for branch in game.branches_of_choice(choice) {
+                    base.add_branch(
+                        game.branch_probability(branch),
+                        game.branch_destination(branch),
+                    );
+                }
+            };
+
+        // Pass 1: the original states, which become `N_0`.
+        for s in 0..old_state_count {
+            let owner = game.base.owners[index(s)];
+            base.add_state(index(s), owner);
+            let k = choice_count_of_state[s];
+            if k == 0 {
+                adversary_states.push(index(s));
+                continue;
+            }
+            state_groups[action_of(s, 0).raw()].push(index(s));
+
+            add_choice(&mut base, &mut labels, continue_action);
+            base.add_branch(1.0, after(s, 0));
+
+            add_choice(&mut base, &mut labels, try_action);
+            base.add_branch(1.0, questionmark(s, 0));
+        }
+
+        // Pass 2: the auxiliary states, in the index order fixed by `extras_start`.
+        for s in 0..old_state_count {
+            let owner = game.base.owners[index(s)];
+            let k = choice_count_of_state[s];
+
+            for j in 0..k {
+                if j > 0 {
+                    // `N_j`
+                    base.add_state(normal(s, j), owner);
+                    extra_base_states.push(index(s));
+                    extra_action_index.push(j);
+                    extra_is_questionmark.push(false);
+                    state_groups[action_of(s, j).raw()].push(normal(s, j));
+
+                    add_choice(&mut base, &mut labels, continue_action);
+                    base.add_branch(1.0, after(s, j));
+
+                    add_choice(&mut base, &mut labels, try_action);
+                    base.add_branch(1.0, questionmark(s, j));
+                }
+
+                // `Q_j`
+                base.add_state(questionmark(s, j), owner);
+                extra_base_states.push(index(s));
+                extra_action_index.push(j);
+                extra_is_questionmark.push(true);
+                helper_states.push(questionmark(s, j));
+
+                add_choice(&mut base, &mut labels, back_action);
+                base.add_branch(1.0, after(s, j));
+
+                add_choice(&mut base, &mut labels, action_of(s, j));
+                copy_branches(&mut base, s, j);
+            }
+
+            // `A_s`, which offers every original action to the adversary.
+            base.add_state(adversary(s), owner);
+            extra_base_states.push(index(s));
+            extra_action_index.push(k);
+            extra_is_questionmark.push(false);
+            adversary_states.push(adversary(s));
+
+            for j in 0..k {
+                add_choice(&mut base, &mut labels, action_of(s, j));
+                copy_branches(&mut base, s, j);
+            }
+        }
+
+        // --- Valuations ---------------------------------------------------------------------
+        // The auxiliary states inherit the valuation of the state they were derived from, with the
+        // two bookkeeping variables set. Building the new valuations before appending them keeps
+        // the immutable borrow of the old model separate from the mutable one.
+        let valuation_class = single_valuation_class(&game.state_valuations);
+        let action_index_variable = variable_index(&game.state_valuations, ACTION_INDEX_VARIABLE)
+            .expect("The auxiliary action index variable is missing from the built model");
+        let questionmark_variable = variable_index(&game.state_valuations, QUESTIONMARK_VARIABLE)
+            .expect("The auxiliary questionmark variable is missing from the built model");
+        let _ = valuation_class;
+
+        let extra_valuations: Vec<BareStandaloneValuation<_, _>> = extra_base_states
+            .iter()
+            .zip(extra_action_index.iter())
+            .zip(extra_is_questionmark.iter())
+            .map(|((&base_state, &action_index), &is_questionmark)| {
+                let entry = game.state_valuation(base_state);
+                let mut valuation = entry.clone_into_standalone_valuation();
+                valuation.set_int(action_index_variable, action_index as i64);
+                if is_questionmark {
+                    valuation.set_bool(questionmark_variable, true);
+                }
+                valuation.bare()
+            })
+            .collect();
+
+        // --- Atomic propositions ------------------------------------------------------------
+        let ap_indices: Vec<ApIdx> = game
+            .atomic_propositions
+            .internal_indices()
+            .into_iter()
+            .collect();
+        let ap_values: Vec<Vec<bool>> = ap_indices
+            .iter()
+            .map(|&ap| {
+                extra_base_states
+                    .iter()
+                    .map(|&base_state| game.atomic_propositions.entries()[ap][base_state])
+                    .collect()
+            })
+            .collect();
+
+        // --- Assemble the new game ----------------------------------------------------------
+        let Game {
+            initial,
+            mut atomic_propositions,
+            mut state_valuations,
+            ..
+        } = game;
+
+        for (offset, valuation) in extra_valuations.iter().enumerate() {
+            state_valuations.add_valuation(index(old_state_count + offset), valuation);
+        }
+
+        for (&ap, values) in ap_indices.iter().zip(ap_values) {
+            let annotation = atomic_propositions
+                .get_mut(ap)
+                .expect("atomic proposition disappeared while rebuilding the model");
+            for (offset, value) in values.into_iter().enumerate() {
+                annotation.add_value(index(old_state_count + offset), value);
+            }
+        }
+
+        let game = probabilistic_models::Model {
+            base,
+            initial,
+            choice_labels: labels,
+            branch_labels: (),
+            observations: (),
+            atomic_propositions,
+            rewards: (),
+            annotations: (),
+            state_valuations,
+            predecessors: (),
+        }
+        .compute_predecessors::<PredecessorIdx>();
 
         let mut builder = Self::GroupType::get_builder();
-        for (group_name, states) in state_groups {
+        for (group_name, states) in group_names.into_iter().zip(state_groups) {
             builder.create_group_from_vec(states, group_name);
         }
 
-        GroupsAndAuxiliary::with_auxiliary(
-            builder.finish(),
-            helper_state_group,
-            adversary_state_group,
+        (
+            game,
+            GroupsAndAuxiliary::with_auxiliary(builder.finish(), helper_states, adversary_states),
         )
     }
 
@@ -329,12 +423,14 @@ impl super::GroupExtractionScheme for ActionGroupExtractionScheme {
             );
 
             for span in spans {
-                highlighting.add_highlight(Highlight::new(
-                    span.start,
-                    span.end,
-                    Colour::new(colour_ramp_index, value),
-                    &tooltip,
-                ));
+                if let Some(range) = span.range() {
+                    highlighting.add_highlight(Highlight::new(
+                        range.start,
+                        range.end,
+                        Colour::new(colour_ramp_index, value),
+                        &tooltip,
+                    ));
+                }
             }
         }
 

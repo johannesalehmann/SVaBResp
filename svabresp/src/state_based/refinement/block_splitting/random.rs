@@ -2,9 +2,8 @@ use super::BlockSplittingHeuristics;
 use crate::state_based::StateBasedResponsibilityNonstochasticGame;
 use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{BlockSwitchingPair, PlayerPartition};
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
-use probabilistic_model_algorithms::regions::StateRegion;
-use rand::Rng;
+use rand::RngExt;
+use crate::state_based::game::Objective;
 
 pub struct RandomSplittingHeuristics {}
 
@@ -15,11 +14,11 @@ impl RandomSplittingHeuristics {
 }
 
 impl BlockSplittingHeuristics for RandomSplittingHeuristics {
-    fn split_block<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn split_block<G: StateGroups, O: Objective>(
         &mut self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
         partition: &mut PlayerPartition,
-        bsp: BlockSwitchingPair<A::WinningRegionType>,
+        bsp: BlockSwitchingPair,
     ) {
         let mut overlapping_players = Vec::new();
         let players = &partition.entries[bsp.block_index].players;

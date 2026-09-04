@@ -3,8 +3,8 @@ use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{
     BlockSelectionHeuristics, BlockSwitchingPair, PlayerPartition,
 };
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
-use rand::Rng;
+use rand::RngExt;
+use crate::state_based::game::Objective;
 
 pub struct RandomBlockSelectionHeuristics {
     blocks_per_iteration: usize,
@@ -19,12 +19,12 @@ impl RandomBlockSelectionHeuristics {
 }
 
 impl BlockSelectionHeuristics for RandomBlockSelectionHeuristics {
-    fn select_blocks<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn select_blocks<G: StateGroups, O: Objective>(
         &mut self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
         partition: &PlayerPartition,
-        mut refinement_candidates: Vec<BlockSwitchingPair<A::WinningRegionType>>,
-    ) -> Vec<BlockSwitchingPair<A::WinningRegionType>> {
+        mut refinement_candidates: Vec<BlockSwitchingPair>,
+    ) -> Vec<BlockSwitchingPair> {
         let _ = (game, partition);
 
         let mut res = Vec::new();

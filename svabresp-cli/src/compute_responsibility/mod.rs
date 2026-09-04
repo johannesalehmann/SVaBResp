@@ -623,22 +623,23 @@ trait OutputPrinter<T> {
 
 struct ResponsibilityValuesPrinter {}
 
-impl<PD: std::fmt::Display> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
+impl<PD: std::fmt::Display + Clone> OutputPrinter<ResponsibilityValues<PD, f64, f64>>
     for ResponsibilityValuesPrinter
 {
     fn print_human_readable(self, output: ResponsibilityValues<PD, f64, f64>) {
         println!("Responsibility values:");
         let mut counter = 0;
-        for player in output.players {
+        let mut players = output.players.clone();
+        players.sort_unstable_by(|p1, p2| p2.value.partial_cmp(&p1.value).unwrap());
+        for player in players {
             println!(
-                " {}: {} ({})",
+                " {}: {}",
                 player.player_info,
                 player
                     .value
                     .to_f64()
                     .map(|f| format!("{:.6}", f))
                     .unwrap_or_else(|| "err".to_string()),
-                player.value
             );
             if player.value > 0.0 {
                 counter += 1;

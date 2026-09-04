@@ -79,7 +79,7 @@ impl CriticalPairCounter<f64> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CriticalPairCounterState<V> {
     counts: Vec<V>,
 }
@@ -170,7 +170,7 @@ impl<P, V, VD> ResponsibilityValues<P, V, VD> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ResponsibilityValue<P, V, VD> {
     pub player_info: P,
     pub value: V,

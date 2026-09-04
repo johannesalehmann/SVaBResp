@@ -1,32 +1,54 @@
 use crate::shapley::{ResponsibilityValues, SwitchingPairCollection};
+use crate::state_based::game::{ApIdx, Game, variable_index};
 use crate::state_based::grouping::GroupsAndAuxiliary;
 use crate::{PrismModel, PrismProperty};
-use chumsky::span::SimpleSpan;
 use prism_model::{
-    Assignment, Command, Expression, Identifier, Module, Update, VariableInfo, VariableRange,
-    VariableReference,
+    Assignment, Command, Expression, FullSpan, Identifier, Module, Span, Update, VariableInfo,
+    VariableRange, VariableReference,
 };
-use probabilistic_models::{
-    AtomicProposition, Context, ModelTypes, ProbabilisticModel, TwoPlayer, Valuation,
-    VectorPredecessors,
-};
+use probabilistic_models::traits::{ReadStateSpace, ReadValuations};
+use probabilistic_models::valuations::ValuationBits;
 use probabilistic_properties::Query;
 use std::collections::HashMap;
 
+// TODO: Store this in the extraction scheme instead of as a constant. This allows adapting to cases
+//  where the variable name already exists.
+/// The name of the auxiliary PRISM variable that records which module the scheduler activated.
+const ACTIVE_MODULE_VARIABLE: &str = "_active_module";
+
+/// Builds the expression `_active_module = value`.
+fn active_module_is(
+    variable: VariableReference,
+    value: i64,
+) -> Expression<VariableReference, FullSpan> {
+    Expression::var_or_const(variable).equals_to(Expression::int(value))
+}
+
+/// Builds the update `1: (_active_module' = value)`.
+fn set_active_module(
+    variable: VariableReference,
+    value: i64,
+) -> Update<VariableReference, FullSpan> {
+    Update::with_assignments(
+        Expression::int(1),
+        vec![Assignment::new(variable, Expression::int(value))],
+    )
+}
+
 pub struct ModuleGroupInfo {
     name: String,
-    spans: Vec<SimpleSpan>,
+    spans: Vec<FullSpan>,
 }
 
 impl ModuleGroupInfo {
-    pub fn new<S: Into<String>>(name: S, spans: Vec<SimpleSpan>) -> Self {
+    pub fn new<S: Into<String>>(name: S, spans: Vec<FullSpan>) -> Self {
         Self {
             name: name.into(),
             spans,
         }
     }
 
-    pub fn with_single_span<S: Into<String>>(name: S, span: SimpleSpan) -> Self {
+    pub fn with_single_span<S: Into<String>>(name: S, span: FullSpan) -> Self {
         Self {
             name: name.into(),
             spans: vec![span],
@@ -57,39 +79,33 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
         &mut self,
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
-        atomic_propositions: &mut Vec<Expression<VariableReference, SimpleSpan>>,
         character_to_line: &prism_parser::CharacterToLineMap,
     ) {
-        let _ = (property, atomic_propositions, character_to_line);
+        let _ = (property, character_to_line);
 
-        let span = SimpleSpan::new(0, 0);
         let selected_module_variable = prism_model
             .variable_manager
-            .add_variable(VariableInfo::with_initial_value(
-                Identifier::new("_active_module", span).unwrap(),
-                VariableRange::UnboundedInt { span },
-                false,
-                Some(prism_model.modules.modules.len()),
-                Expression::Int(0, span),
-                span,
-            ))
+            .add_variable(
+                VariableInfo::local_var(
+                    Identifier::new(ACTIVE_MODULE_VARIABLE).unwrap(),
+                    VariableRange::unbounded_int(),
+                    prism_model.modules.len(),
+                )
+                .initial_value(Expression::int(0)),
+            )
             .unwrap();
 
         let mut action_infos: HashMap<String, ActionInfo> = HashMap::new();
-        for module in &prism_model.modules.modules {
+        for module in prism_model.modules.iter() {
             let mut module_action_guards: HashMap<String, Expression<_, _>> = HashMap::new();
-            let mut module_action_spans: HashMap<String, Vec<SimpleSpan>> = HashMap::new();
+            let mut module_action_spans: HashMap<String, Vec<FullSpan>> = HashMap::new();
             for command in &module.commands {
                 if let Some(action) = &command.action {
                     if module_action_guards.contains_key(&action.name) {
                         let current_guard = module_action_guards.get_mut(&action.name).unwrap();
-                        *current_guard = Expression::Disjunction(
-                            Box::new(command.guard.clone()),
-                            Box::new(current_guard.clone()),
-                            span,
-                        );
+                        *current_guard = command.guard.clone().or(current_guard.clone());
                         let current_spans = module_action_spans.get_mut(&action.name).unwrap();
-                        current_spans.push(action.span);
+                        current_spans.push(action.span.clone());
                     } else {
                         module_action_guards.insert(action.name.clone(), command.guard.clone());
                         module_action_spans.insert(action.name.clone(), vec![action.span.clone()]);
@@ -113,126 +129,64 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
             }
         }
 
-        let mut scheduler = Module::new(Identifier::new("scheduler", span).unwrap(), span);
+        let mut scheduler = Module::new(Identifier::new("scheduler").unwrap());
         self.group_info.push(ModuleGroupInfo::with_single_span(
             "scheduler",
-            prism_model.model_type.get_span().clone(),
+            prism_model.model_type.span().clone(),
         ));
 
-        for (module_index, module) in prism_model.modules.modules.iter_mut().enumerate() {
+        for (module_index, module) in prism_model.modules.iter_mut().enumerate() {
             self.group_info.push(ModuleGroupInfo::with_single_span(
                 module.name.name.clone(),
                 module.name.span.clone(),
             ));
             let execute_action = format!("execute_module_{}", module_index);
-            let mut guard = Expression::Bool(false, span);
+            let mut guard = Expression::bool(false);
             for command in &mut module.commands {
                 if command.action.is_none()
                     || !action_infos[&command.action.as_ref().unwrap().name].is_synchronising()
                 {
-                    guard = Expression::Disjunction(
-                        Box::new(guard),
-                        Box::new(command.guard.clone()),
-                        span,
-                    );
-                    command.action = Some(Identifier::new(execute_action.clone(), span).unwrap());
+                    guard = guard.or(command.guard.clone());
+                    command.action = Some(Identifier::new(execute_action.clone()).unwrap());
                 }
             }
 
-            let guard = Expression::Conjunction(
-                Box::new(guard),
-                Box::new(Expression::Equals(
-                    Box::new(Expression::VarOrConst(selected_module_variable, span)),
-                    Box::new(Expression::Int(0, span)),
-                    span,
-                )),
-                span,
-            );
+            let guard = guard.and(active_module_is(selected_module_variable, 0));
 
-            let mut select_command = Command::new(None, span, guard, span);
-            select_command.updates.push(Update::with_assignments(
-                Expression::Int(1, span),
-                vec![Assignment::new(
-                    selected_module_variable,
-                    Expression::Int(module_index as i64 + 1, span),
-                    span,
-                    span,
-                )],
-                span,
+            let mut select_command = Command::new(None, guard);
+            select_command.add_update(set_active_module(
+                selected_module_variable,
+                module_index as i64 + 1,
             ));
             scheduler.commands.push(select_command);
 
             let mut activate_command = Command::new(
-                Some(Identifier::new(execute_action.clone(), span).unwrap()),
-                span,
-                Expression::Equals(
-                    Box::new(Expression::VarOrConst(selected_module_variable, span)),
-                    Box::new(Expression::Int(module_index as i64 + 1, span)),
-                    span,
-                ),
-                span,
+                Some(Identifier::new(execute_action.clone()).unwrap()),
+                active_module_is(selected_module_variable, module_index as i64 + 1),
             );
-            activate_command.updates.push(Update::with_assignments(
-                Expression::Int(1, span),
-                vec![Assignment::new(
-                    selected_module_variable,
-                    Expression::Int(0, span),
-                    span,
-                    span,
-                )],
-                span,
-            ));
+            activate_command.add_update(set_active_module(selected_module_variable, 0));
             scheduler.commands.push(activate_command);
         }
 
-        let mut index = 1 + prism_model.modules.modules.len();
+        let mut index = prism_model.modules.len() + 1;
         for (action, action_info) in action_infos {
             if action_info.is_synchronising() {
                 self.group_info
                     .push(ModuleGroupInfo::new(&action, action_info.spans.clone()));
 
-                let guard = Expression::Conjunction(
-                    Box::new(action_info.get_guard()),
-                    Box::new(Expression::Equals(
-                        Box::new(Expression::VarOrConst(selected_module_variable, span)),
-                        Box::new(Expression::Int(0, span)),
-                        span,
-                    )),
-                    span,
-                );
-                let mut select_command = Command::new(None, span, guard, span);
-                select_command.updates.push(Update::with_assignments(
-                    Expression::Int(1, span),
-                    vec![Assignment::new(
-                        selected_module_variable,
-                        Expression::Int(index as i64, span),
-                        span,
-                        span,
-                    )],
-                    span,
-                ));
+                let guard = action_info
+                    .get_guard()
+                    .and(active_module_is(selected_module_variable, 0));
+                let mut select_command = Command::new(None, guard);
+                select_command
+                    .add_update(set_active_module(selected_module_variable, index as i64));
                 scheduler.commands.push(select_command);
 
                 let mut activate_command = Command::new(
-                    Some(Identifier::new(action, span).unwrap()),
-                    span,
-                    Expression::Equals(
-                        Box::new(Expression::VarOrConst(selected_module_variable, span)),
-                        Box::new(Expression::Int(index as i64, span)),
-                        span,
-                    ),
-                    span,
+                    Some(Identifier::new(action).unwrap()),
+                    active_module_is(selected_module_variable, index as i64),
                 );
-                activate_command.updates.push(Update::with_assignments(
-                    Expression::Int(1, span),
-                    vec![Assignment::new(
-                        selected_module_variable,
-                        Expression::Int(0, span),
-                        span,
-                        span,
-                    )],
-                    span,
-                ));
+                activate_command.add_update(set_active_module(selected_module_variable, 0));
                 scheduler.commands.push(activate_command);
 
                 index += 1;
@@ -245,11 +199,11 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
         self.selected_module_variable = Some(selected_module_variable);
     }
 
-    fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
+    fn create_groups(
         &mut self,
-        game: &mut ProbabilisticModel<M>,
-        property: &Query<i64, f64, AtomicProposition>,
-    ) -> GroupsAndAuxiliary<Self::GroupType> {
+        game: Game,
+        property: &Query<i64, f64, ApIdx>,
+    ) -> (Game, GroupsAndAuxiliary<Self::GroupType>) {
         let _ = property;
 
         let group_count = self.group_count.unwrap();
@@ -259,17 +213,11 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
             groups.push(Vec::new());
         }
 
-        for (index, state) in game.states.iter().enumerate() {
-            // TODO: Using get_variable_count() - 1 as index is a hack that assumes that last-added
-            // variable is also the last variable in the valuation. We cannot use
-            // self.selected_module_variable.index, as the variable manager index does not
-            // correspond to the index in the valuation (the former includes constants, the latter
-            // does not)
-            let value = state
-                .valuation
-                .evaluate_unbounded_int(game.valuation_context.get_variable_count() - 1)
-                as usize;
-            groups[value].push(index);
+        let active_module = variable_index(&game.state_valuations, ACTIVE_MODULE_VARIABLE)
+            .expect("The scheduler variable is missing from the model");
+        for state in game.states() {
+            let value = game.state_valuation(state).evaluate_int(active_module) as usize;
+            groups[value].push(state);
         }
 
         let mut builder = Self::GroupType::get_builder();
@@ -282,7 +230,7 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
             builder.create_group_from_vec(group, group_name);
         }
 
-        GroupsAndAuxiliary::new(builder.finish())
+        (game, GroupsAndAuxiliary::new(builder.finish()))
     }
 
     fn get_syntax_elements<S: AsRef<str>>(
@@ -313,12 +261,14 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
             );
 
             for span in &group.spans {
-                highlighting.add_highlight(Highlight::new(
-                    span.start,
-                    span.end,
-                    Colour::new(colour_ramp_index, value),
-                    &tooltip,
-                ));
+                if let Some(range) = span.range() {
+                    highlighting.add_highlight(Highlight::new(
+                        range.start,
+                        range.end,
+                        Colour::new(colour_ramp_index, value),
+                        &tooltip,
+                    ));
+                }
             }
         }
 
@@ -327,8 +277,8 @@ impl super::GroupExtractionScheme for ModuleGroupExtractionScheme {
 }
 
 struct ActionInfo {
-    pub module_guards: Vec<Expression<VariableReference, SimpleSpan>>,
-    pub spans: Vec<SimpleSpan>,
+    pub module_guards: Vec<Expression<VariableReference, FullSpan>>,
+    pub spans: Vec<FullSpan>,
 }
 
 impl ActionInfo {
@@ -336,14 +286,10 @@ impl ActionInfo {
         self.module_guards.len() >= 2
     }
 
-    fn get_guard(self) -> Expression<VariableReference, SimpleSpan> {
-        let mut guard = Expression::Bool(true, SimpleSpan::new(0, 0));
+    fn get_guard(self) -> Expression<VariableReference, FullSpan> {
+        let mut guard = Expression::bool(true);
         for module_guard in self.module_guards {
-            guard = Expression::Conjunction(
-                Box::new(guard),
-                Box::new(module_guard),
-                SimpleSpan::new(0, 0),
-            );
+            guard = guard.and(module_guard);
         }
         guard
     }

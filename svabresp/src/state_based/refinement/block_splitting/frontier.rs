@@ -1,10 +1,9 @@
 use super::{BlockSplittingHeuristics, PlayerPartition};
 use crate::state_based::StateBasedResponsibilityNonstochasticGame;
 use crate::state_based::grouping::StateGroups;
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
-use probabilistic_model_algorithms::regions::StateRegion;
-use probabilistic_models::{ActionCollection, Distribution, Valuation};
-use rand::Rng;
+use crate::state_based::game::Objective;
+use probabilistic_models::traits::{ReadStateSpace, ReadValuations};
+use rand::RngExt;
 
 pub enum FrontierSplittingVariant {
     RandomState,
@@ -63,11 +62,11 @@ impl OverlapData {
 }
 
 impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
-    fn split_block<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn split_block<G: StateGroups, O: Objective>(
         &mut self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
         partition: &mut PlayerPartition,
-        bsp: super::super::BlockSwitchingPair<A::WinningRegionType>,
+        bsp: super::super::BlockSwitchingPair,
     ) {
         let players = &partition.entries[bsp.block_index].players;
 
@@ -81,14 +80,9 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
             println!(") with coalition {:b}", bsp.coalition_bitmap);
 
             println!("Winning regions:");
-            for state in 0..bsp.winning_region_with.size() {
+            for state in game.get_game().states() {
                 if bsp.winning_region_with.contains(state) {
-                    print!(
-                        "  {}",
-                        game.get_solvable().get_game().states[state]
-                            .valuation
-                            .displayable(&game.get_solvable().get_game().valuation_context)
-                    );
+                    print!("  {}", game.get_game().state_valuation(state));
                     if bsp.winning_region_without.contains(state) {
                         print!(" (also in region without)");
                     }
@@ -105,36 +99,26 @@ impl BlockSplittingHeuristics for FrontierSplittingHeuristics {
                 if !bsp.winning_region_without.contains(state)
                     && bsp.winning_region_with.contains(state)
                 {
-                    let game = game.get_solvable().get_game();
-                    for action in game.states[state].actions.iter() {
-                        for destination in action.successors.iter() {
-                            if bsp.winning_region_without.contains(destination.index) {
-                                overlap_value.states_to_winning += 1;
-                                if print {
-                                    println!(
-                                        "  {} has transition to {} (winning)",
-                                        game.states[state]
-                                            .valuation
-                                            .displayable(&game.valuation_context),
-                                        game.states[destination.index]
-                                            .valuation
-                                            .displayable(&game.valuation_context)
-                                    )
-                                }
+                    let game = game.get_game();
+                    for destination in game.successors_of_state(state) {
+                        if bsp.winning_region_without.contains(destination) {
+                            overlap_value.states_to_winning += 1;
+                            if print {
+                                println!(
+                                    "  {} has transition to {} (winning)",
+                                    game.state_valuation(state),
+                                    game.state_valuation(destination)
+                                )
                             }
-                            if !bsp.winning_region_with.contains(destination.index) {
-                                overlap_value.states_to_losing += 1;
-                                if print {
-                                    println!(
-                                        "  {} has transition to {} (losing)",
-                                        game.states[state]
-                                            .valuation
-                                            .displayable(&game.valuation_context),
-                                        game.states[destination.index]
-                                            .valuation
-                                            .displayable(&game.valuation_context)
-                                    )
-                                }
+                        }
+                        if !bsp.winning_region_with.contains(destination) {
+                            overlap_value.states_to_losing += 1;
+                            if print {
+                                println!(
+                                    "  {} has transition to {} (losing)",
+                                    game.state_valuation(state),
+                                    game.state_valuation(destination)
+                                )
                             }
                         }
                     }

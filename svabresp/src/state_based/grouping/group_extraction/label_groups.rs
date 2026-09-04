@@ -1,25 +1,22 @@
 use crate::shapley::{ResponsibilityValues, SwitchingPairCollection};
 use crate::state_based::grouping::GroupsAndAuxiliary;
+use crate::state_based::game::{ApIdx, Game};
 use crate::{PrismModel, PrismProperty};
-use chumsky::prelude::SimpleSpan;
-use prism_model::VariableReference;
-use probabilistic_models::{
-    AtomicProposition, AtomicPropositions, ModelTypes, ProbabilisticModel, TwoPlayer,
-    VectorPredecessors,
-};
+use prism_model::{FullSpan, Span};
+use probabilistic_models::traits::{ReadAtomicPropositions, ReadStateSpace};
 use probabilistic_properties::Query;
 use std::collections::HashMap;
 
 struct LabelDetails {
     label_name: String,
-    definition_span: SimpleSpan,
+    definition_span: FullSpan,
     contained_in_players: Vec<String>,
     label_index: Option<usize>,
 }
 
 pub struct LabelGroupExtractionScheme {
     labels: Vec<String>,
-    label_atomic_propositions: Option<Vec<AtomicProposition>>,
+    label_atomic_propositions: Option<Vec<ApIdx>>,
     label_details: Vec<LabelDetails>,
 }
 
@@ -47,15 +44,13 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
         &mut self,
         prism_model: &mut PrismModel,
         property: &mut PrismProperty,
-        atomic_propositions: &mut Vec<prism_model::Expression<VariableReference, SimpleSpan>>,
         character_to_line: &prism_parser::CharacterToLineMap,
     ) {
         let _ = (property, character_to_line);
-        let mut label_atomic_propositions = Vec::new();
 
         self.label_details.push(LabelDetails {
             label_name: Self::no_labels_text().to_string(),
-            definition_span: prism_model.model_type.get_span().clone(),
+            definition_span: prism_model.model_type.span().clone(),
             contained_in_players: vec![],
             label_index: None,
         });
@@ -66,41 +61,50 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
                 .by_name(label.as_str())
                 .unwrap_or_else(|| panic!("Could not find label with name `{}`", label));
 
-            let index = atomic_propositions.len();
-            atomic_propositions.push(prism_label.condition.clone());
-            label_atomic_propositions.push(AtomicProposition::new(index));
-
             self.label_details.push(LabelDetails {
                 label_name: label.to_string(),
-                definition_span: prism_label.name.span,
+                definition_span: prism_label.name.span.clone(),
                 contained_in_players: Vec::new(),
                 label_index: Some(label_index),
             })
         }
-
-        self.label_atomic_propositions = Some(label_atomic_propositions);
     }
 
-    fn create_groups<M: ModelTypes<Owners = TwoPlayer, Predecessors = VectorPredecessors>>(
+    fn create_groups(
         &mut self,
-        game: &mut ProbabilisticModel<M>,
-        property: &Query<i64, f64, AtomicProposition>,
-    ) -> GroupsAndAuxiliary<Self::GroupType> {
+        game: Game,
+        property: &Query<i64, f64, ApIdx>,
+    ) -> (Game, GroupsAndAuxiliary<Self::GroupType>) {
         let _ = property;
-        let label_atomic_propositions = self.label_atomic_propositions.as_ref().unwrap();
+
+        // The model builder creates one atomic proposition per PRISM label, named after the label,
+        // so the atomic propositions for the grouping labels can be looked up on the built model.
+        let label_atomic_propositions: Vec<ApIdx> = self
+            .labels
+            .iter()
+            .map(|label| {
+                game.atomic_propositions
+                    .index_by_name(label.as_str())
+                    .unwrap_or_else(|| {
+                        panic!("The built model has no atomic proposition for label `{}`", label)
+                    })
+            })
+            .collect();
+        self.label_atomic_propositions = Some(label_atomic_propositions.clone());
+
         let mut groups = HashMap::new();
-        for (i, state) in game.states.iter().enumerate() {
+        for state in game.states() {
             let mut index = 0u128;
-            for (j, label) in label_atomic_propositions.iter().enumerate() {
-                if state.atomic_propositions.get_value(label.index) {
+            for (j, &label) in label_atomic_propositions.iter().enumerate() {
+                if game.is_atomic_proposition_set(state, label) {
                     index += 1u128 << j;
                 }
             }
             if !groups.contains_key(&index) {
                 // This string concatenation is not very pretty, but for n<128, this should be plenty fast
                 let mut name = String::new();
-                for (label, ap_index) in self.labels.iter().zip(label_atomic_propositions.iter()) {
-                    if state.atomic_propositions.get_value(ap_index.index) {
+                for (label, &ap_index) in self.labels.iter().zip(label_atomic_propositions.iter()) {
+                    if game.is_atomic_proposition_set(state, ap_index) {
                         if name.len() > 0 {
                             name += ", ";
                         }
@@ -111,9 +115,9 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
                     name = Self::no_labels_text().to_string();
                 }
 
-                groups.insert(index, (name, vec![i]));
+                groups.insert(index, (name, vec![state]));
             } else {
-                groups.get_mut(&index).unwrap().1.push(i);
+                groups.get_mut(&index).unwrap().1.push(state);
             }
         }
 
@@ -136,7 +140,7 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
             builder.create_group_from_vec(states, group_name);
         }
 
-        GroupsAndAuxiliary::new(builder.finish())
+        (game, GroupsAndAuxiliary::new(builder.finish()))
     }
 
     fn get_syntax_elements<S: AsRef<str>>(
@@ -200,12 +204,14 @@ impl super::GroupExtractionScheme for LabelGroupExtractionScheme {
 
             let tooltip = tooltip.join("");
 
-            highlighting.add_highlight(Highlight::new(
-                label_details.definition_span.start,
-                label_details.definition_span.end,
-                Colour::new(2, total_responsibility),
-                tooltip,
-            ))
+            if let Some(range) = label_details.definition_span.range() {
+                highlighting.add_highlight(Highlight::new(
+                    range.start,
+                    range.end,
+                    Colour::new(2, total_responsibility),
+                    tooltip,
+                ))
+            }
         }
 
         Some(highlighting)

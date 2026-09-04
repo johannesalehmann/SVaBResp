@@ -4,8 +4,8 @@ use crate::state_based::grouping::StateGroups;
 use crate::state_based::refinement::{
     InitialPartitionProvider, PlayerPartition, PlayerPartitionEntry,
 };
-use probabilistic_model_algorithms::deterministic_games::SolvableNonstochasticGame;
-use rand::Rng;
+use rand::RngExt;
+use crate::state_based::game::Objective;
 
 pub struct RandomInitialPartition {
     block_count: usize,
@@ -18,9 +18,9 @@ impl RandomInitialPartition {
 }
 
 impl InitialPartitionProvider for RandomInitialPartition {
-    fn get_initial_coalition<G: StateGroups, A: SolvableNonstochasticGame>(
+    fn get_initial_coalition<G: StateGroups, O: Objective>(
         self,
-        game: &StateBasedResponsibilityNonstochasticGame<G, A>,
+        game: &StateBasedResponsibilityNonstochasticGame<G, O>,
     ) -> PlayerPartition {
         let mut blocks = PlayerPartition::new();
         for _ in 0..self.block_count {

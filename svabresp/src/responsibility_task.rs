@@ -124,16 +124,17 @@ impl ModelFromString {
 
 impl ModelAndPropertySource for ModelFromString {
     fn get_model_and_property(self) -> (PrismModel, PrismProperty, CharacterToLineMap) {
-        let (model, properties, character_to_line_map) =
-            tiny_pmc::parsing::parse_prism_and_print_errors(
-                Some(self.name.as_str()),
-                self.model.as_str(),
-                &[self.property.as_str()],
-            )
-            .expect("Failed to parse prism model or property");
+        let (model, properties) = tiny_pmc::parsing::parse_prism_and_print_errors(
+            Some(self.name.as_str()),
+            self.model.as_str(),
+            &[self.property.as_str()],
+        )
+        .expect("Failed to parse prism model or property");
 
         assert_eq!(properties.len(), 1);
         let property = properties.into_iter().nth(0).unwrap();
+
+        let character_to_line_map = CharacterToLineMap::from_str(self.model.as_str());
 
         (model, property, character_to_line_map)
     }
