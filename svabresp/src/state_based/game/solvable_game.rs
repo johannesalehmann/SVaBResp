@@ -1,6 +1,16 @@
-use super::{Game, Objective, StateIdx, WinningRegion};
+use super::{Game, Objective, StateIdx, ValueObjective, WinningRegion};
 use probabilistic_models::owners::TwoPlayer;
 use probabilistic_models::traits::{ReadInitialStates, StateSet};
+
+fn single_initial_state(game: &Game) -> StateIdx {
+    let initial_states = game.initial_states().iter().collect::<Vec<_>>();
+    assert_eq!(
+        initial_states.len(),
+        1,
+        "responsibility computation requires a model with exactly one initial state"
+    );
+    initial_states[0]
+}
 
 pub struct SolvableGame<O: Objective> {
     game: Game,
@@ -11,13 +21,7 @@ pub struct SolvableGame<O: Objective> {
 
 impl<O: Objective> SolvableGame<O> {
     pub fn new(game: Game, objective: O) -> Self {
-        let initial_states = game.initial_states().iter().collect::<Vec<_>>();
-        assert_eq!(
-            initial_states.len(),
-            1,
-            "responsibility computation requires a model with exactly one initial state"
-        );
-        let initial_state = initial_states[0];
+        let initial_state = single_initial_state(&game);
         let context = objective.create_context(&game);
         Self {
             game,
@@ -54,5 +58,44 @@ impl<O: Objective> SolvableGame<O> {
         // TODO: See winner()
         self.objective.reset(&mut self.context);
         self.objective.winning_region(&self.game, &mut self.context)
+    }
+}
+
+pub struct SolvableValueGame<O: ValueObjective> {
+    game: Game,
+    objective: O,
+    context: O::Context,
+    initial_state: StateIdx,
+}
+
+impl<O: ValueObjective> SolvableValueGame<O> {
+    pub fn new(game: Game, objective: O) -> Self {
+        let initial_state = single_initial_state(&game);
+        let context = objective.create_context(&game);
+        Self {
+            game,
+            objective,
+            context,
+            initial_state,
+        }
+    }
+
+    pub fn game(&self) -> &Game {
+        &self.game
+    }
+
+    pub fn initial_state(&self) -> StateIdx {
+        self.initial_state
+    }
+
+    pub fn set_owner(&mut self, state: StateIdx, owner: TwoPlayer) {
+        self.objective
+            .set_owner(&mut self.game, &mut self.context, state, owner);
+    }
+
+    pub fn value(&mut self) -> f64 {
+        self.objective.reset(&mut self.context);
+        self.objective
+            .value_from_state(&self.game, &mut self.context, self.initial_state)
     }
 }

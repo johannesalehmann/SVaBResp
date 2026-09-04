@@ -1,82 +1,69 @@
 use crate::shapley::{CoalitionSpecifier, CooperativeGame};
+use crate::state_based::game::{Game, SolvableValueGame, StateIdx, ValueObjective};
+use crate::state_based::group_ownership::GroupOwnership;
 use crate::state_based::grouping::StateGroups;
-use probabilistic_model_algorithms::traits::SolvableStochasticGame;
-use probabilistic_models::TwoPlayer;
 
-pub struct StateBasedResponsibilityStochasticGame<G: StateGroups, A: SolvableStochasticGame> {
-    solvable: A,
-    pub grouping: G,
-    always_helping: Vec<usize>,
-    always_adversarial: Vec<usize>,
-    group_names: super::GroupNames,
+pub struct StateBasedResponsibilityStochasticGame<G: StateGroups, O: ValueObjective> {
+    solvable: SolvableValueGame<O>,
+    ownership: GroupOwnership<G>,
 }
-impl<G: StateGroups, A: SolvableStochasticGame> StateBasedResponsibilityStochasticGame<G, A> {
+
+impl<G: StateGroups, O: ValueObjective> StateBasedResponsibilityStochasticGame<G, O> {
     pub fn new(
-        solvable: A,
+        solvable: SolvableValueGame<O>,
         grouping: G,
-        always_helping: Vec<usize>,
-        always_adversarial: Vec<usize>,
+        always_helping: Vec<StateIdx>,
+        always_adversarial: Vec<StateIdx>,
     ) -> Self {
-        let group_info = super::GroupNames::from_grouping(&grouping);
         Self {
             solvable,
-            grouping,
-            always_helping,
-            always_adversarial,
-            group_names: group_info,
+            ownership: GroupOwnership::new(grouping, always_helping, always_adversarial),
         }
     }
 
-    // TODO: Currently, there is some duplication with the non-stochastic case. Can this be unified without introducing even more confusing traits?
-    pub fn set_state_owners<C: CoalitionSpecifier>(&mut self, coalition: C) {
-        self.set_auxiliary_state_owners();
-        for i in 0..self.grouping.get_count() {
-            if coalition.is_in_coalition(i) {
-                self.set_group_owners(i, TwoPlayer::PlayerOne);
-            } else {
-                self.set_group_owners(i, TwoPlayer::PlayerTwo);
-            }
+    pub fn map_grouping<G2: StateGroups, F: Fn(G) -> G2>(
+        self,
+        map: F,
+    ) -> StateBasedResponsibilityStochasticGame<G2, O> {
+        StateBasedResponsibilityStochasticGame {
+            solvable: self.solvable,
+            ownership: self.ownership.map_grouping(map),
         }
     }
 
-    pub fn set_auxiliary_state_owners(&mut self) {
-        for state in self.grouping.get_dummy_states() {
-            self.solvable.set_owner(state, TwoPlayer::PlayerOne);
-        }
-        for &state in &self.always_helping {
-            self.solvable.set_owner(state, TwoPlayer::PlayerOne);
-        }
-        for &state in &self.always_adversarial {
-            self.solvable.set_owner(state, TwoPlayer::PlayerTwo);
-        }
+    pub fn into_grouping(self) -> G {
+        self.ownership.grouping
     }
 
-    pub fn set_group_owners(&mut self, group_index: usize, owner: TwoPlayer) {
-        for state in self.grouping.get_states(group_index) {
-            self.solvable.set_owner(state, owner);
-        }
+    pub fn get_grouping(&self) -> &G {
+        &self.ownership.grouping
+    }
+
+    pub fn get_game(&self) -> &Game {
+        self.solvable.game()
     }
 }
 
-impl<G: StateGroups, A: SolvableStochasticGame> CooperativeGame
-    for StateBasedResponsibilityStochasticGame<G, A>
+impl<G: StateGroups, O: ValueObjective> CooperativeGame
+    for StateBasedResponsibilityStochasticGame<G, O>
 {
     type PlayerDescriptions = super::GroupNames;
 
     fn get_player_count(&self) -> usize {
-        self.grouping.get_count()
+        self.ownership.group_count()
     }
 
     fn player_descriptions(&self) -> &Self::PlayerDescriptions {
-        &self.group_names
+        self.ownership.group_names()
     }
 
     fn player_descriptions_mut(&mut self) -> &mut Self::PlayerDescriptions {
-        &mut self.group_names
+        self.ownership.group_names_mut()
     }
 
     fn get_value<C: CoalitionSpecifier>(&mut self, coalition: C) -> f64 {
-        self.set_state_owners(coalition);
-        self.solvable.maximum_player_1_probability()
+        self.ownership
+            .set_state_owners(coalition, &mut self.solvable);
+        self.solvable.value()
     }
 }

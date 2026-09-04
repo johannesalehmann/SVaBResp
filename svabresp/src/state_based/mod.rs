@@ -5,6 +5,12 @@ pub mod game;
 mod nonstochastic_game;
 pub use nonstochastic_game::StateBasedResponsibilityNonstochasticGame;
 
+mod stochastic_game;
+pub use stochastic_game::StateBasedResponsibilityStochasticGame;
+
+mod group_ownership;
+pub use group_ownership::{GroupOwnership, SetStateOwner};
+
 pub mod grouping;
 
 mod group_names;
@@ -12,10 +18,12 @@ pub use group_names::GroupNames;
 
 pub mod refinement;
 
-use crate::shapley::{MinimalCoalitionCache, ShapleyAlgorithm, SwitchingPairCollector};
+use crate::shapley::{
+    GameValueCache, MinimalCoalitionCache, ShapleyAlgorithm, SwitchingPairCollector,
+};
 use crate::state_based::game::{
-    ApIdx, Buechi, Game, GamePredecessors, Objective, PredecessorIdx, Reachability, Safety,
-    SolvableGame, StateIdx, is_probabilistic,
+    Buechi, Game, Objective, PredecessorIdx, Reachability, ReachabilityValue, Safety, SolvableGame,
+    SolvableValueGame, ValueObjective, is_probabilistic,
 };
 use crate::state_based::grouping::{GroupsAndAuxiliary, StateGroups, VectorStateGroups};
 use crate::state_based::refinement::GroupBlockingProvider;
@@ -27,7 +35,6 @@ use probabilistic_models::base_model::TwoPlayerTurnBasedGame;
 use probabilistic_models::owners::TwoPlayer;
 use probabilistic_models::traits::ReadStateSpace;
 use probabilistic_models::typed_index_collections::To1;
-use probabilistic_properties::Query;
 
 pub struct StateBasedOutput<O, G: StateGroups> {
     pub shapley_output: O,
@@ -70,7 +77,17 @@ pub fn compute_for_prism<
 
     if is_probabilistic(&game) {
         info!("Model exhibits probabilistic behaviour");
-        todo!("responsibility computation for probabilistic models has not been migrated yet")
+        let objective = ReachabilityValue::try_from_query(&property).expect(
+            "Unsupported property type: probabilistic models only support properties of the form \
+             `P=? [F ...]`",
+        );
+        return compute_stochastic_responsibility(
+            game,
+            objective,
+            grouping,
+            shapley,
+            switching_pair_collector,
+        );
     }
 
     trace!("Transforming transition system into game");
@@ -138,7 +155,38 @@ fn compute_responsibility<
 
     StateBasedOutput {
         shapley_output,
-        grouping: coop_game.grouping.to_vector_state_groups(),
+        grouping: coop_game.into_grouping().to_vector_state_groups(),
+    }
+}
+
+fn compute_stochastic_responsibility<
+    O: ValueObjective,
+    G: StateGroups,
+    S: ShapleyAlgorithm,
+    SPC: SwitchingPairCollector,
+>(
+    game: Game,
+    objective: O,
+    grouping: GroupsAndAuxiliary<G>,
+    shapley: &mut S,
+    switching_pair_collector: &mut SPC,
+) -> StateBasedOutput<S::Output<String>, VectorStateGroups> {
+    let solvable_game = SolvableValueGame::new(game, objective);
+    let mut coop_game = StateBasedResponsibilityStochasticGame::new(
+        solvable_game,
+        grouping.groups,
+        grouping.always_helping,
+        grouping.always_adversarial,
+    );
+
+    let mut cached_coop_game = GameValueCache::create(&mut coop_game);
+
+    let shapley_output =
+        shapley.compute_with_switching_pairs(&mut cached_coop_game, switching_pair_collector);
+
+    StateBasedOutput {
+        shapley_output,
+        grouping: coop_game.into_grouping().to_vector_state_groups(),
     }
 }
 

@@ -1,8 +1,11 @@
 mod objective;
 pub use objective::{Buechi, Objective, Reachability, Safety};
 
+mod value_objective;
+pub use value_objective::{ReachabilityValue, ValueObjective};
+
 mod solvable_game;
-pub use solvable_game::SolvableGame;
+pub use solvable_game::{SolvableGame, SolvableValueGame};
 
 mod winning_region;
 pub use winning_region::WinningRegion;
