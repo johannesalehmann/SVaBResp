@@ -1,5 +1,5 @@
 use clap::Parser;
-use tiny_pmc::parsing::Inputs;
+use svabresp::grouping::{GroupingScheme, IndividualGrouping};
 
 #[derive(Parser)]
 #[command(version, about = "Computes responsibility values")]
@@ -8,6 +8,8 @@ struct Arguments {
     files: Vec<String>,
     #[arg(short, long, default_value = "individual", value_parser = parse_grouping)]
     grouping: Grouping,
+    #[arg(short, long, default_value_t = String::new())]
+    constants: String,
 }
 
 #[derive(Clone, Debug)]
@@ -35,14 +37,20 @@ fn parse_grouping(s: &str) -> Result<Grouping, String> {
     }
 }
 
+impl Grouping {
+    fn scheme(&self) -> Box<dyn GroupingScheme> {
+        match self {
+            Grouping::Individual => Box::new(IndividualGrouping),
+            Grouping::Actions | Grouping::Modules | Grouping::Variables(_) => {
+                unimplemented!("Grouping {self:?} is not yet supported")
+            }
+        }
+    }
+}
+
 fn main() {
     let arguments = Arguments::parse();
-    let _inputs = match Inputs::from_cli_args(&arguments.files) {
-        Ok(inputs) => inputs,
-        Err(err) => {
-            eprintln!("{err}");
-            std::process::exit(1);
-        }
-    };
-    println!("Grouping: {:?}", arguments.grouping);
+    let mut grouping = arguments.grouping.scheme();
+    let built = svabresp::build::build(&arguments.files, &arguments.constants, grouping.as_mut());
+    println!("{}", built.model.info());
 }
