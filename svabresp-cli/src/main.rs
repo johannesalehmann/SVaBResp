@@ -53,4 +53,5 @@ fn main() {
     let mut grouping = arguments.grouping.scheme();
     let built = svabresp::build::build(&arguments.files, &arguments.constants, grouping.as_mut());
     println!("{}", built.model.info());
+    println!("Groups: {}", built.groups.len());
 }
