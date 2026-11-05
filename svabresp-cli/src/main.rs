@@ -1,36 +1,48 @@
-mod compute_responsibility;
-use compute_responsibility::ComputeResponsibilityCommand;
+use clap::Parser;
+use tiny_pmc::parsing::Inputs;
 
-mod list_grouping_options;
-use list_grouping_options::ListGroupingOptionsCommand;
-
-#[cfg(test)]
-mod tests;
-
-enum SVaBRespCommand {
-    ListGroupingOptions(ListGroupingOptionsCommand),
-    ComputeResponsibility(ComputeResponsibilityCommand),
+#[derive(Parser)]
+#[command(version, about = "Computes responsibility values")]
+struct Arguments {
+    #[arg(value_name = "MODEL_OR_PROPERTY", num_args = 1.., required = true)]
+    files: Vec<String>,
+    #[arg(short, long, default_value = "individual", value_parser = parse_grouping)]
+    grouping: Grouping,
 }
 
-impl SVaBRespCommand {
-    pub fn from_arguments() -> Self {
-        let matches = ComputeResponsibilityCommand::get_command()
-            .args_conflicts_with_subcommands(true)
-            .subcommand(ListGroupingOptionsCommand::get_subcommand())
-            .get_matches();
+#[derive(Clone, Debug)]
+enum Grouping {
+    Individual,
+    Actions,
+    Modules,
+    Variables(Vec<String>),
+}
 
-        if let Some(matches) = matches.subcommand_matches("list-grouping-options") {
-            Self::ListGroupingOptions(ListGroupingOptionsCommand::from_matches(matches))
-        } else {
-            Self::ComputeResponsibility(ComputeResponsibilityCommand::from_matches(&matches))
-        }
+fn parse_grouping(s: &str) -> Result<Grouping, String> {
+    match s.trim() {
+        "individual" => Ok(Grouping::Individual),
+        "actions" => Ok(Grouping::Actions),
+        "modules" => Ok(Grouping::Modules),
+        s => s
+            .strip_prefix("variables")
+            .map(str::trim)
+            .and_then(|s| s.strip_prefix('('))
+            .and_then(|s| s.strip_suffix(')'))
+            .map(|vars| Grouping::Variables(vars.split_whitespace().map(String::from).collect()))
+            .ok_or_else(|| {
+                format!("expected `individual`, `actions`, `modules` or `variables(x1 x2 ... xn)`, got `{s}`")
+            }),
     }
 }
 
 fn main() {
-    let command = SVaBRespCommand::from_arguments();
-    match command {
-        SVaBRespCommand::ListGroupingOptions(command) => command.execute(),
-        SVaBRespCommand::ComputeResponsibility(command) => command.execute(),
-    }
+    let arguments = Arguments::parse();
+    let _inputs = match Inputs::from_cli_args(&arguments.files) {
+        Ok(inputs) => inputs,
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(1);
+        }
+    };
+    println!("Grouping: {:?}", arguments.grouping);
 }

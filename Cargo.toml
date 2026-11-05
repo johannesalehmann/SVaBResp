@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["svabresp", "svabresp-benchmarking", "svabresp-cli"]
+members = ["svabresp", "svabresp-cli"]
 
 [profile.release]
 lto = "fat"
