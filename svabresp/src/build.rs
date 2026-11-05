@@ -1,4 +1,4 @@
-use crate::grouping::{GroupingScheme, StateGroup};
+use crate::grouping::{Grouping, GroupingScheme};
 use prism_model_builder::ModelBuilder;
 use prism_model_builder::queries::ProcessedQuery;
 use tiny_pmc::parsing::Inputs;
@@ -7,7 +7,7 @@ use tiny_pmc::{API, OptionalModel};
 pub struct BuiltModel {
     pub model: OptionalModel,
     pub query: ProcessedQuery<API>,
-    pub groups: Vec<StateGroup>,
+    pub grouping: Grouping,
 }
 
 pub fn build(files: &[String], constants: &str, grouping: &mut dyn GroupingScheme) -> BuiltModel {
@@ -15,7 +15,7 @@ pub fn build(files: &[String], constants: &str, grouping: &mut dyn GroupingSchem
         .unwrap_or_else(|e| panic!("Failed to parse constants: {e:?}"));
     let inputs = Inputs::from_cli_args(files).unwrap_or_else(|e| panic!("{e}"));
 
-    let (model, query) = match inputs {
+    let (mut model, query) = match inputs {
         Inputs::Prism { mut model, queries } => {
             let mut query = single(queries.into_iter().collect());
             grouping.transform_prism(&mut model, &mut query);
@@ -36,11 +36,11 @@ pub fn build(files: &[String], constants: &str, grouping: &mut dyn GroupingSchem
         }
     };
 
-    let groups = grouping.create_groups(&model, &query);
+    let grouping = grouping.create_groups(&mut model, &query);
     BuiltModel {
         model,
         query,
-        groups,
+        grouping,
     }
 }
 
