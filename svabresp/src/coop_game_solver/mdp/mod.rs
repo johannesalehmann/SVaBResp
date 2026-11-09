@@ -1,273 +1,419 @@
-mod subgame;
-
-use crate::coop_game::{Coalition, CooperativeGame};
 use crate::grouping::{Grouping, StateIdx};
-use probabilistic_model_algorithms::sccs::{ExcludeStatesAndChoices, Sccs};
-use probabilistic_models::traits::ReadStateSpace;
-use probabilistic_models::typed_index_collections::{Csr, To1, index};
-use probabilistic_models::{DefaultIx, Index, Ix};
-use std::ops::Range;
-use subgame::{SubChoiceIdx, SubStateIdx, Subgame, ValuePositionIdx};
+use prism_model_builder::To1;
+use probabilistic_model_algorithms::sccs::{ExcludeStatesAndChoices, Scc, Sccs};
+use probabilistic_models::base_model::{Mdp, TwoPlayer, TwoPlayerStochasticGame};
+use probabilistic_models::traits::{BuildChoiceBranchGraph, ReadStateSpace};
+use probabilistic_models::typed_index_collections::{Csr, index};
+use probabilistic_models::{BranchIndex, ChoiceIndex, DefaultIx, Index, Ix, StateIndex, Sub};
 
-index!(SubgameIndex<I: Ix> => I::State);
+pub type SubIx = Sub<DefaultIx>;
+
+index!(ExternalTransitionIndex<I: Ix> => I::Branch);
+index!(SubGameIndex<I: Ix> => I::State);
 index!(GroupIndex<I: Ix> => I::Meta);
 index!(GroupEntryIndex<I: Ix> => I::State);
 
-pub type SubgameIdx = SubgameIndex<DefaultIx>;
-pub type GroupIdx = GroupIndex<DefaultIx>;
-pub type GroupEntryIdx = GroupEntryIndex<DefaultIx>;
-
-type ValueVector = To1<ValuePositionIdx, f64>;
-
-fn goal_position() -> ValuePositionIdx {
-    ValuePositionIdx::from_raw(0)
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct SubgameState {
-    subgame: SubgameIdx,
-    local_state: SubStateIdx,
+struct SubGameState {
+    sub_game: SubGameIndex<DefaultIx>,
+    local_state: StateIndex<SubIx>,
 }
 
-/// Computes the cooperative game of an MDP. States in the coalition are owned by Eve, who
-/// maximises, all other states by Adam, who minimises.
-pub struct MdpSolver {
-    /// Every subgame only exits into earlier subgames.
-    subgames: To1<SubgameIdx, Subgame>,
+struct Groups {
+    group_to_entries: Csr<GroupIndex<DefaultIx>, GroupEntryIndex<DefaultIx>>,
+    /// Sorted by sub game within each group.
+    entry_states: To1<GroupEntryIndex<DefaultIx>, SubGameState>,
+}
+
+impl Groups {
+    fn build(grouping: &Grouping, global_to_local: &GlobalToLocal) -> Self {
+        let mut group_to_entries = Csr::with_capacity(grouping.groups.len());
+        let mut entry_states = To1::new();
+        for group in &grouping.groups {
+            let group_start = entry_states.len();
+            for &model_state in &group.states {
+                if let Some(state) = global_to_local.global_to_sub_game_state(model_state) {
+                    entry_states.add(state);
+                }
+            }
+            entry_states.entries_mut()[group_start..].sort_unstable();
+            group_to_entries.add_entry_unchecked(GroupEntryIndex::from_raw(entry_states.len()));
+        }
+        Self {
+            group_to_entries,
+            entry_states,
+        }
+    }
+
+    /// For each group, the sub games that contain one of its states or exit into such a sub game.
+    /// `successors` must only point to earlier sub games.
+    fn compute_group_dirty_flags(
+        &self,
+        successors: &To1<SubGameIndex<DefaultIx>, Vec<SubGameIndex<DefaultIx>>>,
+    ) -> To1<GroupIndex<DefaultIx>, To1<SubGameIndex<DefaultIx>, bool>> {
+        let group_count = self.group_to_entries.keys().len();
+        let dirty_per_group = (0..group_count).map(|group| {
+            let mut dirty = To1::with_entries(vec![false; successors.len()]);
+            for entry in self
+                .group_to_entries
+                .index(GroupIndex::from_raw(group as u32))
+            {
+                dirty[self.entry_states[entry].sub_game] = true;
+            }
+            for sub_game in (0..successors.len()).map(SubGameIndex::from_raw) {
+                if successors[sub_game]
+                    .iter()
+                    .any(|&successor| dirty[successor])
+                {
+                    dirty[sub_game] = true;
+                }
+            }
+            dirty
+        });
+        To1::with_entries(dirty_per_group.collect::<Vec<_>>())
+    }
+}
+
+pub struct SubGameSolver {
+    sub_games: To1<SubGameIndex<DefaultIx>, SubGame>,
     value_count: usize,
-    initial_position: ValuePositionIdx,
-    always_helping: Vec<SubgameState>,
-    groups: Csr<GroupIdx, GroupEntryIdx>,
-    /// Sorted by subgame.
-    group_states: To1<GroupEntryIdx, SubgameState>,
+    initial_value_index: usize,
+    groups: Groups,
+    group_dirty_flags: To1<GroupIndex<DefaultIx>, To1<SubGameIndex<DefaultIx>, bool>>,
 }
 
-impl MdpSolver {
-    pub fn new<M: ReadStateSpace<Ix = DefaultIx>>(
-        model: &M,
+impl SubGameSolver {
+    pub fn build(
+        mdp: Mdp<DefaultIx>,
         initial: StateIdx,
         goal: &To1<StateIdx, bool>,
         grouping: &Grouping,
     ) -> Self {
-        let exclusion_criterion = ExcludeStatesAndChoices::new(
-            goal.clone(),
-            To1::with_entries(vec![false; model.choices().len()]),
+        assert!(
+            grouping.groups.len() <= u64::BITS as usize,
+            "at most {} groups are supported",
+            u64::BITS
         );
-        let sccs = Sccs::compute_tarjan(model, &exclusion_criterion);
+        let exclusion_criterion = Self::goal_exclusion_criterion(&mdp, goal);
+        let sccs = Sccs::compute_tarjan(&mdp, &exclusion_criterion);
 
-        let state_count = model.states().len();
-        let mut value_positions = To1::with_entries(vec![goal_position(); state_count]);
-        let mut subgame_state = To1::with_entries(vec![None; state_count]);
-        let mut subgames = To1::new();
-        let mut next_position = goal_position() + 1;
-        for (subgame, scc) in sccs.reverse_topological_ordering().enumerate() {
-            let subgame_positions = next_position..next_position + scc.size();
-            for (local_state, model_state) in scc.states().enumerate() {
-                value_positions[model_state] = next_position + local_state;
-                subgame_state[model_state] = Some(SubgameState {
-                    subgame: SubgameIdx::from_raw(subgame),
-                    local_state: SubStateIdx::from_raw(local_state),
-                });
+        let state_count = mdp.states().len();
+        let mut global_to_local = GlobalToLocal {
+            sub_game: To1::with_entries(vec![None; state_count]),
+            local: To1::with_entries(vec![StateIndex::<SubIx>::from_raw(0); state_count]),
+            value_vector_index: To1::with_entries(vec![0; state_count]),
+        };
+        let always_helping = To1::with_true_values(&grouping.always_helping, state_count);
+        let mut sub_games: To1<_, SubGame> = To1::new();
+        let mut successors_per_sub_game = To1::new();
+        let mut next_value_index = 1;
+        for scc in sccs.reverse_topological_ordering() {
+            if scc.as_singleton().is_some_and(|state| goal[state]) {
+                continue;
             }
-            next_position = subgame_positions.end;
-            subgames.add(Subgame::new(
-                model,
-                scc.states(),
-                subgame_positions,
-                &value_positions,
-            ));
+            let sub_game_index = SubGameIndex::from_raw(sub_games.len());
+            global_to_local.add_scc(scc, sub_game_index, next_value_index);
+            let (sub_game, successors) =
+                SubGame::build(&mdp, scc, &global_to_local, &always_helping);
+            sub_games.add(sub_game);
+            successors_per_sub_game.add(successors);
+            next_value_index += scc.size();
         }
 
-        let mut groups = Csr::with_capacity(grouping.groups.len());
-        let mut group_states = To1::new();
-        for group in &grouping.groups {
-            let group_start = group_states.len();
-            for &model_state in &group.states {
-                if let Some(state) = subgame_state[model_state] {
-                    group_states.add(state);
-                }
-            }
-            group_states.entries_mut()[group_start..].sort_unstable();
-            groups.add_entry_unchecked(GroupEntryIdx::from_raw(group_states.len()));
-        }
-
+        let groups = Groups::build(grouping, &global_to_local);
         Self {
-            subgames,
-            value_count: next_position.raw(),
-            initial_position: value_positions[initial],
-            always_helping: (grouping.always_helping.iter())
-                .filter_map(|&model_state| subgame_state[model_state])
-                .collect(),
+            sub_games,
+            value_count: next_value_index,
+            initial_value_index: global_to_local.global_to_value_vector_index(initial),
+            group_dirty_flags: groups.compute_group_dirty_flags(&successors_per_sub_game),
             groups,
-            group_states,
         }
     }
 
-    /// Computes the value of every coalition. The coalitions of the highest `split_groups` groups
-    /// are solved sequentially, after which one thread per such coalition solves its extensions
-    /// by the remaining groups. The result does not depend on `split_groups`.
-    pub fn solve(&self, split_groups: usize, eps: f64) -> CooperativeGame {
-        let group_count = self.groups.keys().len();
-        let thread_groups = group_count - split_groups.min(group_count);
-
-        let mut root_values = To1::with_entries(vec![0.0; self.value_count]);
-        root_values[goal_position()] = 1.0;
-        let mut worker = Worker::new(self, 0, eps);
-        worker.solve_subgames_from(SubgameIdx::from_raw(0), &mut root_values);
-        let mut split_values = vec![To1::new(); 1 << (group_count - thread_groups)];
-        let split_groups = thread_groups..group_count;
-        worker.walk(0, split_groups, root_values, |coalition, values| {
-            split_values[(coalition >> thread_groups) as usize] = values.clone();
-        });
-
-        let mut coalition_values = vec![0.0; 1 << group_count];
-        let extension_mask: Coalition = (1 << thread_groups) - 1;
-        std::thread::scope(|scope| {
-            let thread_chunks = coalition_values.chunks_mut(1 << thread_groups);
-            for ((split_coalition, values), chunk) in
-                (split_values.into_iter().enumerate()).zip(thread_chunks)
-            {
-                scope.spawn(move || {
-                    let root = (split_coalition as Coalition) << thread_groups;
-                    let mut worker = Worker::new(self, root, eps);
-                    worker.walk(root, 0..thread_groups, values, |coalition, values| {
-                        chunk[(coalition & extension_mask) as usize] =
-                            values[self.initial_position];
-                    });
-                });
+    fn goal_exclusion_criterion(
+        mdp: &Mdp,
+        goal: &To1<StateIdx, bool>,
+    ) -> ExcludeStatesAndChoices<DefaultIx> {
+        let state_count = mdp.states().len();
+        let mut goal_choices = To1::with_entries(vec![false; mdp.choices().len()]);
+        for goal_state in mdp.states().into_iter().filter(|&state| goal[state]) {
+            for choice in mdp.choices_of_state(goal_state) {
+                goal_choices[choice] = true;
             }
-        });
-        CooperativeGame::new(group_count, coalition_values)
-    }
-
-    fn value_position(&self, state: SubgameState) -> ValuePositionIdx {
-        self.subgames[state.subgame].value_position(state.local_state)
-    }
-
-    fn first_affected_subgame(&self, group: usize) -> SubgameIdx {
-        let entries = self.groups.index(GroupIdx::from_raw(group as u32));
-        match entries.len() {
-            0 => SubgameIdx::from_raw(self.subgames.len()),
-            _ => self.group_states[entries.start].subgame,
         }
+        let exclusion_criterion =
+            ExcludeStatesAndChoices::new(To1::with_entries(vec![false; state_count]), goal_choices);
+        exclusion_criterion
     }
 }
 
-struct Worker<'a> {
-    solver: &'a MdpSolver,
-    eps: f64,
-    owned_by_eve: To1<ValuePositionIdx, bool>,
-    exit_value_buffer: To1<SubChoiceIdx, f64>,
+/// The mutable state of solving the sub games of a [`SubGameSolver`] for one coalition at a time.
+#[derive(Clone)]
+pub struct SolveWorker<'a> {
+    solver: &'a SubGameSolver,
+    values: Vec<f64>,
+    owners: To1<SubGameIndex<DefaultIx>, To1<StateIndex<SubIx>, TwoPlayer>>,
+    exit_values: To1<ChoiceIndex<SubIx>, f64>,
+    values_before_adding_group: ValuesBeforeAddingGroup,
 }
 
-impl<'a> Worker<'a> {
-    fn new(solver: &'a MdpSolver, coalition: Coalition, eps: f64) -> Self {
-        let mut worker = Self {
+impl<'a> SolveWorker<'a> {
+    pub fn new(solver: &'a SubGameSolver) -> Self {
+        let mut values = vec![0.0; solver.value_count];
+        values[0] = 1.0;
+        Self {
             solver,
-            eps,
-            owned_by_eve: To1::with_entries(vec![false; solver.value_count]),
-            exit_value_buffer: To1::new(),
-        };
-        for &state in &solver.always_helping {
-            worker.owned_by_eve[solver.value_position(state)] = true;
-        }
-        let group_count = solver.groups.keys().len();
-        for group in (0..group_count).filter(|&group| coalition >> group & 1 == 1) {
-            worker.set_group_owned_by_eve(group, true);
-        }
-        worker
-    }
-
-    fn set_group_owned_by_eve(&mut self, group: usize, owned_by_eve: bool) {
-        for entry in self.solver.groups.index(GroupIdx::from_raw(group as u32)) {
-            let position = self.solver.value_position(self.solver.group_states[entry]);
-            self.owned_by_eve[position] = owned_by_eve;
+            values,
+            owners: To1::with_entries(
+                (solver.sub_games.iter())
+                    .map(|sub_game| sub_game.game.players.state_to_owner.clone())
+                    .collect::<Vec<_>>(),
+            ),
+            exit_values: To1::new(),
+            values_before_adding_group: ValuesBeforeAddingGroup::default(),
         }
     }
 
-    fn solve_subgames_from(&mut self, first_subgame: SubgameIdx, values: &mut ValueVector) {
-        for subgame in &self.solver.subgames.entries()[first_subgame.raw()..] {
-            subgame.solve(
-                &self.owned_by_eve,
-                &mut self.exit_value_buffer,
-                values,
-                self.eps,
-            );
+    /// Solves the game for the empty coalition and returns the value of the initial state. Must be
+    /// called before any group is added.
+    pub fn solve_empty_coalition(&mut self, eps: f64) -> f64 {
+        let all_sub_games = To1::with_entries(vec![true; self.solver.sub_games.len()]);
+        self.solve_sub_games(&all_sub_games, eps)
+    }
+
+    /// Adds `group` to the coalition, solves it and returns the value of the initial state.
+    pub fn add_group_and_solve(&mut self, group: usize, eps: f64) -> f64 {
+        self.values_before_adding_group.save(group, &self.values);
+        self.set_group_owner(group, TwoPlayer::Eve);
+        let solver = self.solver;
+        let dirty = &solver.group_dirty_flags[GroupIndex::from_raw(group as u32)];
+        self.solve_sub_games(dirty, eps)
+    }
+
+    /// Undoes [`Self::add_group_and_solve`] without solving. Every group added after `group` must
+    /// already be removed.
+    pub fn remove_group(&mut self, group: usize) {
+        self.set_group_owner(group, TwoPlayer::Adam);
+        self.values
+            .copy_from_slice(self.values_before_adding_group.get(group));
+    }
+
+    fn set_group_owner(&mut self, group: usize, owner: TwoPlayer) {
+        let groups = &self.solver.groups;
+        for entry in groups
+            .group_to_entries
+            .index(GroupIndex::from_raw(group as u32))
+        {
+            let state = groups.entry_states[entry];
+            self.owners[state.sub_game][state.local_state] = owner;
         }
     }
 
-    /// Visits `root` and all coalitions that extend it by `groups`, in depth-first order. Groups
-    /// are added from highest to lowest, i.e. the parent of a coalition lacks its lowest group.
-    fn walk(
-        &mut self,
-        root: Coalition,
-        groups: Range<usize>,
-        root_values: ValueVector,
-        mut visit: impl FnMut(Coalition, &ValueVector),
-    ) {
-        visit(root, &root_values);
-        let mut values_per_depth = vec![root_values; groups.len() + 1];
-        self.visit_extensions(root, groups, &mut values_per_depth, &mut visit);
-    }
-
-    /// `values_per_depth[0]` holds the values of `coalition`; the deeper entries are overwritten.
-    fn visit_extensions(
-        &mut self,
-        coalition: Coalition,
-        groups: Range<usize>,
-        values_per_depth: &mut [ValueVector],
-        visit: &mut impl FnMut(Coalition, &ValueVector),
-    ) {
-        let (parent_values, deeper_values) = values_per_depth.split_first_mut().unwrap();
-        let lowest_group = groups.start;
-        for group in groups.rev() {
-            let extended = coalition | 1 << group;
-            let values = &mut deeper_values[0];
-            values.copy_from_other(parent_values);
-            self.set_group_owned_by_eve(group, true);
-            self.solve_subgames_from(self.solver.first_affected_subgame(group), values);
-            visit(extended, values);
-            self.visit_extensions(extended, lowest_group..group, deeper_values, visit);
-            self.set_group_owned_by_eve(group, false);
+    fn solve_sub_games(&mut self, dirty: &To1<SubGameIndex<DefaultIx>, bool>, eps: f64) -> f64 {
+        let sub_games = self.solver.sub_games.entries();
+        let mut first_value_index = 1;
+        for ((sub_game, owners), &dirty) in
+            (sub_games.iter().zip(self.owners.entries())).zip(dirty.entries())
+        {
+            let state_count = sub_game.game.states().len();
+            if dirty {
+                let (exit_values, own_values) = self.values.split_at_mut(first_value_index);
+                sub_game.rebuild_exits(exit_values, &mut self.exit_values);
+                sub_game.solve(
+                    owners,
+                    &self.exit_values,
+                    &mut own_values[..state_count],
+                    eps,
+                );
+            }
+            first_value_index += state_count;
         }
+        self.values[self.solver.initial_value_index]
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::grouping::StateGroup;
-    use probabilistic_models::{Model, mdp};
+/// The value vector of a [`SolveWorker`] right before each group was added to its coalition.
+#[derive(Clone, Default)]
+struct ValuesBeforeAddingGroup {
+    values_per_group: Vec<Vec<f64>>,
+}
 
-    #[test]
-    fn solve() {
-        // s0, s1 and s4 form groups 0, 1 and 2. s2 is the goal and s3 a deadlock.
-        mdp!(mdp = {
-            s0 -> 1.0: s1,
-            s0 -> 0.5: s2 & 0.5: s4,
-            s1 -> 0.5: s2 & 0.5: s0,
-            s1 -> 1.0: s3,
-            s2 -> 1.0: s2,
-            s3 -> deadlock,
-            s4 -> 1.0: s2,
-            s4 -> 1.0: s3
-        });
-        let model = Model::new(mdp);
-        let goal = To1::with_entries(vec![false, false, true, false, false]);
-        let group = |s: usize| StateGroup {
-            name: format!("s{s}"),
-            states: vec![StateIdx::from_raw(s)],
-        };
-        let grouping = Grouping::new(vec![group(0), group(1), group(4)]);
-        let solver = MdpSolver::new(&model, StateIdx::from_raw(0), &goal, &grouping);
-
-        let expected = [0.0, 0.5, 0.5, 1.0, 0.0, 1.0, 1.0, 1.0];
-        let sequential = solver.solve(0, 1e-9);
-        for (value, expected) in sequential.values.iter().zip(expected) {
-            assert!((value - expected).abs() < 1e-6, "{value} != {expected}");
+impl ValuesBeforeAddingGroup {
+    fn save(&mut self, group: usize, values: &[f64]) {
+        if self.values_per_group.len() <= group {
+            self.values_per_group.resize(group + 1, Vec::new());
         }
-        for split_groups in 1..=4 {
-            assert_eq!(solver.solve(split_groups, 1e-9).values, sequential.values);
+        let saved_values = &mut self.values_per_group[group];
+        saved_values.clear();
+        saved_values.extend_from_slice(values);
+    }
+
+    fn get(&self, group: usize) -> &[f64] {
+        &self.values_per_group[group]
+    }
+}
+
+// Goal states have value vector index 0
+struct GlobalToLocal {
+    sub_game: To1<StateIdx, Option<SubGameIndex<DefaultIx>>>,
+    local: To1<StateIdx, StateIndex<SubIx>>,
+    value_vector_index: To1<StateIdx, usize>,
+}
+
+impl GlobalToLocal {
+    fn add_scc(
+        &mut self,
+        scc: Scc<'_, DefaultIx>,
+        sub_game: SubGameIndex<DefaultIx>,
+        first_value_vector_index: usize,
+    ) {
+        for (local, model_state) in scc.states().enumerate() {
+            self.sub_game[model_state] = Some(sub_game);
+            self.local[model_state] = StateIndex::from_raw(local);
+            self.value_vector_index[model_state] = first_value_vector_index + local;
+        }
+    }
+
+    fn global_to_local(&self, state: StateIdx) -> StateIndex<SubIx> {
+        self.local[state]
+    }
+
+    fn global_to_sub_game_state(&self, state: StateIdx) -> Option<SubGameState> {
+        Some(SubGameState {
+            sub_game: self.sub_game[state]?,
+            local_state: self.local[state],
+        })
+    }
+
+    fn global_to_value_vector_index(&self, state: StateIdx) -> usize {
+        self.value_vector_index[state]
+    }
+}
+
+struct ExternalTransition {
+    target: usize,
+    probability: f64,
+}
+
+pub struct SubGame {
+    game: TwoPlayerStochasticGame<SubIx>,
+    choice_to_external_transition: Csr<ChoiceIndex<SubIx>, ExternalTransitionIndex<SubIx>>,
+    external_transitions: To1<ExternalTransitionIndex<SubIx>, ExternalTransition>,
+}
+
+impl SubGame {
+    fn build(
+        mdp: &Mdp<DefaultIx>,
+        scc: Scc<'_, DefaultIx>,
+        global_to_local: &GlobalToLocal,
+        always_helping: &To1<StateIdx, bool>,
+    ) -> (Self, Vec<SubGameIndex<DefaultIx>>) {
+        let mut successors = Vec::new();
+        let mut game = TwoPlayerStochasticGame::<SubIx>::default();
+        let mut choice_to_external_transition = Csr::new();
+        let mut external_transitions: To1<ExternalTransitionIndex<SubIx>, _> = To1::new();
+        for model_state in scc.states() {
+            let owner = if always_helping[model_state] {
+                TwoPlayer::Eve
+            } else {
+                TwoPlayer::Adam
+            };
+            game.add_state(owner);
+            for model_choice in mdp.choices_of_state(model_state) {
+                game.add_choice();
+                for branch in mdp.branches_of_choice(model_choice) {
+                    let destination = mdp.branch_destination(branch);
+                    let probability = mdp.branch_probability(branch);
+                    if scc.contains(destination) {
+                        game.add_branch(probability, global_to_local.global_to_local(destination));
+                    } else {
+                        successors.extend(global_to_local.sub_game[destination]);
+                        external_transitions.add(ExternalTransition {
+                            target: global_to_local.global_to_value_vector_index(destination),
+                            probability,
+                        });
+                    }
+                }
+                choice_to_external_transition.add_entry_unchecked(
+                    ExternalTransitionIndex::from_raw(external_transitions.len()),
+                );
+            }
+        }
+        successors.sort_unstable();
+        successors.dedup();
+        let sub_game = Self {
+            game,
+            choice_to_external_transition,
+            external_transitions,
+        };
+        (sub_game, successors)
+    }
+
+    fn rebuild_exits(&self, values: &[f64], exit_values: &mut To1<ChoiceIndex<SubIx>, f64>) {
+        exit_values.clear();
+        for choice in self.game.choices() {
+            let exit_value = (self.choice_to_external_transition.index(choice).into_iter())
+                .map(|transition| {
+                    let transition = &self.external_transitions[transition];
+                    transition.probability * values[transition.target]
+                })
+                .sum();
+            exit_values.add(exit_value);
+        }
+    }
+
+    /// Solves the game using Gauss-Seidel value iteration. Eve maximises, Adam minimises.
+    ///
+    /// `values` must contain a lower bound when `solve()` is called, as the values are not reset.
+    fn solve(
+        &self,
+        owners: &To1<StateIndex<SubIx>, TwoPlayer>,
+        exit_values: &To1<ChoiceIndex<SubIx>, f64>,
+        values: &mut [f64],
+        eps: f64,
+    ) {
+        let graph = &self.game.graph;
+        let choice_ends = graph.state_to_choice.entries_raw();
+        let owners = owners.entries();
+        debug_assert_eq!(values.len(), choice_ends.len());
+        debug_assert_eq!(values.len(), owners.len());
+
+        let probabilities = &graph.branch_probabilities;
+        let destinations = &graph.branch_destinations;
+        loop {
+            let mut converged = true;
+            let mut choice = ChoiceIndex::<SubIx>::from_raw(0);
+            let mut branch = BranchIndex::<SubIx>::from_raw(0);
+            for (state, (&choice_end, &owner)) in choice_ends.iter().zip(owners).enumerate() {
+                let maximise = owner == TwoPlayer::Eve;
+                let has_choices = choice < choice_end;
+                let mut best_value = if maximise { 0.0 } else { f64::INFINITY };
+                while choice < choice_end {
+                    let mut choice_value = exit_values[choice];
+                    let branch_end = graph.choice_to_branch.index_raw(choice);
+                    while branch < branch_end {
+                        choice_value += probabilities[branch] * values[destinations[branch].raw()];
+                        branch += 1;
+                    }
+                    best_value = if maximise {
+                        best_value.max(choice_value)
+                    } else {
+                        best_value.min(choice_value)
+                    };
+                    choice += 1;
+                }
+                if !has_choices {
+                    best_value = 0.0;
+                }
+
+                if (best_value - values[state]).abs() > eps * best_value {
+                    converged = false;
+                }
+                values[state] = best_value;
+            }
+            if converged {
+                break;
+            }
         }
     }
 }
