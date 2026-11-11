@@ -1,3 +1,4 @@
+use prism_model_builder::To1;
 use prism_model_builder::queries::ProcessedQuery;
 use probabilistic_models::valuations::{Type, Valuations};
 use probabilistic_models::{DefaultIx, StateIndex, ValuationClassEntryIndex};
@@ -38,6 +39,35 @@ impl Grouping {
             groups,
             always_helping: Vec::new(),
             always_adversarial: Vec::new(),
+        }
+    }
+
+    pub fn restrict_to_potentially_responsible(
+        self,
+        potentially_responsible: &To1<StateIdx, bool>,
+    ) -> Self {
+        let mut groups = Vec::new();
+        let mut always_adversarial = self.always_adversarial;
+        for group in self.groups {
+            let mut states = Vec::new();
+            for state in group.states {
+                if potentially_responsible[state] {
+                    states.push(state);
+                } else {
+                    always_adversarial.push(state);
+                }
+            }
+            if !states.is_empty() {
+                groups.push(StateGroup {
+                    name: group.name,
+                    states,
+                });
+            }
+        }
+        Self {
+            groups,
+            always_helping: self.always_helping,
+            always_adversarial,
         }
     }
 }
