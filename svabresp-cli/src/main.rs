@@ -67,5 +67,10 @@ impl Grouping {
 fn main() {
     let arguments = Arguments::parse();
     let mut grouping = arguments.grouping.scheme();
-    compute_responsibility_from_files(&arguments.files, &arguments.constants, grouping.as_mut());
+    let responsibility = compute_responsibility_from_files(
+        &arguments.files,
+        &arguments.constants,
+        grouping.as_mut(),
+    );
+    println!("{responsibility}");
 }

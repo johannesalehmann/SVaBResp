@@ -43,32 +43,42 @@ impl Grouping {
     }
 
     pub fn restrict_to_potentially_responsible(
-        self,
+        &self,
         potentially_responsible: &To1<StateIdx, bool>,
-    ) -> Self {
+    ) -> (Self, GroupingLink) {
         let mut groups = Vec::new();
-        let mut always_adversarial = self.always_adversarial;
-        for group in self.groups {
-            let mut states = Vec::new();
-            for state in group.states {
-                if potentially_responsible[state] {
-                    states.push(state);
-                } else {
-                    always_adversarial.push(state);
-                }
-            }
+        let mut original_index = Vec::new();
+        let mut always_adversarial = self.always_adversarial.clone();
+        for (index, group) in self.groups.iter().enumerate() {
+            let (states, discarded): (Vec<_>, Vec<_>) = group
+                .states
+                .iter()
+                .partition(|&&state| potentially_responsible[state]);
+            always_adversarial.extend(discarded);
             if !states.is_empty() {
                 groups.push(StateGroup {
-                    name: group.name,
+                    name: group.name.clone(),
                     states,
                 });
+                original_index.push(index);
             }
         }
-        Self {
+        let restricted = Self {
             groups,
-            always_helping: self.always_helping,
+            always_helping: self.always_helping.clone(),
             always_adversarial,
-        }
+        };
+        (restricted, GroupingLink { original_index })
+    }
+}
+
+pub struct GroupingLink {
+    original_index: Vec<usize>,
+}
+
+impl GroupingLink {
+    pub fn new_to_old_index(&self, new_index: usize) -> usize {
+        self.original_index[new_index]
     }
 }
 

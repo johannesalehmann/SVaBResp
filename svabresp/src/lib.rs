@@ -2,6 +2,7 @@ use crate::build::build;
 use crate::coop_game_solver::build_cooperative_game;
 use crate::grouping::{Grouping, GroupingScheme};
 use crate::preprocessing::potentially_responsible_states;
+use crate::responsibility::Responsibility;
 use prism_model_builder::To1;
 use prism_model_builder::probabilistic_models::traits::{
     ReadAtomicPropositionsMaybe, ReadInitialStatesMaybe,
@@ -15,22 +16,23 @@ pub mod coop_game;
 pub mod coop_game_solver;
 pub mod grouping;
 pub mod preprocessing;
+pub mod responsibility;
 pub mod shapley;
 
 pub fn compute_responsibility_from_files(
     files: &[String],
     constants: &str,
     grouping: &mut dyn GroupingScheme,
-) {
+) -> Responsibility {
     let built = build(files, constants, grouping);
-    compute_responsibility(built.model, &built.query, built.grouping);
+    compute_responsibility(built.model, &built.query, built.grouping)
 }
 
 pub fn compute_responsibility(
     model: OptionalModel,
     query: &ProcessedQuery<API>,
     grouping: Grouping,
-) {
+) -> Responsibility {
     let model = model
         .try_with_atomic_propositions()
         .expect("Model must contain atomic propositions")
@@ -56,21 +58,24 @@ pub fn compute_responsibility(
         let goal_states = To1::with_entries(mdp.atomic_propositions[*goal].values().as_slice());
 
         let potentially_responsible = potentially_responsible_states(&mdp.base);
-        let grouping = grouping.restrict_to_potentially_responsible(&potentially_responsible);
+        let (restricted, link) =
+            grouping.restrict_to_potentially_responsible(&potentially_responsible);
         let parallel_groups = std::thread::available_parallelism().map_or(0, |n| n.get().ilog2());
         let coop_game = build_cooperative_game(
             mdp.base,
             mdp.initial.index,
             &goal_states,
-            &grouping,
+            &restricted,
             parallel_groups as usize,
             1e-6,
         );
-        let shapley_values = coop_game.shapley_values();
-        for (group, value) in grouping.groups.iter().zip(shapley_values.iter()) {
-            println!("{}: {value}", group.name);
+
+        let mut values = vec![0.0; grouping.groups.len()];
+        for (index, value) in coop_game.shapley_values().into_iter().enumerate() {
+            values[link.new_to_old_index(index)] = value;
         }
+        Responsibility::new(grouping.groups, values)
     } else {
-        println!("Unsupported model type: {:?}", model.base.model_type())
+        panic!("Unsupported model type: {:?}", model.base.model_type())
     }
 }
