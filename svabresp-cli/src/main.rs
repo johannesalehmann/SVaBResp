@@ -1,4 +1,5 @@
 use clap::Parser;
+use svabresp::compute_responsibility_from_files;
 use svabresp::grouping::{
     ActionGrouping, GroupingScheme, IndividualGrouping, LabelGrouping, ModuleGrouping,
     VariableGrouping,
@@ -66,7 +67,5 @@ impl Grouping {
 fn main() {
     let arguments = Arguments::parse();
     let mut grouping = arguments.grouping.scheme();
-    let built = svabresp::build::build(&arguments.files, &arguments.constants, grouping.as_mut());
-    println!("{}", built.model.info());
-    println!("Groups: {}", built.grouping.groups.len());
+    compute_responsibility_from_files(&arguments.files, &arguments.constants, grouping.as_mut());
 }
