@@ -17,6 +17,7 @@ pub mod coop_game_solver;
 pub mod grouping;
 pub mod preprocessing;
 pub mod responsibility;
+pub mod scheduler;
 pub mod shapley;
 
 pub fn compute_responsibility_from_files(
