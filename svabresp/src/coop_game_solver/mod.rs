@@ -1,6 +1,7 @@
 use crate::coop_game::CooperativeGame;
 use crate::coop_game_solver::mdp::{SolveWorker, SubGameSolver};
 use crate::grouping::{Grouping, StateIdx};
+use crate::scheduler::PartialScheduler;
 use prism_model_builder::To1;
 use probabilistic_models::DefaultIx;
 use probabilistic_models::base_model::Mdp;
@@ -16,11 +17,12 @@ pub fn build_cooperative_game(
     initial: StateIdx,
     goal: &To1<StateIdx, bool>,
     grouping: &Grouping,
+    scheduler: Option<&PartialScheduler>,
     parallel_groups: usize,
     eps: f64,
 ) -> CooperativeGame {
     let group_count = grouping.groups.len();
-    let solver = SubGameSolver::build(mdp, initial, goal, grouping);
+    let solver = SubGameSolver::build(mdp, initial, goal, grouping, scheduler);
     let mut worker = SolveWorker::new(&solver);
     let mut coalition_values = vec![0.0; 1 << group_count];
     coalition_values[0] = worker.solve_empty_coalition(eps);
@@ -125,6 +127,7 @@ mod tests {
                 StateIdx::from_raw(0),
                 &goal,
                 &grouping,
+                None,
                 parallel_groups,
                 1e-9,
             )

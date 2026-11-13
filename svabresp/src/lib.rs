@@ -67,6 +67,7 @@ pub fn compute_responsibility(
             mdp.initial.index,
             &goal_states,
             &restricted,
+            None,
             parallel_groups as usize,
             1e-6,
         );
