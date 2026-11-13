@@ -1,10 +1,14 @@
+use crate::coop_game_solver::mdp::owner::{Behaviour, Owner};
 use crate::grouping::{Grouping, StateIdx};
+use crate::scheduler::PartialScheduler;
 use prism_model_builder::To1;
 use probabilistic_model_algorithms::sccs::{ExcludeStatesAndChoices, Scc, Sccs};
-use probabilistic_models::base_model::{Mdp, TwoPlayer, TwoPlayerStochasticGame};
-use probabilistic_models::traits::{BuildChoiceBranchGraph, ReadStateSpace};
+use probabilistic_models::base_model::Mdp;
+use probabilistic_models::traits::{BuildChoiceBranchGraph, BuildStates, ReadStateSpace};
 use probabilistic_models::typed_index_collections::{Csr, index};
 use probabilistic_models::{BranchIndex, ChoiceIndex, DefaultIx, Index, Ix, StateIndex, Sub};
+
+pub mod owner;
 
 pub type SubIx = Sub<DefaultIx>;
 
@@ -88,6 +92,7 @@ impl SubGameSolver {
         initial: StateIdx,
         goal: &To1<StateIdx, bool>,
         grouping: &Grouping,
+        scheduler: Option<&PartialScheduler>,
     ) -> Self {
         assert!(
             grouping.groups.len() <= u64::BITS as usize,
@@ -114,7 +119,7 @@ impl SubGameSolver {
             let sub_game_index = SubGameIndex::from_raw(sub_games.len());
             global_to_local.add_scc(scc, sub_game_index, next_value_index);
             let (sub_game, successors) =
-                SubGame::build(&mdp, scc, &global_to_local, &always_helping);
+                SubGame::build(&mdp, scc, &global_to_local, &always_helping, scheduler);
             sub_games.add(sub_game);
             successors_per_sub_game.add(successors);
             next_value_index += scc.size();
@@ -152,7 +157,7 @@ impl SubGameSolver {
 pub struct SolveWorker<'a> {
     solver: &'a SubGameSolver,
     values: Vec<f64>,
-    owners: To1<SubGameIndex<DefaultIx>, To1<StateIndex<SubIx>, TwoPlayer>>,
+    owners: To1<SubGameIndex<DefaultIx>, To1<StateIndex<SubIx>, Owner>>,
     exit_values: To1<ChoiceIndex<SubIx>, f64>,
     values_before_adding_group: ValuesBeforeAddingGroup,
 }
@@ -166,7 +171,7 @@ impl<'a> SolveWorker<'a> {
             values,
             owners: To1::with_entries(
                 (solver.sub_games.iter())
-                    .map(|sub_game| sub_game.game.players.state_to_owner.clone())
+                    .map(|sub_game| sub_game.owners.clone())
                     .collect::<Vec<_>>(),
             ),
             exit_values: To1::new(),
@@ -184,7 +189,7 @@ impl<'a> SolveWorker<'a> {
     /// Adds `group` to the coalition, solves it and returns the value of the initial state.
     pub fn add_group_and_solve(&mut self, group: usize, eps: f64) -> f64 {
         self.values_before_adding_group.save(group, &self.values);
-        self.set_group_owner(group, TwoPlayer::Eve);
+        self.update_group_owners(group, Owner::join_coalition);
         let solver = self.solver;
         let dirty = &solver.group_dirty_flags[GroupIndex::from_raw(group as u32)];
         self.solve_sub_games(dirty, eps)
@@ -193,19 +198,19 @@ impl<'a> SolveWorker<'a> {
     /// Undoes [`Self::add_group_and_solve`] without solving. Every group added after `group` must
     /// already be removed.
     pub fn remove_group(&mut self, group: usize) {
-        self.set_group_owner(group, TwoPlayer::Adam);
+        self.update_group_owners(group, Owner::leave_coalition);
         self.values
             .copy_from_slice(self.values_before_adding_group.get(group));
     }
 
-    fn set_group_owner(&mut self, group: usize, owner: TwoPlayer) {
+    fn update_group_owners(&mut self, group: usize, update: impl Fn(&mut Owner)) {
         let groups = &self.solver.groups;
         for entry in groups
             .group_to_entries
             .index(GroupIndex::from_raw(group as u32))
         {
             let state = groups.entry_states[entry];
-            self.owners[state.sub_game][state.local_state] = owner;
+            update(&mut self.owners[state.sub_game][state.local_state]);
         }
     }
 
@@ -215,7 +220,7 @@ impl<'a> SolveWorker<'a> {
         for ((sub_game, owners), &dirty) in
             (sub_games.iter().zip(self.owners.entries())).zip(dirty.entries())
         {
-            let state_count = sub_game.game.states().len();
+            let state_count = sub_game.mdp.states().len();
             if dirty {
                 let (exit_values, own_values) = self.values.split_at_mut(first_value_index);
                 sub_game.rebuild_exits(exit_values, &mut self.exit_values);
@@ -296,7 +301,10 @@ struct ExternalTransition {
 }
 
 pub struct SubGame {
-    game: TwoPlayerStochasticGame<SubIx>,
+    mdp: Mdp<SubIx>,
+    owners: To1<StateIndex<SubIx>, Owner>,
+    // This is NaN when the scheduler isn't defined for this choice
+    scheduler_probabilities: To1<ChoiceIndex<SubIx>, f64>,
     choice_to_external_transition: Csr<ChoiceIndex<SubIx>, ExternalTransitionIndex<SubIx>>,
     external_transitions: To1<ExternalTransitionIndex<SubIx>, ExternalTransition>,
 }
@@ -307,25 +315,35 @@ impl SubGame {
         scc: Scc<'_, DefaultIx>,
         global_to_local: &GlobalToLocal,
         always_helping: &To1<StateIdx, bool>,
+        scheduler: Option<&PartialScheduler>,
     ) -> (Self, Vec<SubGameIndex<DefaultIx>>) {
         let mut successors = Vec::new();
-        let mut game = TwoPlayerStochasticGame::<SubIx>::default();
+        let mut sub_mdp = Mdp::<SubIx>::default();
+        let mut owners = To1::new();
+        let mut scheduler_probabilities = To1::new();
         let mut choice_to_external_transition = Csr::new();
         let mut external_transitions: To1<ExternalTransitionIndex<SubIx>, _> = To1::new();
         for model_state in scc.states() {
             let owner = if always_helping[model_state] {
-                TwoPlayer::Eve
+                Owner::MAXIMISER
+            } else if scheduler.is_some_and(|scheduler| scheduler.is_defined(model_state)) {
+                Owner::SCHEDULER
             } else {
-                TwoPlayer::Adam
+                Owner::MINIMISER
             };
-            game.add_state(owner);
+            owners.add(owner);
+            sub_mdp.add_state();
             for model_choice in mdp.choices_of_state(model_state) {
-                game.add_choice();
+                sub_mdp.add_choice();
+                scheduler_probabilities.add(
+                    scheduler.map_or(f64::NAN, |scheduler| scheduler.probability(model_choice)),
+                );
                 for branch in mdp.branches_of_choice(model_choice) {
                     let destination = mdp.branch_destination(branch);
                     let probability = mdp.branch_probability(branch);
                     if scc.contains(destination) {
-                        game.add_branch(probability, global_to_local.global_to_local(destination));
+                        sub_mdp
+                            .add_branch(probability, global_to_local.global_to_local(destination));
                     } else {
                         successors.extend(global_to_local.sub_game[destination]);
                         external_transitions.add(ExternalTransition {
@@ -342,7 +360,9 @@ impl SubGame {
         successors.sort_unstable();
         successors.dedup();
         let sub_game = Self {
-            game,
+            mdp: sub_mdp,
+            owners,
+            scheduler_probabilities,
             choice_to_external_transition,
             external_transitions,
         };
@@ -351,7 +371,7 @@ impl SubGame {
 
     fn rebuild_exits(&self, values: &[f64], exit_values: &mut To1<ChoiceIndex<SubIx>, f64>) {
         exit_values.clear();
-        for choice in self.game.choices() {
+        for choice in self.mdp.choices() {
             let exit_value = (self.choice_to_external_transition.index(choice).into_iter())
                 .map(|transition| {
                     let transition = &self.external_transitions[transition];
@@ -362,17 +382,19 @@ impl SubGame {
         }
     }
 
-    /// Solves the game using Gauss-Seidel value iteration. Eve maximises, Adam minimises.
+    /// Solves the game using Gauss-Seidel value iteration. If a state is in the coalition, it
+    /// maximises, otherwise, if the scheduler is defined for the state, it follows the scheduler
+    /// and otherwise, it minimises.
     ///
     /// `values` must contain a lower bound when `solve()` is called, as the values are not reset.
     fn solve(
         &self,
-        owners: &To1<StateIndex<SubIx>, TwoPlayer>,
+        owners: &To1<StateIndex<SubIx>, Owner>,
         exit_values: &To1<ChoiceIndex<SubIx>, f64>,
         values: &mut [f64],
         eps: f64,
     ) {
-        let graph = &self.game.graph;
+        let graph = &self.mdp.graph;
         let choice_ends = graph.state_to_choice.entries_raw();
         let owners = owners.entries();
         debug_assert_eq!(values.len(), choice_ends.len());
@@ -380,14 +402,18 @@ impl SubGame {
 
         let probabilities = &graph.branch_probabilities;
         let destinations = &graph.branch_destinations;
+        let scheduler_probabilities = &self.scheduler_probabilities;
         loop {
             let mut converged = true;
             let mut choice = ChoiceIndex::<SubIx>::from_raw(0);
             let mut branch = BranchIndex::<SubIx>::from_raw(0);
             for (state, (&choice_end, &owner)) in choice_ends.iter().zip(owners).enumerate() {
-                let maximise = owner == TwoPlayer::Eve;
+                let behaviour = owner.behaviour();
                 let has_choices = choice < choice_end;
-                let mut best_value = if maximise { 0.0 } else { f64::INFINITY };
+                let mut value = match behaviour {
+                    Behaviour::Maximise | Behaviour::FollowScheduler => 0.0,
+                    Behaviour::Minimise => f64::INFINITY,
+                };
                 while choice < choice_end {
                     let mut choice_value = exit_values[choice];
                     let branch_end = graph.choice_to_branch.index_raw(choice);
@@ -395,21 +421,23 @@ impl SubGame {
                         choice_value += probabilities[branch] * values[destinations[branch].raw()];
                         branch += 1;
                     }
-                    best_value = if maximise {
-                        best_value.max(choice_value)
-                    } else {
-                        best_value.min(choice_value)
+                    value = match behaviour {
+                        Behaviour::Maximise => value.max(choice_value),
+                        Behaviour::Minimise => value.min(choice_value),
+                        Behaviour::FollowScheduler => {
+                            value + scheduler_probabilities[choice] * choice_value
+                        }
                     };
                     choice += 1;
                 }
                 if !has_choices {
-                    best_value = 0.0;
+                    value = 0.0;
                 }
 
-                if (best_value - values[state]).abs() > eps * best_value {
+                if (value - values[state]).abs() > eps * value {
                     converged = false;
                 }
-                values[state] = best_value;
+                values[state] = value;
             }
             if converged {
                 break;
