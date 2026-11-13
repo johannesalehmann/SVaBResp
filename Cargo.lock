@@ -106,9 +106,9 @@ checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
 name = "cc"
-version = "1.11.1"
+version = "1.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ff2a8126fff0f8c839080d619675a585e61720bb12d2baceae45769fd66f155"
+checksum = "33ef9e3e8154a45c7a95cff4c1299702106ad94062d7bb85fdc5d3a5afd91d45"
 dependencies = [
  "find-msvc-tools",
  "shlex",
@@ -405,7 +405,7 @@ dependencies = [
 [[package]]
 name = "maybe-spanned-error-helper"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "ariadne",
  "prism-model",
@@ -511,7 +511,7 @@ dependencies = [
 [[package]]
 name = "prism-model"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "chumsky",
 ]
@@ -519,7 +519,7 @@ dependencies = [
 [[package]]
 name = "prism-model-builder"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "indexmap",
  "prism-model",
@@ -531,7 +531,7 @@ dependencies = [
 [[package]]
 name = "prism-parser"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "chumsky",
  "maybe-spanned-error-helper",
@@ -542,7 +542,7 @@ dependencies = [
 [[package]]
 name = "probabilistic-model-algorithms"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "probabilistic-models",
  "typed-index-collections",
@@ -551,7 +551,7 @@ dependencies = [
 [[package]]
 name = "probabilistic-models"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -562,7 +562,7 @@ dependencies = [
 [[package]]
 name = "probabilistic-properties"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 
 [[package]]
 name = "proc-macro2"
@@ -815,7 +815,7 @@ dependencies = [
 [[package]]
 name = "tiny-pmc"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "prism-model",
  "prism-model-builder",
@@ -829,7 +829,7 @@ dependencies = [
 [[package]]
 name = "typed-index-collections"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -838,7 +838,7 @@ dependencies = [
 [[package]]
 name = "umb-parser"
 version = "0.1.0"
-source = "git+https://github.com/johannesalehmann/tiny-pmc#fe315d72306efee9f478035836ff549d62483f4e"
+source = "git+https://github.com/johannesalehmann/tiny-pmc#e3847a057d85286c53483158bed39be46acdf740"
 dependencies = [
  "flate2",
  "indexmap",

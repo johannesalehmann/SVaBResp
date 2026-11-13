@@ -14,6 +14,8 @@ struct Arguments {
     grouping: Grouping,
     #[arg(short, long, default_value_t = String::new())]
     constants: String,
+    #[arg(short, long, value_name = "FILE")]
+    scheduler: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -71,6 +73,7 @@ fn main() {
         &arguments.files,
         &arguments.constants,
         grouping.as_mut(),
+        arguments.scheduler.as_deref(),
     );
     println!("{responsibility}");
 }
